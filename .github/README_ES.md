@@ -301,7 +301,7 @@ Este botón realiza todas las operaciones de limpieza y ejecuta el paquete de el
 
 ### Recompilar el Programa Usando C#
 Requisitos:
-- **.NET 6.0 SDK** o superior
+- **.NET 8.0 SDK** o superior
 - **Visual Studio 2022** o **Visual Studio Code**
 - Sistema operativo **Windows 10/11**
 
@@ -383,4 +383,5 @@ Usar este programa es completamente gratuito. No obtengo ningún ingreso de su u
 - El cumplimiento de las regulaciones legales es responsabilidad del usuario
 > [!IMPORTANT]
 > Toda la responsabilidad legal que surja del uso de este programa pertenece a la persona que lo usa. La aplicación está escrita y editada solo con fines educativos y de investigación; usar o no usar esta aplicación bajo estas condiciones es la propia elección del usuario. Este proyecto en la plataforma Github donde se comparten códigos de código abierto está escrito y editado con fines de intercambio de información y educación en programación.
+
 
