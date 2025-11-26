@@ -112,6 +112,7 @@ namespace SplitWireTurkey.Services
                     "roblox",
                     "Discord.exe",
                     "DiscordPTB.exe",
+                    "webcord.exe",
                     "SplitWire-Turkey.exe",
                     "Update.exe",
                     "RobloxPlayerBeta.exe",
@@ -135,7 +136,8 @@ namespace SplitWireTurkey.Services
                         "chromium.exe",
                         "iexplore.exe",
                         "Maxthon.exe",
-                        "librewolf.exe"
+                        "librewolf.exe",
+                        "electron.exe"
                     };
                     appPaths.AddRange(browserApps);
                 }
