@@ -302,7 +302,7 @@ Bu buton, tüm temizlik işlemlerini gerçekleştirip unins000.exe isimli kaldı
 
 ### C# Kullanarak Programı Tekrar Derleme
 Gereksinimler:
-- **.NET 6.0 SDK** veya üzeri
+- **.NET 8.0 SDK** veya üzeri
 - **Visual Studio 2022** veya **Visual Studio Code**
 - **Windows 10/11** işletim sistemi
 
