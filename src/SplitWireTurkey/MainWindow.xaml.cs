@@ -22,6 +22,7 @@ using System.Windows.Threading;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.IO.Compression;
 
 namespace SplitWireTurkey
 {
@@ -91,6 +92,7 @@ namespace SplitWireTurkey
         private const string REG_LAST_UPDATED = "LastUpdated";
         private const string REG_VERSION = "Version";
         private const string REG_LANGUAGE = "Language";
+        private const string REG_AUTO_DNS_CHANGE = "AutoDNSChange";
         
         // Dil değişkenleri
         private string _currentLanguage = "TR";
@@ -101,6 +103,7 @@ namespace SplitWireTurkey
         private double _animFinalOpacityTR = 1.0;
         private double _animFinalOpacityEN = 1.0;
         private double _animFinalOpacityRU = 1.0;
+        private double _animFinalOpacityES = 1.0;
         
         /// <summary>
         /// Uygulama versiyonunu alır
@@ -273,14 +276,14 @@ namespace SplitWireTurkey
         private double _mainPageBaseHeight = 610;
         private double _mainPageAdvancedSettingsHeight = 875;
         private double _byeDPIHeight = 640;
-        private double _discordHeight = 660;
+        private double _discordHeight = 800;
         private double _zapretBaseHeight = 670;
         private double _zapretManualParamsHeight = 765;
         private double _goodbyeDPIBaseHeight = 550;
         private double _goodbyeDPIManualParamsHeight = 80;
         private double _goodbyeDPIUseBlacklistHeight = 55;
         private double _goodbyeDPIEditBlacklistHeight = 120;
-        private double _advancedHeight = 780;
+        private double _advancedHeight = 830;
         
         // Switch durumları
         private bool _mainPageAdvancedSettingsActive = false;
@@ -360,6 +363,9 @@ namespace SplitWireTurkey
             // Registry'den dil ayarını yükle
             LoadLanguageFromRegistry();
             
+            // Registry'den Auto DNS Change ayarını yükle
+            LoadAutoDNSChangeFromRegistryAndApply();
+            
             // Animasyon son opacity değerlerini güncelle
             UpdateAnimFinalOpacityValues();
             
@@ -397,7 +403,8 @@ namespace SplitWireTurkey
                                 currentElement.Name == "btnLanguageSelector" ||
                                 currentElement.Name == "btnLanguageTR" ||
                                 currentElement.Name == "btnLanguageEN" ||
-                                currentElement.Name == "btnLanguageRU")
+                                currentElement.Name == "btnLanguageRU" ||
+                                currentElement.Name == "btnLanguageES")
                             {
                                 isLanguageElement = true;
                                 break;
@@ -446,7 +453,8 @@ namespace SplitWireTurkey
                                 currentElement.Name == "btnLanguageSelector" ||
                                 currentElement.Name == "btnLanguageTR" ||
                                 currentElement.Name == "btnLanguageEN" ||
-                                currentElement.Name == "btnLanguageRU")
+                                currentElement.Name == "btnLanguageRU" ||
+                                currentElement.Name == "btnLanguageES")
                             {
                                 isLanguageElement = true;
                                 break;
@@ -608,6 +616,40 @@ namespace SplitWireTurkey
         #region Registry Management
         
         /// <summary>
+        /// Belirtilen dosyayı Windows 8 uyumluluk moduna ayarlar
+        /// </summary>
+        /// <param name="filePath">Uyumluluk modu ayarlanacak dosyanın tam yolu</param>
+        private void SetWindows8CompatibilityMode(string filePath)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+                {
+                    Debug.WriteLine($"Dosya bulunamadı: {filePath}");
+                    return;
+                }
+
+                // Registry yolu: HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers
+                const string registryPath = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers";
+                
+                using (var key = Registry.CurrentUser.CreateSubKey(registryPath))
+                {
+                    if (key != null)
+                    {
+                        // Dosya yolunu key olarak, "WIN8RTM" değerini value olarak ayarla
+                        key.SetValue(filePath, "WIN8RTM", RegistryValueKind.String);
+                        Debug.WriteLine($"Windows 8 uyumluluk modu ayarlandı: {filePath}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Windows 8 uyumluluk modu ayarlanırken hata: {ex.Message}");
+                throw;
+            }
+        }
+        
+        /// <summary>
         /// Tema ayarını Registry'ye kaydeder
         /// </summary>
         /// <param name="isDarkMode">Karanlık mod aktif mi?</param>
@@ -680,6 +722,61 @@ namespace SplitWireTurkey
             {
                 Debug.WriteLine($"Tema ayarı Registry'den okunamadı: {ex.Message}, varsayılan aydınlık mod kullanılıyor");
                 return false; // Hata durumunda: aydınlık mod
+            }
+        }
+        
+        /// <summary>
+        /// Auto DNS Change switch durumunu Registry'ye kaydeder
+        /// </summary>
+        /// <param name="isEnabled">Auto DNS Change aktif mi?</param>
+        private void SaveAutoDNSChangeToRegistry(bool isEnabled)
+        {
+            try
+            {
+                using (var key = Registry.CurrentUser.CreateSubKey(REG_KEY_PATH))
+                {
+                    if (key != null)
+                    {
+                        key.SetValue(REG_AUTO_DNS_CHANGE, isEnabled ? 1 : 0, RegistryValueKind.DWord);
+                        Debug.WriteLine($"Auto DNS Change ayarı Registry'ye kaydedildi: {(isEnabled ? "Aktif" : "Pasif")}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Auto DNS Change ayarı Registry'ye kaydedilemedi: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Auto DNS Change switch durumunu Registry'den okur
+        /// </summary>
+        /// <returns>Auto DNS Change aktif mi? Hata durumunda true (varsayılan aktif)</returns>
+        private bool LoadAutoDNSChangeFromRegistry()
+        {
+            try
+            {
+                using (var key = Registry.CurrentUser.OpenSubKey(REG_KEY_PATH))
+                {
+                    if (key != null)
+                    {
+                        var autoDNSValue = key.GetValue(REG_AUTO_DNS_CHANGE);
+                        if (autoDNSValue != null && autoDNSValue is int)
+                        {
+                            var isEnabled = (int)autoDNSValue == 1;
+                            Debug.WriteLine($"Auto DNS Change ayarı Registry'den okundu: {(isEnabled ? "Aktif" : "Pasif")}");
+                            return isEnabled;
+                        }
+                    }
+                }
+                
+                Debug.WriteLine("Registry'de Auto DNS Change ayarı bulunamadı, varsayılan aktif kullanılıyor");
+                return true; // Varsayılan: aktif
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Auto DNS Change ayarı Registry'den okunamadı: {ex.Message}, varsayılan aktif kullanılıyor");
+                return true; // Hata durumunda: aktif
             }
         }
         
@@ -1242,15 +1339,34 @@ namespace SplitWireTurkey
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 };
 
+                // ES butonu animasyonu (dördüncü)
+                var esAnimation = new DoubleAnimation
+                {
+                    From = -50,
+                    To = 0,
+                    Duration = TimeSpan.FromMilliseconds(200),
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
+                
+                var esOpacityAnimation = new DoubleAnimation
+                {
+                    From = 0,
+                    To = _animFinalOpacityES,
+                    Duration = TimeSpan.FromMilliseconds(200),
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
+
                 // Başlangıç pozisyonlarını ayarla
                 btnLanguageTR.RenderTransform = new TranslateTransform(-50, 0);
                 btnLanguageEN.RenderTransform = new TranslateTransform(-50, 0);
                 btnLanguageRU.RenderTransform = new TranslateTransform(-50, 0);
+                btnLanguageES.RenderTransform = new TranslateTransform(-50, 0);
                 
                 // Başlangıç opacity değerlerini 0 yap (animasyon ile güncellenecek)
                 btnLanguageTR.Opacity = 0;
                 btnLanguageEN.Opacity = 0;
                 btnLanguageRU.Opacity = 0;
+                btnLanguageES.Opacity = 0;
 
                 // Animasyonları başlat (sıralı)
                 var trTransform = new TranslateTransform();
@@ -1282,6 +1398,18 @@ namespace SplitWireTurkey
                 };
                 ruTimer.Start();
 
+                // ES butonu 150ms gecikmeli
+                var esTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+                esTimer.Tick += (s, e) =>
+                {
+                    esTimer.Stop();
+                    var esTransform = new TranslateTransform();
+                    btnLanguageES.RenderTransform = esTransform;
+                    esTransform.BeginAnimation(TranslateTransform.XProperty, esAnimation);
+                    btnLanguageES.BeginAnimation(UIElement.OpacityProperty, esOpacityAnimation);
+                };
+                esTimer.Start();
+
                 // Animasyon bitince tooltip'leri yeniden etkinleştir
                 var completionTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
                 completionTimer.Tick += (s, e) =>
@@ -1311,7 +1439,24 @@ namespace SplitWireTurkey
                 _isLanguageAnimationRunning = true;
                 UpdateLanguageTooltipVisibility();
 
-                // RU butonu animasyonu (ilk kapanan)
+                // ES butonu animasyonu (ilk kapanan)
+                var esAnimation = new DoubleAnimation
+                {
+                    From = 0,
+                    To = -50,
+                    Duration = TimeSpan.FromMilliseconds(150),
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+                };
+                
+                var esOpacityAnimation = new DoubleAnimation
+                {
+                    From = _animFinalOpacityES,
+                    To = 0,
+                    Duration = TimeSpan.FromMilliseconds(150),
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+                };
+
+                // RU butonu animasyonu (ikinci kapanan)
                 var ruAnimation = new DoubleAnimation
                 {
                     From = 0,
@@ -1363,13 +1508,25 @@ namespace SplitWireTurkey
                 };
 
                 // Animasyonları başlat (sıralı)
+                var esTransform = new TranslateTransform();
+                btnLanguageES.RenderTransform = esTransform;
+                esTransform.BeginAnimation(TranslateTransform.XProperty, esAnimation);
+                btnLanguageES.BeginAnimation(UIElement.OpacityProperty, esOpacityAnimation);
+
+                // RU butonu 30ms gecikmeli
+                var ruTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) };
+                ruTimer.Tick += (s, e) =>
+                {
+                    ruTimer.Stop();
                 var ruTransform = new TranslateTransform();
                 btnLanguageRU.RenderTransform = ruTransform;
                 ruTransform.BeginAnimation(TranslateTransform.XProperty, ruAnimation);
                 btnLanguageRU.BeginAnimation(UIElement.OpacityProperty, ruOpacityAnimation);
+                };
+                ruTimer.Start();
 
-                // EN butonu 30ms gecikmeli
-                var enTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) };
+                // EN butonu 60ms gecikmeli
+                var enTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(60) };
                 enTimer.Tick += (s, e) =>
                 {
                     enTimer.Stop();
@@ -1380,8 +1537,8 @@ namespace SplitWireTurkey
                 };
                 enTimer.Start();
 
-                // TR butonu 60ms gecikmeli
-                var trTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(60) };
+                // TR butonu 90ms gecikmeli
+                var trTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(90) };
                 trTimer.Tick += (s, e) =>
                 {
                     trTimer.Stop();
@@ -1470,6 +1627,27 @@ namespace SplitWireTurkey
                 if (result == MessageBoxResult.Yes)
                 {
                     SetLanguage("RU");
+                    RestartApplication();
+                }
+            }
+        }
+
+        /// <summary>
+        /// İspanyolca dil seçimi
+        /// </summary>
+        private void BtnLanguageES_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentLanguage != "ES")
+            {
+                var result = System.Windows.MessageBox.Show(
+                    LanguageManager.GetText("messages", "language_change_confirm_es"),
+                    LanguageManager.GetText("messages", "language_change_title_es"),
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+                
+                if (result == MessageBoxResult.Yes)
+                {
+                    SetLanguage("ES");
                     RestartApplication();
                 }
             }
@@ -1570,6 +1748,7 @@ namespace SplitWireTurkey
                 _animFinalOpacityTR = 1.0;
                 _animFinalOpacityEN = 1.0;
                 _animFinalOpacityRU = 1.0;
+                _animFinalOpacityES = 1.0;
                 
                 // Seçili olmayan butonları %50 parlaklığa ayarla
                 switch (_currentLanguage)
@@ -1577,14 +1756,22 @@ namespace SplitWireTurkey
                     case "TR":
                         _animFinalOpacityEN = 0.5;
                         _animFinalOpacityRU = 0.5;
+                        _animFinalOpacityES = 0.5;
                         break;
                     case "EN":
                         _animFinalOpacityTR = 0.5;
                         _animFinalOpacityRU = 0.5;
+                        _animFinalOpacityES = 0.5;
                         break;
                     case "RU":
                         _animFinalOpacityTR = 0.5;
                         _animFinalOpacityEN = 0.5;
+                        _animFinalOpacityES = 0.5;
+                        break;
+                    case "ES":
+                        _animFinalOpacityTR = 0.5;
+                        _animFinalOpacityEN = 0.5;
+                        _animFinalOpacityRU = 0.5;
                         break;
                 }
             }
@@ -1756,6 +1943,9 @@ namespace SplitWireTurkey
                 if (btnDiscordPTBRemove != null)
                     btnDiscordPTBRemove.Content = LanguageManager.GetText("buttons", "remove");
 
+                if (btnWebCordRemove != null)
+                    btnWebCordRemove.Content = LanguageManager.GetText("buttons", "remove");
+
                 // Gelişmiş butonları
                 if (btnRemoveAllServices != null)
                     btnRemoveAllServices.Content = LanguageManager.GetText("buttons", "remove_all_services");
@@ -1837,8 +2027,163 @@ namespace SplitWireTurkey
                 if (txtBrowserTunnelingMain != null)
                     txtBrowserTunnelingMain.Text = LanguageManager.GetText("ui_texts", "browser_tunneling");
                 
+                if (txtWireSockRepeater != null)
+                    txtWireSockRepeater.Text = LanguageManager.GetText("ui_texts", "wiresock_repeater");
+                
+                if (txtAutoDNSChange != null)
+                    txtAutoDNSChange.Text = LanguageManager.GetText("ui_texts", "auto_dns_change");
+                
                 if (txtBrowserTunnelingByeDPI != null)
                     txtBrowserTunnelingByeDPI.Text = LanguageManager.GetText("ui_texts", "browser_tunneling");
+                
+                // WireSock sekmesi tooltip'leri
+                if (tooltipStandardInstall != null)
+                    tooltipStandardInstall.Content = LanguageManager.GetText("ui_texts", "tooltip_standard_install");
+                
+                if (tooltipAlternativeInstall != null)
+                    tooltipAlternativeInstall.Content = LanguageManager.GetText("ui_texts", "tooltip_alternative_install");
+                
+                if (tooltipBrowserTunneling != null)
+                    tooltipBrowserTunneling.Content = LanguageManager.GetText("ui_texts", "tooltip_browser_tunneling");
+                
+                if (tooltipWireSockRepeater != null)
+                    tooltipWireSockRepeater.Content = LanguageManager.GetText("ui_texts", "tooltip_wiresock_repeater");
+                
+                if (tooltipFolderCustomization != null)
+                    tooltipFolderCustomization.Content = LanguageManager.GetText("ui_texts", "tooltip_folder_customization");
+                
+                if (tooltipAddFolder != null)
+                    tooltipAddFolder.Content = LanguageManager.GetText("ui_texts", "tooltip_add_folder");
+                
+                if (tooltipClearList != null)
+                    tooltipClearList.Content = LanguageManager.GetText("ui_texts", "tooltip_clear_list");
+                
+                if (tooltipCustomInstall != null)
+                    tooltipCustomInstall.Content = LanguageManager.GetText("ui_texts", "tooltip_custom_install");
+                
+                if (tooltipGenerateConfig != null)
+                    tooltipGenerateConfig.Content = LanguageManager.GetText("ui_texts", "tooltip_generate_config");
+                
+                // ByeDPI sekmesi tooltip'leri
+                if (tooltipByeDPISplit != null)
+                    tooltipByeDPISplit.Content = LanguageManager.GetText("ui_texts", "tooltip_byedpi_split");
+                
+                if (tooltipByeDPIBrowserTunneling != null)
+                    tooltipByeDPIBrowserTunneling.Content = LanguageManager.GetText("ui_texts", "tooltip_byedpi_browser_tunneling");
+                
+                if (tooltipByeDPIDLL != null)
+                    tooltipByeDPIDLL.Content = LanguageManager.GetText("ui_texts", "tooltip_byedpi_dll");
+                
+                // Zapret sekmesi tooltip'leri
+                if (tooltipZapretAuto != null)
+                    tooltipZapretAuto.Content = LanguageManager.GetText("ui_texts", "tooltip_zapret_auto");
+                
+                if (tooltipScan != null)
+                    tooltipScan.Content = LanguageManager.GetText("ui_texts", "tooltip_scan");
+                
+                if (tooltipPreset != null)
+                    tooltipPreset.Content = LanguageManager.GetText("ui_texts", "tooltip_preset");
+                
+                if (tooltipEditPreset != null)
+                    tooltipEditPreset.Content = LanguageManager.GetText("ui_texts", "tooltip_edit_preset");
+                
+                if (tooltipPresetService != null)
+                    tooltipPresetService.Content = LanguageManager.GetText("ui_texts", "tooltip_preset_service");
+                
+                if (tooltipPresetOnce != null)
+                    tooltipPresetOnce.Content = LanguageManager.GetText("ui_texts", "tooltip_preset_once");
+                
+                // GoodbyeDPI sekmesi tooltip'leri
+                if (tooltipGoodbyeDPIPreset != null)
+                    tooltipGoodbyeDPIPreset.Content = LanguageManager.GetText("ui_texts", "tooltip_goodbyedpi_preset");
+                
+                if (tooltipGoodbyeDPIEditPreset != null)
+                    tooltipGoodbyeDPIEditPreset.Content = LanguageManager.GetText("ui_texts", "tooltip_goodbyedpi_edit_preset");
+                
+                if (tooltipGoodbyeDPIUseBlacklist != null)
+                    tooltipGoodbyeDPIUseBlacklist.Content = LanguageManager.GetText("ui_texts", "tooltip_goodbyedpi_use_blacklist");
+                
+                if (tooltipGoodbyeDPIEditBlacklist != null)
+                    tooltipGoodbyeDPIEditBlacklist.Content = LanguageManager.GetText("ui_texts", "tooltip_goodbyedpi_edit_blacklist");
+                
+                if (tooltipGoodbyeDPISaveBlacklist != null)
+                    tooltipGoodbyeDPISaveBlacklist.Content = LanguageManager.GetText("ui_texts", "tooltip_goodbyedpi_save_blacklist");
+                
+                if (tooltipGoodbyeDPIService != null)
+                    tooltipGoodbyeDPIService.Content = LanguageManager.GetText("ui_texts", "tooltip_goodbyedpi_service");
+                
+                if (tooltipGoodbyeDPIOnce != null)
+                    tooltipGoodbyeDPIOnce.Content = LanguageManager.GetText("ui_texts", "tooltip_goodbyedpi_once");
+                
+                // Onarım sekmesi tooltip'leri
+                if (tooltipDiscordRepair != null)
+                    tooltipDiscordRepair.Content = LanguageManager.GetText("ui_texts", "tooltip_discord_repair");
+                
+                if (tooltipDiscordPTBInstall != null)
+                    tooltipDiscordPTBInstall.Content = LanguageManager.GetText("ui_texts", "tooltip_discord_ptb_install");
+                
+                if (tooltipCleanInstallPTB != null)
+                    tooltipCleanInstallPTB.Content = LanguageManager.GetText("ui_texts", "tooltip_clean_install_ptb");
+
+                // WebCord tooltip'leri
+                if (tooltipWebCordInstall != null)
+                    tooltipWebCordInstall.Content = LanguageManager.GetText("ui_texts", "tooltip_webcord_install");
+                if (tooltipWebCordShortcut != null)
+                    tooltipWebCordShortcut.Content = LanguageManager.GetText("ui_texts", "tooltip_webcord_shortcut");
+                if (tooltipWebCordAction != null)
+                    tooltipWebCordAction.Content = LanguageManager.GetText("ui_texts", "tooltip_start");
+                if (tooltipWebCordRemove != null)
+                    tooltipWebCordRemove.Content = LanguageManager.GetText("ui_texts", "tooltip_discord_remove");
+                
+                // Kaldır butonları tooltip'leri
+                if (tooltipDiscordRemove != null)
+                    tooltipDiscordRemove.Content = LanguageManager.GetText("ui_texts", "tooltip_remove");
+                
+                if (tooltipDiscordPTBRemove != null)
+                    tooltipDiscordPTBRemove.Content = LanguageManager.GetText("ui_texts", "tooltip_remove");
+                
+                // Discord action butonları tooltip'leri dinamik olarak güncellenecek
+                UpdateDiscordActionTooltips();
+                
+                // Gelişmiş sekmesi tooltip'leri
+                if (tooltipRemoveService != null)
+                    tooltipRemoveService.Content = LanguageManager.GetText("ui_texts", "tooltip_remove_service");
+                
+                if (tooltipByeDPIRemoveService != null)
+                    tooltipByeDPIRemoveService.Content = LanguageManager.GetText("ui_texts", "tooltip_remove_service");
+                
+                if (tooltipProxiFyreRemoveService != null)
+                    tooltipProxiFyreRemoveService.Content = LanguageManager.GetText("ui_texts", "tooltip_remove_service");
+                
+                if (tooltipWinWS1RemoveService != null)
+                    tooltipWinWS1RemoveService.Content = LanguageManager.GetText("ui_texts", "tooltip_remove_service");
+                
+                if (tooltipWinWS2RemoveService != null)
+                    tooltipWinWS2RemoveService.Content = LanguageManager.GetText("ui_texts", "tooltip_remove_service");
+                
+                if (tooltipZapretServiceRemoveService != null)
+                    tooltipZapretServiceRemoveService.Content = LanguageManager.GetText("ui_texts", "tooltip_remove_service");
+                
+                if (tooltipGoodbyeDPIAdvancedRemoveService != null)
+                    tooltipGoodbyeDPIAdvancedRemoveService.Content = LanguageManager.GetText("ui_texts", "tooltip_remove_service");
+                
+                if (tooltipWinDivertRemoveService != null)
+                    tooltipWinDivertRemoveService.Content = LanguageManager.GetText("ui_texts", "tooltip_remove_service");
+                
+                if (tooltipDroverRemoveService != null)
+                    tooltipDroverRemoveService.Content = LanguageManager.GetText("ui_texts", "tooltip_remove_service");
+                
+                if (tooltipAutoDNSChange != null)
+                    tooltipAutoDNSChange.Content = LanguageManager.GetText("ui_texts", "tooltip_auto_dns_change");
+                
+                if (tooltipRemoveAllServices != null)
+                    tooltipRemoveAllServices.Content = LanguageManager.GetText("ui_texts", "tooltip_remove_all_services");
+                
+                if (tooltipResetDNSDoH != null)
+                    tooltipResetDNSDoH.Content = LanguageManager.GetText("ui_texts", "tooltip_reset_dns_doh");
+                
+                if (tooltipUninstallSplitWire != null)
+                    tooltipUninstallSplitWire.Content = LanguageManager.GetText("ui_texts", "tooltip_uninstall_splitwire");
                 
                 if (txtFolderCustomization != null)
                     txtFolderCustomization.Text = LanguageManager.GetText("ui_texts", "folder_customization");
@@ -1878,6 +2223,12 @@ namespace SplitWireTurkey
                 // Onarım metinleri
                 if (txtCleanInstallPTB != null)
                     txtCleanInstallPTB.Text = LanguageManager.GetText("ui_texts", "clean_install_ptb");
+
+                // WebCord butonları
+                if (btnWebCordInstall != null)
+                    btnWebCordInstall.Content = LanguageManager.GetText("ui_texts", "install_webcord");
+                if (txtWebCordShortcut != null)
+                    txtWebCordShortcut.Text = LanguageManager.GetText("ui_texts", "webcord_shortcut");
 
                 // Gelişmiş metinleri
                 if (txtServices != null)
@@ -1926,7 +2277,7 @@ namespace SplitWireTurkey
                     if (themeKey != null)
                     {
                         var language = themeKey.GetValue(REG_LANGUAGE) as string;
-                        if (!string.IsNullOrEmpty(language) && (language == "TR" || language == "EN" || language == "RU"))
+                        if (!string.IsNullOrEmpty(language) && (language == "TR" || language == "EN" || language == "RU" || language == "ES"))
                         {
                             _currentLanguage = language;
                             WriteUpdateLog($"Registry'den dil yüklendi: {language}");
@@ -1983,6 +2334,8 @@ namespace SplitWireTurkey
                 btnLanguageEN.Opacity = 1.0;
                 btnLanguageRU.BorderThickness = new Thickness(0);
                 btnLanguageRU.Opacity = 1.0;
+                btnLanguageES.BorderThickness = new Thickness(0);
+                btnLanguageES.Opacity = 1.0;
 
                 // Tooltip'lerin tema desteğini güncelle (animasyon çalışmıyorsa)
                 if (!_isLanguageAnimationRunning)
@@ -1999,6 +2352,7 @@ namespace SplitWireTurkey
                         btnLanguageTR.Opacity = 1.0; // Seçili - tam parlaklık
                         btnLanguageEN.Opacity = 0.5; // Seçili değil - %50 parlaklık
                         btnLanguageRU.Opacity = 0.5; // Seçili değil - %50 parlaklık
+                        btnLanguageES.Opacity = 0.5; // Seçili değil - %50 parlaklık
                         break;
                     case "EN":
                         btnLanguageEN.BorderThickness = borderThickness;
@@ -2006,6 +2360,7 @@ namespace SplitWireTurkey
                         btnLanguageEN.Opacity = 1.0; // Seçili - tam parlaklık
                         btnLanguageTR.Opacity = 0.5; // Seçili değil - %50 parlaklık
                         btnLanguageRU.Opacity = 0.5; // Seçili değil - %50 parlaklık
+                        btnLanguageES.Opacity = 0.5; // Seçili değil - %50 parlaklık
                         break;
                     case "RU":
                         btnLanguageRU.BorderThickness = borderThickness;
@@ -2013,6 +2368,15 @@ namespace SplitWireTurkey
                         btnLanguageRU.Opacity = 1.0; // Seçili - tam parlaklık
                         btnLanguageTR.Opacity = 0.5; // Seçili değil - %50 parlaklık
                         btnLanguageEN.Opacity = 0.5; // Seçili değil - %50 parlaklık
+                        btnLanguageES.Opacity = 0.5; // Seçili değil - %50 parlaklık
+                        break;
+                    case "ES":
+                        btnLanguageES.BorderThickness = borderThickness;
+                        btnLanguageES.BorderBrush = borderColor;
+                        btnLanguageES.Opacity = 1.0; // Seçili - tam parlaklık
+                        btnLanguageTR.Opacity = 0.5; // Seçili değil - %50 parlaklık
+                        btnLanguageEN.Opacity = 0.5; // Seçili değil - %50 parlaklık
+                        btnLanguageRU.Opacity = 0.5; // Seçili değil - %50 parlaklık
                         break;
                 }
             }
@@ -2058,10 +2422,357 @@ namespace SplitWireTurkey
                     ruTooltip.Background = tooltipBackground;
                     ruTooltip.Foreground = tooltipForeground;
                 }
+
+                // ES butonu tooltip'i
+                if (btnLanguageES.ToolTip is System.Windows.Controls.ToolTip esTooltip)
+                {
+                    esTooltip.Background = tooltipBackground;
+                    esTooltip.Foreground = tooltipForeground;
+                }
+                
+                // WireSock sekmesi tooltip'leri
+                if (tooltipStandardInstall != null)
+                {
+                    tooltipStandardInstall.Background = tooltipBackground;
+                    tooltipStandardInstall.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipAlternativeInstall != null)
+                {
+                    tooltipAlternativeInstall.Background = tooltipBackground;
+                    tooltipAlternativeInstall.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipBrowserTunneling != null)
+                {
+                    tooltipBrowserTunneling.Background = tooltipBackground;
+                    tooltipBrowserTunneling.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipWireSockRepeater != null)
+                {
+                    tooltipWireSockRepeater.Background = tooltipBackground;
+                    tooltipWireSockRepeater.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipFolderCustomization != null)
+                {
+                    tooltipFolderCustomization.Background = tooltipBackground;
+                    tooltipFolderCustomization.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipAddFolder != null)
+                {
+                    tooltipAddFolder.Background = tooltipBackground;
+                    tooltipAddFolder.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipClearList != null)
+                {
+                    tooltipClearList.Background = tooltipBackground;
+                    tooltipClearList.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipCustomInstall != null)
+                {
+                    tooltipCustomInstall.Background = tooltipBackground;
+                    tooltipCustomInstall.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipGenerateConfig != null)
+                {
+                    tooltipGenerateConfig.Background = tooltipBackground;
+                    tooltipGenerateConfig.Foreground = tooltipForeground;
+                }
+                
+                // ByeDPI sekmesi tooltip'leri
+                if (tooltipByeDPISplit != null)
+                {
+                    tooltipByeDPISplit.Background = tooltipBackground;
+                    tooltipByeDPISplit.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipByeDPIBrowserTunneling != null)
+                {
+                    tooltipByeDPIBrowserTunneling.Background = tooltipBackground;
+                    tooltipByeDPIBrowserTunneling.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipByeDPIDLL != null)
+                {
+                    tooltipByeDPIDLL.Background = tooltipBackground;
+                    tooltipByeDPIDLL.Foreground = tooltipForeground;
+                }
+                
+                // Zapret sekmesi tooltip'leri
+                if (tooltipZapretAuto != null)
+                {
+                    tooltipZapretAuto.Background = tooltipBackground;
+                    tooltipZapretAuto.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipScan != null)
+                {
+                    tooltipScan.Background = tooltipBackground;
+                    tooltipScan.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipPreset != null)
+                {
+                    tooltipPreset.Background = tooltipBackground;
+                    tooltipPreset.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipEditPreset != null)
+                {
+                    tooltipEditPreset.Background = tooltipBackground;
+                    tooltipEditPreset.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipPresetService != null)
+                {
+                    tooltipPresetService.Background = tooltipBackground;
+                    tooltipPresetService.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipPresetOnce != null)
+                {
+                    tooltipPresetOnce.Background = tooltipBackground;
+                    tooltipPresetOnce.Foreground = tooltipForeground;
+                }
+                
+                // GoodbyeDPI sekmesi tooltip'leri
+                if (tooltipGoodbyeDPIPreset != null)
+                {
+                    tooltipGoodbyeDPIPreset.Background = tooltipBackground;
+                    tooltipGoodbyeDPIPreset.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipGoodbyeDPIEditPreset != null)
+                {
+                    tooltipGoodbyeDPIEditPreset.Background = tooltipBackground;
+                    tooltipGoodbyeDPIEditPreset.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipGoodbyeDPIUseBlacklist != null)
+                {
+                    tooltipGoodbyeDPIUseBlacklist.Background = tooltipBackground;
+                    tooltipGoodbyeDPIUseBlacklist.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipGoodbyeDPIEditBlacklist != null)
+                {
+                    tooltipGoodbyeDPIEditBlacklist.Background = tooltipBackground;
+                    tooltipGoodbyeDPIEditBlacklist.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipGoodbyeDPISaveBlacklist != null)
+                {
+                    tooltipGoodbyeDPISaveBlacklist.Background = tooltipBackground;
+                    tooltipGoodbyeDPISaveBlacklist.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipGoodbyeDPIService != null)
+                {
+                    tooltipGoodbyeDPIService.Background = tooltipBackground;
+                    tooltipGoodbyeDPIService.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipGoodbyeDPIOnce != null)
+                {
+                    tooltipGoodbyeDPIOnce.Background = tooltipBackground;
+                    tooltipGoodbyeDPIOnce.Foreground = tooltipForeground;
+                }
+                
+                // Onarım sekmesi tooltip'leri
+                if (tooltipDiscordRepair != null)
+                {
+                    tooltipDiscordRepair.Background = tooltipBackground;
+                    tooltipDiscordRepair.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipDiscordPTBInstall != null)
+                {
+                    tooltipDiscordPTBInstall.Background = tooltipBackground;
+                    tooltipDiscordPTBInstall.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipCleanInstallPTB != null)
+                {
+                    tooltipCleanInstallPTB.Background = tooltipBackground;
+                    tooltipCleanInstallPTB.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipDiscordAction != null)
+                {
+                    tooltipDiscordAction.Background = tooltipBackground;
+                    tooltipDiscordAction.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipDiscordRemove != null)
+                {
+                    tooltipDiscordRemove.Background = tooltipBackground;
+                    tooltipDiscordRemove.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipDiscordPTBAction != null)
+                {
+                    tooltipDiscordPTBAction.Background = tooltipBackground;
+                    tooltipDiscordPTBAction.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipDiscordPTBRemove != null)
+                {
+                    tooltipDiscordPTBRemove.Background = tooltipBackground;
+                    tooltipDiscordPTBRemove.Foreground = tooltipForeground;
+                }
+
+                // WebCord tooltip'leri
+                if (tooltipWebCordInstall != null)
+                {
+                    tooltipWebCordInstall.Background = tooltipBackground;
+                    tooltipWebCordInstall.Foreground = tooltipForeground;
+                }
+
+                if (tooltipWebCordShortcut != null)
+                {
+                    tooltipWebCordShortcut.Background = tooltipBackground;
+                    tooltipWebCordShortcut.Foreground = tooltipForeground;
+                }
+
+                if (tooltipWebCordAction != null)
+                {
+                    tooltipWebCordAction.Background = tooltipBackground;
+                    tooltipWebCordAction.Foreground = tooltipForeground;
+                }
+
+                if (tooltipWebCordRemove != null)
+                {
+                    tooltipWebCordRemove.Background = tooltipBackground;
+                    tooltipWebCordRemove.Foreground = tooltipForeground;
+                }
+
+                // Gelişmiş sekmesi tooltip'leri
+                if (tooltipRemoveService != null)
+                {
+                    tooltipRemoveService.Background = tooltipBackground;
+                    tooltipRemoveService.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipByeDPIRemoveService != null)
+                {
+                    tooltipByeDPIRemoveService.Background = tooltipBackground;
+                    tooltipByeDPIRemoveService.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipProxiFyreRemoveService != null)
+                {
+                    tooltipProxiFyreRemoveService.Background = tooltipBackground;
+                    tooltipProxiFyreRemoveService.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipWinWS1RemoveService != null)
+                {
+                    tooltipWinWS1RemoveService.Background = tooltipBackground;
+                    tooltipWinWS1RemoveService.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipWinWS2RemoveService != null)
+                {
+                    tooltipWinWS2RemoveService.Background = tooltipBackground;
+                    tooltipWinWS2RemoveService.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipZapretServiceRemoveService != null)
+                {
+                    tooltipZapretServiceRemoveService.Background = tooltipBackground;
+                    tooltipZapretServiceRemoveService.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipGoodbyeDPIAdvancedRemoveService != null)
+                {
+                    tooltipGoodbyeDPIAdvancedRemoveService.Background = tooltipBackground;
+                    tooltipGoodbyeDPIAdvancedRemoveService.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipWinDivertRemoveService != null)
+                {
+                    tooltipWinDivertRemoveService.Background = tooltipBackground;
+                    tooltipWinDivertRemoveService.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipDroverRemoveService != null)
+                {
+                    tooltipDroverRemoveService.Background = tooltipBackground;
+                    tooltipDroverRemoveService.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipAutoDNSChange != null)
+                {
+                    tooltipAutoDNSChange.Background = tooltipBackground;
+                    tooltipAutoDNSChange.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipRemoveAllServices != null)
+                {
+                    tooltipRemoveAllServices.Background = tooltipBackground;
+                    tooltipRemoveAllServices.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipResetDNSDoH != null)
+                {
+                    tooltipResetDNSDoH.Background = tooltipBackground;
+                    tooltipResetDNSDoH.Foreground = tooltipForeground;
+                }
+                
+                if (tooltipUninstallSplitWire != null)
+                {
+                    tooltipUninstallSplitWire.Background = tooltipBackground;
+                    tooltipUninstallSplitWire.Foreground = tooltipForeground;
+                }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Dil buton tooltip'leri güncellenirken hata: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Discord action butonlarının tooltip'lerini dinamik olarak günceller
+        /// </summary>
+        private void UpdateDiscordActionTooltips()
+        {
+            try
+            {
+                if (btnDiscordAction != null && tooltipDiscordAction != null)
+                {
+                    var content = btnDiscordAction.Content?.ToString();
+                    if (content == LanguageManager.GetText("buttons", "start"))
+                    {
+                        tooltipDiscordAction.Content = LanguageManager.GetText("ui_texts", "tooltip_start");
+                    }
+                    else if (content == LanguageManager.GetText("buttons", "install"))
+                    {
+                        tooltipDiscordAction.Content = LanguageManager.GetText("ui_texts", "tooltip_install");
+                    }
+                }
+                
+                if (btnDiscordPTBAction != null && tooltipDiscordPTBAction != null)
+                {
+                    var content = btnDiscordPTBAction.Content?.ToString();
+                    if (content == LanguageManager.GetText("buttons", "start"))
+                    {
+                        tooltipDiscordPTBAction.Content = LanguageManager.GetText("ui_texts", "tooltip_start");
+                    }
+                    else if (content == LanguageManager.GetText("buttons", "install"))
+                    {
+                        tooltipDiscordPTBAction.Content = LanguageManager.GetText("ui_texts", "tooltip_install");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Discord action tooltip'leri güncellenirken hata: {ex.Message}");
             }
         }
 
@@ -2078,6 +2789,7 @@ namespace SplitWireTurkey
                     btnLanguageTR.ToolTip = null;
                     btnLanguageEN.ToolTip = null;
                     btnLanguageRU.ToolTip = null;
+                    btnLanguageES.ToolTip = null;
                 }
                 else
                 {
@@ -2139,6 +2851,17 @@ namespace SplitWireTurkey
                     Foreground = tooltipForeground
                 };
                 btnLanguageRU.ToolTip = ruTooltip;
+
+                // ES butonu tooltip'i
+                var esTooltip = new System.Windows.Controls.ToolTip
+                {
+                    Content = "Español",
+                    FontFamily = new FontFamily("Poppins Regular"),
+                    FontSize = 12,
+                    Background = tooltipBackground,
+                    Foreground = tooltipForeground
+                };
+                btnLanguageES.ToolTip = esTooltip;
             }
             catch (Exception ex)
             {
@@ -3178,8 +3901,11 @@ namespace SplitWireTurkey
                 await CleanupDroverFilesAsync();
                 File.AppendAllText(standardLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 3.1. Drover dosyaları temizleme tamamlandı.\n");
                 
+                // DNS ayarları (sadece switch aktifse)
+                var enableAutoDNS = Dispatcher.Invoke(() => chkAutoDNSChange.IsChecked == true);
+                if (enableAutoDNS)
+                {
                 File.AppendAllText(standardLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 3.2. DNS ayarları yapılıyor...\n");
-                // DNS ayarları
                 var dnsSuccess = await SetModernDNSSettingsAsync();
                 
                 if (!dnsSuccess)
@@ -3189,6 +3915,11 @@ namespace SplitWireTurkey
                 else
                 {
                     File.AppendAllText(standardLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 3.2. DNS ayarları başarıyla yapıldı.\n");
+                    }
+                }
+                else
+                {
+                    File.AppendAllText(standardLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 3.2. DNS ayarları atlandı (switch kapalı).\n");
                 }
 
                 File.AppendAllText(standardLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 3.3. WireGuard profili oluşturuluyor...\n");
@@ -3212,7 +3943,10 @@ namespace SplitWireTurkey
                     {
                         File.AppendAllText(standardLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 3.4. WireSock hizmeti başarıyla kuruldu.\n");
                         
-                        // WireSock Refresh görevini oluştur
+                        // WireSock Refresh görevini oluştur (sadece switch aktifse)
+                        var enableRepeater = Dispatcher.Invoke(() => chkWireSockRepeater.IsChecked == true);
+                        if (enableRepeater)
+                        {
                         File.AppendAllText(standardLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 3.5. WireSock Refresh görevi oluşturuluyor...\n");
                         var refreshTaskSuccess = await CreateWireSockRefreshTaskAsync();
                         if (refreshTaskSuccess)
@@ -3222,6 +3956,11 @@ namespace SplitWireTurkey
                         else
                         {
                             File.AppendAllText(standardLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 3.5. UYARI: WireSock Refresh görevi oluşturulamadı.\n");
+                            }
+                        }
+                        else
+                        {
+                            File.AppendAllText(standardLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 3.5. WireSock Refresh görevi oluşturulmayacak (switch kapalı).\n");
                         }
                         
                         File.AppendAllText(standardLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 3.6. Sistem yeniden başlatma mesajı gösteriliyor.\n");
@@ -3265,7 +4004,10 @@ namespace SplitWireTurkey
                 File.AppendAllText(logPath, "Drover dosyaları temizleniyor...\n");
                 await CleanupDroverFilesAsync();
                 
-                // DNS ayarları
+                // DNS ayarları (sadece switch aktifse)
+                var enableAutoDNS = Dispatcher.Invoke(() => chkAutoDNSChange.IsChecked == true);
+                if (enableAutoDNS)
+                {
                 File.AppendAllText(logPath, "DNS ayarları yapılıyor...\n");
                 var dnsSuccess = await SetModernDNSSettingsAsync();
                 
@@ -3276,6 +4018,11 @@ namespace SplitWireTurkey
                 else
                 {
                     File.AppendAllText(logPath, "DNS ayarları başarıyla yapıldı.\n");
+                    }
+                }
+                else
+                {
+                    File.AppendAllText(logPath, "DNS ayarları atlandı (switch kapalı).\n");
                 }
 
                 var extraFolders = _folders.ToArray();
@@ -3300,7 +4047,10 @@ namespace SplitWireTurkey
                     {
                         File.AppendAllText(logPath, "WireSock hizmeti başarıyla kuruldu.\n");
                         
-                        // WireSock Refresh görevini oluştur
+                        // WireSock Refresh görevini oluştur (sadece switch aktifse)
+                        var enableRepeater = Dispatcher.Invoke(() => chkWireSockRepeater.IsChecked == true);
+                        if (enableRepeater)
+                        {
                         File.AppendAllText(logPath, "WireSock Refresh görevi oluşturuluyor...\n");
                         var refreshTaskSuccess = await CreateWireSockRefreshTaskAsync();
                         if (refreshTaskSuccess)
@@ -3310,6 +4060,11 @@ namespace SplitWireTurkey
                         else
                         {
                             File.AppendAllText(logPath, "UYARI: WireSock Refresh görevi oluşturulamadı.\n");
+                            }
+                        }
+                        else
+                        {
+                            File.AppendAllText(logPath, "WireSock Refresh görevi oluşturulmayacak (switch kapalı).\n");
                         }
                         
                         File.AppendAllText(logPath, "Sistem yeniden başlatma mesajı gösteriliyor.\n");
@@ -3394,7 +4149,10 @@ namespace SplitWireTurkey
                 File.AppendAllText(logPath, "Drover dosyaları temizleniyor...\n");
                 await CleanupDroverFilesAsync();
                 
-                // DNS ayarları
+                // DNS ayarları (sadece switch aktifse)
+                var enableAutoDNS = Dispatcher.Invoke(() => chkAutoDNSChange.IsChecked == true);
+                if (enableAutoDNS)
+                {
                 File.AppendAllText(logPath, "DNS ayarları yapılıyor...\n");
                 var dnsSuccess = await SetModernDNSSettingsAsync();
                 
@@ -3405,6 +4163,11 @@ namespace SplitWireTurkey
                 else
                 {
                     File.AppendAllText(logPath, "DNS ayarları başarıyla yapıldı.\n");
+                    }
+                }
+                else
+                {
+                    File.AppendAllText(logPath, "DNS ayarları atlandı (switch kapalı).\n");
                 }
 
                 // Önce mevcut WireSock hizmetini durdur ve kaldır
@@ -3677,7 +4440,10 @@ namespace SplitWireTurkey
                     {
                         File.AppendAllText(logPath, "WireSock hizmeti başarıyla kuruldu.\n");
                         
-                        // WireSock Refresh görevini oluştur
+                        // WireSock Refresh görevini oluştur (sadece switch aktifse)
+                        var enableRepeater = Dispatcher.Invoke(() => chkWireSockRepeater.IsChecked == true);
+                        if (enableRepeater)
+                        {
                         File.AppendAllText(logPath, "WireSock Refresh görevi oluşturuluyor...\n");
                         var refreshTaskSuccess = await CreateWireSockRefreshTaskAsync();
                         if (refreshTaskSuccess)
@@ -3687,6 +4453,11 @@ namespace SplitWireTurkey
                         else
                         {
                             File.AppendAllText(logPath, "UYARI: WireSock Refresh görevi oluşturulamadı.\n");
+                            }
+                        }
+                        else
+                        {
+                            File.AppendAllText(logPath, "WireSock Refresh görevi oluşturulmayacak (switch kapalı).\n");
                         }
                         
                         // WireSock kısayolunu sil
@@ -3710,7 +4481,7 @@ namespace SplitWireTurkey
                 {
                     File.AppendAllText(logPath, "WireGuard profili oluşturulamadı.\n");
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "wiresock_profile_creation_failed"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
             catch (Exception ex)
@@ -4443,10 +5214,13 @@ try {{
                 if (!prereqSuccess)
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "prerequisites_failed_continue"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
 
-                // 2. DNS ayarları
+                // 2. DNS ayarları (sadece switch aktifse)
+                var enableAutoDNS = Dispatcher.Invoke(() => chkAutoDNSChange.IsChecked == true);
+                if (enableAutoDNS)
+                {
                 File.AppendAllText(logPath, "2. DNS ayarları yapılıyor...\n");
                 var dnsSuccess = await SetModernDNSSettingsAsync();
                 
@@ -4457,6 +5231,11 @@ try {{
                 else
                 {
                     File.AppendAllText(logPath, "DNS ayarları başarıyla yapıldı.\n");
+                    }
+                }
+                else
+                {
+                    File.AppendAllText(logPath, "2. DNS ayarları atlandı (switch kapalı).\n");
                 }
 
                 // 3. Hizmetleri kaldır
@@ -4466,7 +5245,7 @@ try {{
                 if (!serviceRemovalSuccess)
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "service_removal_failed_continue"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
 
                 // 4. ProxiFyre kurulumu
@@ -4476,7 +5255,7 @@ try {{
                 if (!proxifyreSuccess)
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "proxifyre_install_failed_continue"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
 
                 // 5. ProxiFyreService başlat
@@ -4496,7 +5275,7 @@ try {{
                 if (!firewallSuccess)
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "firewall_rules_error"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
 
                 // 7. ByeDPI hizmeti kurulumu
@@ -4506,7 +5285,7 @@ try {{
                 if (!byeDPIInstallSuccess)
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "byedpi_service_install_failed_manual"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
                 else
                 {
@@ -4582,10 +5361,13 @@ try {{
                 if (!prereqSuccess)
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "prerequisites_failed_continue"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
 
-                // 3. DNS ayarları
+                // 3. DNS ayarları (sadece switch aktifse)
+                var enableAutoDNS = Dispatcher.Invoke(() => chkAutoDNSChange.IsChecked == true);
+                if (enableAutoDNS)
+                {
                 File.AppendAllText(logPath, "3. DNS ayarları yapılıyor...\n");
                 var dnsSuccess = await SetModernDNSSettingsAsync();
                 
@@ -4596,6 +5378,11 @@ try {{
                 else
                 {
                     File.AppendAllText(logPath, "DNS ayarları başarıyla yapıldı.\n");
+                    }
+                }
+                else
+                {
+                    File.AppendAllText(logPath, "3. DNS ayarları atlandı (switch kapalı).\n");
                 }
 
                 // 4. Hizmetleri kaldır
@@ -4605,7 +5392,7 @@ try {{
                 if (!serviceRemovalSuccess)
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "service_removal_failed_continue"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
 
                 // 5. ProxiFyre kurulumu
@@ -4615,7 +5402,7 @@ try {{
                 if (!proxifyreSuccess)
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "proxifyre_install_failed_continue"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
 
                 // 6. ProxiFyreService başlat
@@ -4635,7 +5422,7 @@ try {{
                 if (!firewallSuccess)
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "firewall_rules_error"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
 
                 // 8. ByeDPI hizmeti kurulumu
@@ -4645,7 +5432,7 @@ try {{
                 if (!byeDPIInstallSuccess)
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "byedpi_service_install_failed_manual"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
                 else
                 {
@@ -4704,10 +5491,13 @@ try {{
                 if (!prereqSuccess)
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "prerequisites_failed_continue"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
 
-                // 4. DNS ayarları
+                // 4. DNS ayarları (sadece switch aktifse)
+                var enableAutoDNS = Dispatcher.Invoke(() => chkAutoDNSChange.IsChecked == true);
+                if (enableAutoDNS)
+                {
                 File.AppendAllText(logPath, "4. DNS ayarları yapılıyor...\n");
                 var dnsSuccess = await SetModernDNSSettingsAsync();
                 
@@ -4718,6 +5508,11 @@ try {{
                 else
                 {
                     File.AppendAllText(logPath, "DNS ayarları başarıyla yapıldı.\n");
+                    }
+                }
+                else
+                {
+                    File.AppendAllText(logPath, "4. DNS ayarları atlandı (switch kapalı).\n");
                 }
 
                 // 5. ByeDPI hizmeti kurulumu
@@ -4727,7 +5522,7 @@ try {{
                 if (!byeDPIInstallSuccess)
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "byedpi_service_install_failed_manual"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
                 else
                 {
@@ -4742,7 +5537,7 @@ try {{
                 if (!firewallSuccess)
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "firewall_rules_error"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
 
                 // 7. Drover dosyalarını kopyala
@@ -4752,7 +5547,7 @@ try {{
                 if (!droverSuccess)
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "drover_files_copy_failed"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
 
                 // 9. Kurulum tamamlandı mesajı
@@ -6522,6 +7317,25 @@ $dohResults | ConvertTo-Json
                 File.AppendAllText(logPath, $"Drover dosyaları temizlenirken hata: {ex.Message}\n");
             }
 
+            // 4. WireSockRefresh görevini kaldır
+            File.AppendAllText(logPath, "4. WireSockRefresh Task Scheduler görevi kaldırılıyor...\n");
+            try
+            {
+                var taskRemovalSuccess = RemoveWireSockRefreshTaskAsync().GetAwaiter().GetResult();
+                if (taskRemovalSuccess)
+                {
+                    File.AppendAllText(logPath, "WireSockRefresh görevi başarıyla kaldırıldı.\n");
+                }
+                else
+                {
+                    File.AppendAllText(logPath, "UYARI: WireSockRefresh görevi kaldırılamadı veya zaten mevcut değildi.\n");
+                }
+            }
+            catch (Exception ex)
+            {
+                File.AppendAllText(logPath, $"WireSockRefresh görevi kaldırılırken hata: {ex.Message}\n");
+            }
+
             File.AppendAllText(logPath, "Kurulum öncesi temizlik tamamlandı.\n");
                     return true;
                 }
@@ -7355,6 +8169,36 @@ Get-DnsClientDohServerAddress
             // Merkezi boyut hesaplama ve güncelleme
             UpdateMainPageWindowSize();
         }
+        
+        /// <summary>
+        /// Auto DNS Change switch durumunu Registry'den yükler ve uygular
+        /// </summary>
+        private void LoadAutoDNSChangeFromRegistryAndApply()
+        {
+            try
+            {
+                var isEnabled = LoadAutoDNSChangeFromRegistry();
+                if (chkAutoDNSChange != null)
+                {
+                    chkAutoDNSChange.IsChecked = isEnabled;
+                    Debug.WriteLine($"Auto DNS Change switch durumu Registry'den yüklendi ve uygulandı: {(isEnabled ? "Aktif" : "Pasif")}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Auto DNS Change switch durumu yüklenirken hata: {ex.Message}");
+            }
+        }
+        
+        private void ChkAutoDNSChange_Checked(object sender, RoutedEventArgs e)
+        {
+            SaveAutoDNSChangeToRegistry(true);
+        }
+
+        private void ChkAutoDNSChange_Unchecked(object sender, RoutedEventArgs e)
+        {
+            SaveAutoDNSChangeToRegistry(false);
+        }
 
         private async void BtnRemoveByeDPI_Click(object sender, RoutedEventArgs e)
         {
@@ -7609,6 +8453,17 @@ Get-DnsClientDohServerAddress
             var browserText = new Run(LanguageManager.GetText("main_help", "browser_text"));
             paragraph.Inlines.Add(browserTitle);
             paragraph.Inlines.Add(browserText);
+            paragraph.Inlines.Add(new LineBreak());
+            paragraph.Inlines.Add(new LineBreak());
+            
+            // WireSock yineleyici kur
+            var repeaterTitle = new Run(LanguageManager.GetText("main_help", "repeater_title"))
+            {
+                FontWeight = FontWeights.Bold
+            };
+            var repeaterText = new Run(LanguageManager.GetText("main_help", "repeater_text"));
+            paragraph.Inlines.Add(repeaterTitle);
+            paragraph.Inlines.Add(repeaterText);
             paragraph.Inlines.Add(new LineBreak());
             paragraph.Inlines.Add(new LineBreak());
 
@@ -8253,6 +9108,17 @@ Get-DnsClientDohServerAddress
             paragraph.Inlines.Add(new LineBreak());
             paragraph.Inlines.Add(new LineBreak());
 
+            // DNS ve DoH ayarlarını her kurulumda gerçekleştir
+            var autoDnsTitle = new Run(LanguageManager.GetText("advanced_help", "auto_dns_title"))
+            {
+                FontWeight = FontWeights.Bold
+            };
+            var autoDnsText = new Run(LanguageManager.GetText("advanced_help", "auto_dns_text"));
+            paragraph.Inlines.Add(autoDnsTitle);
+            paragraph.Inlines.Add(autoDnsText);
+            paragraph.Inlines.Add(new LineBreak());
+            paragraph.Inlines.Add(new LineBreak());
+
             // Tüm Hizmetleri Kaldır
             var removeAllTitle = new Run(LanguageManager.GetText("advanced_help", "remove_all_title"))
             {
@@ -8435,10 +9301,18 @@ Get-DnsClientDohServerAddress
                 var zapretLogPath = GetZapretLogPath();
                 File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Zapret kurulum süreci başlatılıyor...\n");
 
-                // DNS ayarları
+                // DNS ayarları (sadece switch aktifse)
+                var enableAutoDNS = Dispatcher.Invoke(() => chkAutoDNSChange.IsChecked == true);
+                if (enableAutoDNS)
+                {
                 File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DNS ayarları yapılıyor...\n");
                 await SetModernDNSSettingsAsync();
                 File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DNS ayarları tamamlandı.\n");
+                }
+                else
+                {
+                    File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DNS ayarları atlandı (switch kapalı).\n");
+                }
 
                 // Zapret kurulumunu gerçekleştir
                 File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Zapret kurulumu başlatılıyor...\n");
@@ -8780,7 +9654,7 @@ Get-DnsClientDohServerAddress
                     File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Blockcheck sonuçları işlendi ancak hizmet kurulumu başarısız.\n");
 
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "zapret_install_partial_success"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
             catch (Exception ex)
@@ -9032,16 +9906,24 @@ echo Hizmet kurulum işlemi tamamlandı.
                 {
                     File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] HATA: Textbox'ta parametre bulunamadı!\n");
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "zapret_parameters_required"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
                 File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Kullanılacak parametreler: {parameters}\n");
 
-                // DNS ayarları yap
+                // DNS ayarları yap (sadece switch aktifse)
+                var enableAutoDNS = Dispatcher.Invoke(() => chkAutoDNSChange.IsChecked == true);
+                if (enableAutoDNS)
+                {
                 File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DNS ayarları yapılıyor...\n");
                 await SetModernDNSSettingsAsync();
                 File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DNS ayarları tamamlandı.\n");
+                }
+                else
+                {
+                    File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DNS ayarları atlandı (switch kapalı).\n");
+                }
 
                 // Zapret hizmetini kur (blockcheck olmadan, direkt parametrelerle)
                 var success = await InstallZapretServiceDirectly(parameters, zapretLogPath);
@@ -9262,7 +10144,7 @@ echo Hizmet kurulum işlemi tamamlandı.
                 if (string.IsNullOrEmpty(parameters))
                 {
                     System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "zapret_parameters_required_simple"), 
-                        LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
@@ -9270,10 +10152,18 @@ echo Hizmet kurulum işlemi tamamlandı.
                 File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Zapret Özel Tek Seferlik başlatılıyor...\n");
                 File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Parametreler: {parameters}\n");
 
-                // DNS ayarları yap
+                // DNS ayarları yap (sadece switch aktifse)
+                var enableAutoDNS = Dispatcher.Invoke(() => chkAutoDNSChange.IsChecked == true);
+                if (enableAutoDNS)
+                {
                 File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DNS ayarları yapılıyor...\n");
                 await SetModernDNSSettingsAsync();
                 File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DNS ayarları tamamlandı.\n");
+                }
+                else
+                {
+                    File.AppendAllText(zapretLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DNS ayarları atlandı (switch kapalı).\n");
+                }
 
                 // onetime_batch.cmd dosyasının yolunu al
                 var localZapretPath = GetLocalAppDataZapretPath();
@@ -9753,7 +10643,7 @@ echo Hizmet kurulum işlemi tamamlandı.
                 }
                 else
                 {
-                    System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "drover_files_not_found_or_deleted"), LanguageManager.GetText("messages", "warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    System.Windows.MessageBox.Show(LanguageManager.GetText("messages", "drover_files_not_found_or_deleted"), LanguageManager.GetText("messages", "warning_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
             catch (Exception ex)
@@ -10284,7 +11174,7 @@ echo Hizmet kurulum işlemi tamamlandı.
                 {
                     System.Windows.MessageBox.Show(
                         LanguageManager.GetText("messages", "goodbyedpi_service_must_be_removed"),
-                        LanguageManager.GetText("messages", "warning"),
+                        LanguageManager.GetText("messages", "warning_title"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
@@ -10345,10 +11235,18 @@ echo Hizmet kurulum işlemi tamamlandı.
                     File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] UYARI: Kurulum öncesi temizlik sırasında hata oluştu.\n");
                 }
                 
-                // DNS ayarları yap
+                // DNS ayarları yap (sadece switch aktifse)
+                var enableAutoDNS = Dispatcher.Invoke(() => chkAutoDNSChange.IsChecked == true);
+                if (enableAutoDNS)
+                {
                 File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DNS ayarları yapılıyor...\n");
                 await SetModernDNSSettingsAsync();
                 File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DNS ayarları tamamlandı.\n");
+                }
+                else
+                {
+                    File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DNS ayarları atlandı (switch kapalı).\n");
+                }
                 
                 // Hizmet temizleme işlemi
                 File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Hizmet temizleme işlemi başlatılıyor...\n");
@@ -10454,11 +11352,19 @@ echo Hizmet kurulum işlemi tamamlandı.
                     }
                 }
 
-                // DNS ayarları yap
+                // DNS ayarları yap (sadece switch aktifse)
                 var logPath = GetGoodbyeDPILogPath();
+                var enableAutoDNS = Dispatcher.Invoke(() => chkAutoDNSChange.IsChecked == true);
+                if (enableAutoDNS)
+                {
                 File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] GoodbyeDPI Tek Seferlik - DNS ayarları yapılıyor...\n");
                 await SetModernDNSSettingsAsync();
                 File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] GoodbyeDPI Tek Seferlik - DNS ayarları tamamlandı.\n");
+                }
+                else
+                {
+                    File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] GoodbyeDPI Tek Seferlik - DNS ayarları atlandı (switch kapalı).\n");
+                }
 
                 // Parametreleri hazırla
                 var parameters = txtGoodbyeDPIParams.Text.Trim();
@@ -11803,7 +12709,12 @@ echo Hizmet kurulum işlemi tamamlandı.
                 "operagx.exe",
                 "brave.exe",
                 "vivaldi.exe",
-                "msedge.exe"
+                "msedge.exe",
+                "zen.exe",
+                "chromium.exe",
+                "iexplore.exe",
+                "Maxthon.exe",
+                "librewolf.exe"
             };
             
             return string.Join(" ", browsers);
@@ -11862,18 +12773,22 @@ echo Hizmet kurulum işlemi tamamlandı.
                     {
                         "chkAdvancedSettings",
                         "chkBrowserTunneling",
+                        "chkWireSockRepeater", // Added for WireSock repeater switch
+                        "chkAutoDNSChange", // Added for auto DNS change switch
                         "chkManualParams",
                         "chkGoodbyeDPIManualParams",
                         "chkGoodbyeDPIUseBlacklist",
                         "chkGoodbyeDPIEditBlacklist",
                         "chkByeDPIBrowserTunneling", // Added for dark mode support
-                        "chkDiscordUninstallStandard" // Added for Onarım sekmesi
+                        "chkDiscordUninstallStandard", // Added for Onarım sekmesi
+                        "chkWebCordShortcut" // Added for WebCord shortcut switch
                     };
                     
                     // Discord durum göstergelerini de güncelle
                     // NOT: Daire renkleri tema değişikliklerinde korunmalı, sadece yeşil olanlar güncellenmeli
                     var discordStatus = this.FindName("discordStatus") as System.Windows.Shapes.Ellipse;
                     var discordPTBStatus = this.FindName("discordPTBStatus") as System.Windows.Shapes.Ellipse;
+                    var webCordStatus = this.FindName("webCordStatus") as System.Windows.Shapes.Ellipse;
                     
                     if (discordStatus != null)
                     {
@@ -12097,7 +13012,7 @@ echo Hizmet kurulum işlemi tamamlandı.
                     }
                     
                     // Tarayıcı uygulamaları
-                    var browserApps = new[] { "browser", "chrome", "firefox", "opera", "operagx", "brave", "vivaldi", "msedge" };
+                    var browserApps = new[] { "browser", "chrome", "firefox", "opera", "operagx", "brave", "vivaldi", "msedge", "zen", "chromium", "iexplore", "Maxthon", "librewolf", "electron" };
                     
                     if (addBrowsers)
                     {
@@ -12377,10 +13292,27 @@ echo Hizmet kurulum işlemi tamamlandı.
                     // Hata olsa bile devam et
                 }
 
-                // 4.3. %localappdata%/SplitWire-Turkey klasörünü sil
+                // 4.3. WebCord süreçlerini sonlandır ve masaüstü kısayolunu kaldır
                 try
                 {
-                    File.AppendAllText(logPath, "4.3. %localappdata%/SplitWire-Turkey klasörü siliniyor...\n");
+                    File.AppendAllText(logPath, "4.3. WebCord süreçleri sonlandırılıyor...\n");
+                    await CloseWebCordProcessesAsync();
+                    File.AppendAllText(logPath, "4.3. WebCord süreçleri sonlandırıldı.\n");
+                    
+                    File.AppendAllText(logPath, "4.4. WebCord masaüstü kısayolu kaldırılıyor...\n");
+                    RemoveWebCordDesktopShortcuts();
+                    File.AppendAllText(logPath, "4.4. WebCord masaüstü kısayolu kaldırıldı.\n");
+                }
+                catch (Exception ex)
+                {
+                    File.AppendAllText(logPath, $"4.3-4.4. WebCord temizleme hatası: {ex.Message}\n");
+                    // Hata olsa bile devam et
+                }
+
+                // 4.5. %localappdata%/SplitWire-Turkey klasörünü sil
+                try
+                {
+                    File.AppendAllText(logPath, "4.5. %localappdata%/SplitWire-Turkey klasörü siliniyor...\n");
                     var localAppDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                     var splitWireTurkeyPath = Path.Combine(localAppDataPath, "SplitWire-Turkey");
                     
@@ -12390,12 +13322,12 @@ echo Hizmet kurulum işlemi tamamlandı.
                     }
                     else
                     {
-                        //File.AppendAllText(logPath, "4.3. %localappdata%/SplitWire-Turkey klasörü bulunamadı.\n");
+                        //File.AppendAllText(logPath, "4.5. %localappdata%/SplitWire-Turkey klasörü bulunamadı.\n");
                     }
                 }
                 catch (Exception)
                 {
-                    //File.AppendAllText(logPath, $"4.3. %localappdata%/SplitWire-Turkey klasörü silme hatası: {ex.Message}\n");
+                    //File.AppendAllText(logPath, $"4.5. %localappdata%/SplitWire-Turkey klasörü silme hatası: {ex.Message}\n");
                     // Hata olsa bile devam et
                 }
 
@@ -12537,6 +13469,9 @@ echo Hizmet kurulum işlemi tamamlandı.
                 {
                     lblDiscordStatus.Text = LanguageManager.GetText("ui_texts", "installed");
                     btnDiscordAction.Content = LanguageManager.GetText("buttons", "start");
+                    // Tooltip'i güncelle
+                    if (tooltipDiscordAction != null)
+                        tooltipDiscordAction.Content = LanguageManager.GetText("ui_texts", "tooltip_start");
                     
                     // Kaldır butonunu göster
                     var btnDiscordRemoveShow = this.FindName("btnDiscordRemove") as System.Windows.Controls.Button;
@@ -12564,6 +13499,9 @@ echo Hizmet kurulum işlemi tamamlandı.
                 {
                     lblDiscordStatus.Text = LanguageManager.GetText("ui_texts", "not_installed");
                     btnDiscordAction.Content = LanguageManager.GetText("buttons", "install");
+                    // Tooltip'i güncelle
+                    if (tooltipDiscordAction != null)
+                        tooltipDiscordAction.Content = LanguageManager.GetText("ui_texts", "tooltip_install");
                     discordStatus.Fill = System.Windows.Media.Brushes.Red;
                     
                     // Kaldır butonunu gizle
@@ -12590,6 +13528,9 @@ echo Hizmet kurulum işlemi tamamlandı.
                 {
                     lblDiscordPTBStatus.Text = LanguageManager.GetText("ui_texts", "installed");
                     btnDiscordPTBAction.Content = LanguageManager.GetText("buttons", "start");
+                    // Tooltip'i güncelle
+                    if (tooltipDiscordPTBAction != null)
+                        tooltipDiscordPTBAction.Content = LanguageManager.GetText("ui_texts", "tooltip_start");
                     
                     // Kaldır butonunu göster
                     var btnDiscordPTBRemoveShow = this.FindName("btnDiscordPTBRemove") as System.Windows.Controls.Button;
@@ -12617,6 +13558,9 @@ echo Hizmet kurulum işlemi tamamlandı.
                 {
                     lblDiscordPTBStatus.Text = LanguageManager.GetText("ui_texts", "not_installed");
                     btnDiscordPTBAction.Content = LanguageManager.GetText("buttons", "install");
+                    // Tooltip'i güncelle
+                    if (tooltipDiscordPTBAction != null)
+                        tooltipDiscordPTBAction.Content = LanguageManager.GetText("ui_texts", "tooltip_install");
                     discordPTBStatus.Fill = System.Windows.Media.Brushes.Red;
                     
                     // Kaldır butonunu gizle
@@ -12635,6 +13579,9 @@ echo Hizmet kurulum işlemi tamamlandı.
                     
                     File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Discord PTB durumu: Yüklü değil - Yükle butonu aktif\n");
                 }
+
+                // WebCord durumu kontrolü
+                CheckWebCordStatus();
 
                 // Debug bilgileri
                 Debug.WriteLine($"Discord durum kontrolü:");
@@ -12672,6 +13619,415 @@ echo Hizmet kurulum işlemi tamamlandı.
             {
                 File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] HATA: Discord durum kontrolü hatası: {ex.Message}\n");
                 Debug.WriteLine($"Discord durum kontrolü hatası: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// WebCord Yükle butonu tıklama olayı
+        /// </summary>
+        private async void BtnWebCordInstall_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Hizmet kontrolü yap
+                bool anyServiceInstalled = IsAnyServiceInstalled();
+                
+                // Onay mesajı oluştur
+                string messageText = LanguageManager.GetText("messages", "confirm_webcord_install");
+                
+                // Kısayol switch'i aktifse kısayol satırını ekle
+                if (chkWebCordShortcut.IsChecked == true)
+                {
+                    messageText += LanguageManager.GetText("messages", "confirm_webcord_install_shortcut");
+                }
+                
+                // Hizmet yoksa ByeDPI satırını ekle
+                if (!anyServiceInstalled)
+                {
+                    messageText += LanguageManager.GetText("messages", "confirm_webcord_install_byedpi");
+                }
+                
+                var result = System.Windows.MessageBox.Show(
+                    messageText,
+                    LanguageManager.GetText("messages", "webcord_install_title"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    ShowLoading(true);
+
+                    // 1. WebCord kaynak klasörü ve exe kontrolü
+                    var sourcePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "res", "webcord");
+                    var webCordExePath = Path.Combine(sourcePath, "webcord.exe");
+                    
+                    // WebCord.exe yoksa GitHub'dan indir ve çıkar
+                    if (!File.Exists(webCordExePath))
+                    {
+                        try
+                        {
+                            // Kaynak klasörünü oluştur (yoksa)
+                            if (!Directory.Exists(sourcePath))
+                            {
+                                Directory.CreateDirectory(sourcePath);
+                            }
+                            
+                            // GitHub'dan zip dosyasını indir
+                            var downloadUrl = "https://github.com/SpacingBat3/WebCord/releases/download/v4.12.1/WebCord-win32-x64-4.12.1.zip";
+                            var zipPath = Path.Combine(sourcePath, "WebCord-win32-x64-4.12.1.zip");
+                            
+                            using (var httpClient = CreateHttpClientWithAdvancedSettings())
+                            {
+                                httpClient.Timeout = TimeSpan.FromMinutes(10); // İndirme için 10 dakikalık timeout
+                                
+                                var response = await httpClient.GetAsync(downloadUrl);
+                                response.EnsureSuccessStatusCode();
+                                
+                                using (var fileStream = File.Create(zipPath))
+                                {
+                                    await response.Content.CopyToAsync(fileStream);
+                                }
+                            }
+                            
+                            // Zip dosyasını çıkar
+                            ZipFile.ExtractToDirectory(zipPath, sourcePath, true);
+                            
+                            // İndirilen zip dosyasını sil
+                            if (File.Exists(zipPath))
+                            {
+                                File.Delete(zipPath);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            string errorMessage = ex.Message;
+                            
+                            // Timeout hatası kontrolü
+                            if (ex is TaskCanceledException || ex.InnerException is TaskCanceledException || 
+                                errorMessage.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+                                errorMessage.Contains("timed out", StringComparison.OrdinalIgnoreCase))
+                            {
+                                errorMessage = "WebCord indirme işlemi 10 dakika içinde tamamlanamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.";
+                            }
+                            
+                            System.Windows.MessageBox.Show(
+                                $"WebCord indirme hatası: {errorMessage}",
+                                LanguageManager.GetText("messages", "error"), MessageBoxButton.OK, MessageBoxImage.Error);
+                            ShowLoading(false);
+                            return;
+                        }
+                    }
+                    
+                    // 2. WebCord klasörünü AppData'ya kopyala
+                    var targetPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SplitWire-Turkey", "WebCord");
+                    
+                    if (Directory.Exists(sourcePath))
+                    {
+                        // Hedef klasörü oluştur
+                        if (!Directory.Exists(targetPath))
+                        {
+                            Directory.CreateDirectory(targetPath);
+                        }
+                        
+                        // Klasör içeriğini kopyala
+                        CopyDirectory(sourcePath, targetPath, true);
+                    }
+                    else
+                    {
+                        System.Windows.MessageBox.Show(
+                            "WebCord kaynak klasörü bulunamadı: " + sourcePath,
+                            LanguageManager.GetText("messages", "error"), MessageBoxButton.OK, MessageBoxImage.Error);
+                        ShowLoading(false);
+                        return;
+                    }
+
+                    // 3. Masaüstü kısayolu oluştur (eğer switch aktif ise)
+                    if (chkWebCordShortcut.IsChecked == true)
+                    {
+                        var targetWebCordExePath = Path.Combine(targetPath, "webcord.exe");
+                        if (File.Exists(targetWebCordExePath))
+                        {
+                            CreateWebCordDesktopShortcut(targetWebCordExePath);
+                        }
+                    }
+
+                    // 4. ByeDPI kurulumu (sadece hiçbir hizmet yüklü değilse)
+                    if (!anyServiceInstalled)
+                    {
+                        // DNS ve DoH ayarlarını kontrol et
+                        bool enableAutoDNS = chkAutoDNSChange?.IsChecked == true;
+                        
+                        if (enableAutoDNS)
+                        {
+                            await SetModernDNSSettingsAsync();
+                        }
+                        
+                        await PerformByeDPISetupSilentAsync();
+                    }
+
+                    // 5. Durumları güncelle
+                    CheckWebCordStatus();
+
+                    // 6. Başarı mesajı göster
+                    var successResult = System.Windows.MessageBox.Show(
+                        LanguageManager.GetText("messages", "webcord_install_success"),
+                        LanguageManager.GetText("messages", "webcord_install_success_title"), MessageBoxButton.YesNo, MessageBoxImage.Information);
+
+                    if (successResult == MessageBoxResult.Yes)
+                    {
+                        var targetWebCordExePath = Path.Combine(targetPath, "webcord.exe");
+                        if (File.Exists(targetWebCordExePath))
+                        {
+                            var psi = new ProcessStartInfo
+                            {
+                                FileName = targetWebCordExePath,
+                                UseShellExecute = true
+                            };
+                            Process.Start(psi);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(
+                    ex.Message,
+                    LanguageManager.GetText("messages", "error"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                ShowLoading(false);
+            }
+        }
+
+        /// <summary>
+        /// WebCord Yükle/Başlat butonu tıklama olayı
+        /// </summary>
+        private async void BtnWebCordAction_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var webCordPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SplitWire-Turkey", "WebCord", "webcord.exe");
+                
+                if (File.Exists(webCordPath))
+                {
+                    // WebCord'u başlat
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = webCordPath,
+                        UseShellExecute = true
+                    };
+                    Process.Start(psi);
+                }
+                else
+                {
+                    // WebCord yüklü değil, kurulum yap
+                    BtnWebCordInstall_Click(sender, e);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(
+                    ex.Message,
+                    LanguageManager.GetText("messages", "error"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// WebCord Kaldır butonu tıklama olayı
+        /// </summary>
+        private async void BtnWebCordRemove_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var result = System.Windows.MessageBox.Show(
+                    LanguageManager.GetText("messages", "confirm_remove_webcord"),
+                    LanguageManager.GetText("messages", "webcord_remove_title"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    ShowLoading(true);
+
+                    var webCordPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SplitWire-Turkey", "WebCord");
+                    
+                    if (Directory.Exists(webCordPath))
+                    {
+                        // WebCord süreçlerini kapat
+                        var webCordProcesses = Process.GetProcessesByName("webcord");
+                        foreach (var process in webCordProcesses)
+                        {
+                            try
+                            {
+                                process.Kill();
+                                await Task.Delay(500);
+                            }
+                            catch { }
+                        }
+
+                        // Klasörü sil
+                        Directory.Delete(webCordPath, true);
+                    }
+
+                    // Masaüstü kısayollarını sil
+                    RemoveWebCordDesktopShortcuts();
+
+                    // Durumları güncelle
+                    CheckWebCordStatus();
+
+                    System.Windows.MessageBox.Show(
+                        LanguageManager.GetText("messages", "webcord_removed_success"),
+                        LanguageManager.GetText("messages", "success_title"), MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(
+                    ex.Message,
+                    LanguageManager.GetText("messages", "error"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                ShowLoading(false);
+            }
+        }
+
+        /// <summary>
+        /// WebCord durumunu kontrol eder
+        /// </summary>
+        private void CheckWebCordStatus()
+        {
+            try
+            {
+                var webCordPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SplitWire-Turkey", "WebCord", "webcord.exe");
+                bool isWebCordInstalled = File.Exists(webCordPath);
+
+                if (isWebCordInstalled)
+                {
+                    lblWebCordStatus.Text = LanguageManager.GetText("ui_texts", "installed");
+                    btnWebCordAction.Content = LanguageManager.GetText("buttons", "start");
+                    if (tooltipWebCordAction != null)
+                        tooltipWebCordAction.Content = LanguageManager.GetText("ui_texts", "tooltip_start");
+                    
+                    btnWebCordRemove.Visibility = System.Windows.Visibility.Visible;
+                    
+                    bool isDarkMode = btnThemeToggle?.IsChecked == true;
+                    webCordStatus.Fill = isDarkMode ? 
+                        new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#4CAF50")) :
+                        System.Windows.Media.Brushes.Green;
+                    
+                    btnWebCordAction.Click -= BtnWebCordAction_Click;
+                    btnWebCordAction.Click += BtnWebCordAction_Click;
+                }
+                else
+                {
+                    lblWebCordStatus.Text = LanguageManager.GetText("ui_texts", "not_installed");
+                    btnWebCordAction.Content = LanguageManager.GetText("buttons", "install");
+                    if (tooltipWebCordAction != null)
+                        tooltipWebCordAction.Content = LanguageManager.GetText("ui_texts", "tooltip_install");
+                    webCordStatus.Fill = System.Windows.Media.Brushes.Red;
+                    
+                    btnWebCordRemove.Visibility = System.Windows.Visibility.Collapsed;
+                    
+                    btnWebCordAction.Click -= BtnWebCordAction_Click;
+                    btnWebCordAction.Click += BtnWebCordAction_Click;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"WebCord durum kontrolü hatası: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// WebCord masaüstü kısayolu oluşturur
+        /// </summary>
+        private void CreateWebCordDesktopShortcut(string targetPath)
+        {
+            try
+            {
+                // Tüm masaüstü konumlarını al
+                var desktopPaths = new List<string>
+                {
+                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory)
+                };
+
+                foreach (var desktopPath in desktopPaths)
+                {
+                    if (Directory.Exists(desktopPath))
+                    {
+                        var shortcutPath = Path.Combine(desktopPath, "WebCord.lnk");
+                        
+                        // PowerShell kullanarak kısayol oluştur
+                        var psScript = $@"
+$WshShell = New-Object -ComObject WScript.Shell
+$Shortcut = $WshShell.CreateShortcut('{shortcutPath.Replace("'", "''")}')
+$Shortcut.TargetPath = '{targetPath.Replace("'", "''")}'
+$Shortcut.WorkingDirectory = '{Path.GetDirectoryName(targetPath).Replace("'", "''")}'
+$Shortcut.Save()
+";
+                        
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = "powershell.exe",
+                            Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"{psScript}\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        };
+                        
+                        Process.Start(psi)?.WaitForExit();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"WebCord kısayol oluşturma hatası: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// WebCord masaüstü kısayollarını kaldırır
+        /// </summary>
+        private void RemoveWebCordDesktopShortcuts()
+        {
+            try
+            {
+                var desktopPaths = new List<string>
+                {
+                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory)
+                };
+
+                foreach (var desktopPath in desktopPaths)
+                {
+                    var shortcutPath = Path.Combine(desktopPath, "WebCord.lnk");
+                    if (File.Exists(shortcutPath))
+                    {
+                        File.Delete(shortcutPath);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"WebCord kısayol silme hatası: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Klasör içeriğini kopyalar
+        /// </summary>
+        private void CopyDirectory(string sourceDir, string targetDir, bool overwrite)
+        {
+            Directory.CreateDirectory(targetDir);
+
+            foreach (var file in Directory.GetFiles(sourceDir))
+            {
+                var targetFile = Path.Combine(targetDir, Path.GetFileName(file));
+                File.Copy(file, targetFile, overwrite);
+            }
+
+            foreach (var directory in Directory.GetDirectories(sourceDir))
+            {
+                var targetSubDir = Path.Combine(targetDir, Path.GetFileName(directory));
+                CopyDirectory(directory, targetSubDir, overwrite);
             }
         }
 
@@ -12735,12 +14091,32 @@ echo Hizmet kurulum işlemi tamamlandı.
                     await InstallDiscordAsync();
                     File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 4. Discord yeniden kuruldu.\n");
 
-                    // 5. Durumları güncelle
-                    File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 5. Discord durumları güncelleniyor...\n");
-                    CheckDiscordStatus();
-                    File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 5. Discord durumları güncellendi.\n");
+                    // 5. Discord Update.exe'yi Windows 8 uyumluluk moduna ayarla
+                    File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 5. Discord Update.exe Windows 8 uyumluluk moduna ayarlanıyor...\n");
+                    try
+                    {
+                        var discordUpdatePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Discord", "Update.exe");
+                        if (File.Exists(discordUpdatePath))
+                        {
+                            SetWindows8CompatibilityMode(discordUpdatePath);
+                            File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 5. Discord Update.exe Windows 8 uyumluluk moduna ayarlandı.\n");
+                        }
+                        else
+                        {
+                            File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 5. UYARI: Discord Update.exe bulunamadı, uyumluluk modu ayarlanamadı.\n");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 5. UYARI: Discord Update.exe uyumluluk modu ayarlanırken hata: {ex.Message}\n");
+                    }
 
-                    // 6. Başarı mesajı göster
+                    // 6. Durumları güncelle
+                    File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 6. Discord durumları güncelleniyor...\n");
+                    CheckDiscordStatus();
+                    File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 6. Discord durumları güncellendi.\n");
+
+                    // 7. Başarı mesajı göster
                     File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Discord Onar işlemi başarıyla tamamlandı.\n");
                     var restartResult = System.Windows.MessageBox.Show(
                         LanguageManager.GetText("messages", "discord_repair_restart_required"),
@@ -13334,6 +14710,17 @@ echo Hizmet kurulum işlemi tamamlandı.
             paragraph.Inlines.Add(new LineBreak());
             paragraph.Inlines.Add(new LineBreak());
             
+            // WebCord Yükle
+            var webCordTitle = new Run(LanguageManager.GetText("discord_repair_help", "webcord_title"))
+            {
+                FontWeight = FontWeights.Bold
+            };
+            var webCordText = new Run(LanguageManager.GetText("discord_repair_help", "webcord_text"));
+            paragraph.Inlines.Add(webCordTitle);
+            paragraph.Inlines.Add(webCordText);
+            paragraph.Inlines.Add(new LineBreak());
+            paragraph.Inlines.Add(new LineBreak());
+            
             // Discord PTB Yükle
             var ptbTitle = new Run(LanguageManager.GetText("discord_repair_help", "ptb_title"))
             {
@@ -13353,6 +14740,17 @@ echo Hizmet kurulum işlemi tamamlandı.
             var toggleText = new Run(LanguageManager.GetText("discord_repair_help", "toggle_text"));
             paragraph.Inlines.Add(toggleTitle);
             paragraph.Inlines.Add(toggleText);
+            paragraph.Inlines.Add(new LineBreak());
+            paragraph.Inlines.Add(new LineBreak());
+
+            // WebCord için kısayol oluştur
+            var webCordShortcutTitle = new Run(LanguageManager.GetText("discord_repair_help", "webcord_shortcut_title"))
+            {
+                FontWeight = FontWeights.Bold
+            };
+            var webCordShortcutText = new Run(LanguageManager.GetText("discord_repair_help", "webcord_shortcut_text"));
+            paragraph.Inlines.Add(webCordShortcutTitle);
+            paragraph.Inlines.Add(webCordShortcutText);
             paragraph.Inlines.Add(new LineBreak());
             paragraph.Inlines.Add(new LineBreak());
 
@@ -13402,6 +14800,44 @@ echo Hizmet kurulum işlemi tamamlandı.
 
             infoWindow.Content = mainGrid;
             infoWindow.ShowDialog();
+        }
+
+        /// <summary>
+        /// WebCord süreçlerini kapatır
+        /// </summary>
+        private async Task CloseWebCordProcessesAsync()
+        {
+            try
+            {
+                var webCordProcesses = Process.GetProcessesByName("webcord");
+                
+                if (webCordProcesses.Length > 0)
+                {
+                    foreach (var process in webCordProcesses)
+                    {
+                        try
+                        {
+                            if (!process.HasExited)
+                            {
+                                process.Kill();
+                                await process.WaitForExitAsync();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"WebCord süreci sonlandırılırken hata: {ex.Message}");
+                        }
+                        finally
+                        {
+                            process?.Dispose();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"WebCord süreçleri kapatılırken hata: {ex.Message}");
+            }
         }
 
         /// <summary>

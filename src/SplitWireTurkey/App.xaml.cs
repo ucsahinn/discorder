@@ -110,7 +110,7 @@ namespace SplitWireTurkey
                     {
                         var regLanguage = key.GetValue("Language") as string;
                         Debug.WriteLine($"Registry'den dil okundu: {regLanguage}");
-                        if (!string.IsNullOrEmpty(regLanguage) && (regLanguage == "TR" || regLanguage == "EN" || regLanguage == "RU"))
+                        if (!string.IsNullOrEmpty(regLanguage) && (regLanguage == "TR" || regLanguage == "EN" || regLanguage == "RU" || regLanguage == "ES"))
                         {
                             language = regLanguage;
                             Debug.WriteLine($"Dil ayarlandı: {language}");

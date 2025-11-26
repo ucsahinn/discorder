@@ -500,6 +500,24 @@
                              FontSize="12"/>
                 </Button.ToolTip>
             </Button>
+            
+            <!-- Spanish Flag -->
+            <Button x:Name="btnLanguageES" 
+                    Style="{StaticResource InfoButtonStyle}"
+                    Margin="2,0"
+                    Click="BtnLanguageES_Click"
+                    Tag="ES"
+                    ToolTipService.InitialShowDelay="0"
+                    ToolTipService.ShowDuration="5000">
+                <Image Source="pack://application:,,,/Resources/Flags/es_flag.png" 
+                       Width="24" Height="24" 
+                       Stretch="Uniform"/>
+                <Button.ToolTip>
+                    <ToolTip Content="Español" 
+                             FontFamily="Poppins Regular"
+                             FontSize="12"/>
+                </Button.ToolTip>
+            </Button>
         </StackPanel>
 
         <!-- Main Content -->
@@ -538,7 +556,16 @@
                             FontFamily="{StaticResource PoppinsBold}"
                             Background="Transparent"
                             Margin="0,0,0,10"
-                            Click="BtnStart_Click"/>
+                            Click="BtnStart_Click"
+                            ToolTipService.InitialShowDelay="1000"
+                            ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipStandardInstall" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                         
                         <Button x:Name="btnAlternativeSetup" 
                                 Content="Alternatif Kurulum" 
@@ -549,12 +576,29 @@
                                 FontFamily="{StaticResource PoppinsBold}"
                                 Background="Transparent"
                                 Margin="0,0,0,10"
-                                Click="BtnAlternativeSetup_Click"/>
+                                Click="BtnAlternativeSetup_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipAlternativeInstall" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                         
                         <!-- Tarayıcılar için Tünelleme Toggle Switch -->
                         <StackPanel Orientation="Horizontal" 
                                    HorizontalAlignment="Center" 
-                                   Margin="0,5,0,10">
+                                   Margin="0,5,0,10"
+                                   ToolTipService.InitialShowDelay="1000"
+                                   ToolTipService.ShowDuration="5000">
+                            <StackPanel.ToolTip>
+                                <ToolTip x:Name="tooltipBrowserTunneling" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </StackPanel.ToolTip>
                             <ToggleButton x:Name="chkBrowserTunneling" 
                                          Style="{StaticResource ModernToggleSwitchStyle}"
                                          IsChecked="False"/>
@@ -564,10 +608,39 @@
                                        Margin="10,0,0,0"/>
                         </StackPanel>
                         
+                        <!-- WireSock Yineleyici Switch -->
+                        <StackPanel Orientation="Horizontal" 
+                                   HorizontalAlignment="Center" 
+                                   Margin="0,5,0,10"
+                                   ToolTipService.InitialShowDelay="1000"
+                                   ToolTipService.ShowDuration="5000">
+                            <StackPanel.ToolTip>
+                                <ToolTip x:Name="tooltipWireSockRepeater" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </StackPanel.ToolTip>
+                            <ToggleButton x:Name="chkWireSockRepeater" 
+                                         Style="{StaticResource ModernToggleSwitchStyle}"
+                                         IsChecked="False"/>
+                            <TextBlock x:Name="txtWireSockRepeater" Text="WireSock yineleyici kur" 
+                                       FontFamily="{StaticResource Montserrat}"
+                                       VerticalAlignment="Center"
+                                       Margin="10,0,0,0"/>
+                        </StackPanel>
+                        
                         <!-- Gelişmiş Ayarlar Toggle Switch -->
                         <StackPanel Orientation="Horizontal" 
                                    HorizontalAlignment="Center" 
-                                   Margin="0,5,0,10">
+                                   Margin="0,5,0,10"
+                                   ToolTipService.InitialShowDelay="1000"
+                                   ToolTipService.ShowDuration="5000">
+                            <StackPanel.ToolTip>
+                                <ToolTip x:Name="tooltipFolderCustomization" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </StackPanel.ToolTip>
                             <ToggleButton x:Name="chkAdvancedSettings" 
                                          Style="{StaticResource ModernToggleSwitchStyle}"
                                          Checked="ChkAdvancedSettings_Checked"
@@ -593,14 +666,32 @@
                                     Content="Klasör Ekle" 
                                     Style="{StaticResource MaterialDesignOutlinedButton}"
                                     FontFamily="{StaticResource PoppinsRegular}"
-                                    Click="BtnAddFolder_Click"/>
+                                    Click="BtnAddFolder_Click"
+                                    ToolTipService.InitialShowDelay="1000"
+                                    ToolTipService.ShowDuration="5000">
+                                <Button.ToolTip>
+                                    <ToolTip x:Name="tooltipAddFolder" 
+                                             FontFamily="Poppins Regular"
+                                             FontSize="12"
+                                             Placement="Mouse"/>
+                                </Button.ToolTip>
+                            </Button>
                             
                             <Button x:Name="btnClearFolders" 
                                     Content="Listeyi Temizle" 
                                     Style="{StaticResource MaterialDesignOutlinedButton}"
                                     FontFamily="{StaticResource PoppinsRegular}"
                                     Click="BtnClearFolders_Click"
-                                    Margin="10,0,0,0"/>
+                                    Margin="10,0,0,0"
+                                    ToolTipService.InitialShowDelay="1000"
+                                    ToolTipService.ShowDuration="5000">
+                                <Button.ToolTip>
+                                    <ToolTip x:Name="tooltipClearList" 
+                                             FontFamily="Poppins Regular"
+                                             FontSize="12"
+                                             Placement="Mouse"/>
+                                </Button.ToolTip>
+                            </Button>
                     </StackPanel>
                     
                     <!-- Folder List -->
@@ -628,7 +719,16 @@
                                         Style="{StaticResource MaterialDesignOutlinedButton}"
                                         Width="200"
                                         FontFamily="{StaticResource PoppinsRegular}"
-                                Click="BtnCustomSetup_Click"/>
+                                Click="BtnCustomSetup_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipCustomInstall" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                         
                         <Button x:Name="btnGenerateConfig" 
                                 Content="Özel Config Oluştur" 
@@ -636,8 +736,17 @@
                                         Width="200"
                                         Margin="10,0,0,0"
                                         FontFamily="{StaticResource PoppinsRegular}"
-                                        Click="BtnGenerateConfig_Click"/>
-                            </StackPanel>
+                                Click="BtnGenerateConfig_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipGenerateConfig" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
+                    </StackPanel>
                         </StackPanel>
                         
                         <Button x:Name="btnExit" 
@@ -705,13 +814,30 @@
                                 FontFamily="{StaticResource PoppinsBold}"
                                 Background="Transparent"
                                 Margin="0,0,0,0"
-                                Click="BtnByeDPISetup_Click"/>
+                                Click="BtnByeDPISetup_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipByeDPISplit" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                         
                         <!-- Tarayıcı Tünelleme Switch -->
                         <StackPanel x:Name="byedpiBrowserTunnelingPanel" 
                                     Orientation="Horizontal" 
                                     Margin="0,15,0,15" 
-                                    HorizontalAlignment="Center">
+                                    HorizontalAlignment="Center"
+                                    ToolTipService.InitialShowDelay="1000"
+                                    ToolTipService.ShowDuration="5000">
+                            <StackPanel.ToolTip>
+                                <ToolTip x:Name="tooltipByeDPIBrowserTunneling" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </StackPanel.ToolTip>
                             <ToggleButton x:Name="chkByeDPIBrowserTunneling" 
                                          Style="{StaticResource ModernToggleSwitchStyle}"
                                          IsChecked="False"
@@ -745,7 +871,16 @@
                                 FontFamily="{StaticResource PoppinsBold}"
                                 Background="Transparent"
                                 Margin="0,0,0,10"
-                                Click="BtnByeDPIDLLSetup_Click"/>
+                                Click="BtnByeDPIDLLSetup_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipByeDPIDLL" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                         
                         <Button x:Name="btnRemoveByeDPI" 
                                 Content="ByeDPI'ı Kaldır" 
@@ -806,9 +941,26 @@
                                 Height="50"
                                 FontSize="16"
                                 FontFamily="{StaticResource PoppinsBold}"
-                                Click="BtnZapretAutoInstall_Click"/>
+                                Click="BtnZapretAutoInstall_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipZapretAuto" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                         
-                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,20,0,0" HorizontalAlignment="Center">
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,20,0,0" HorizontalAlignment="Center"
+                                    ToolTipService.InitialShowDelay="1000"
+                                    ToolTipService.ShowDuration="5000">
+                            <StackPanel.ToolTip>
+                                <ToolTip x:Name="tooltipScan" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </StackPanel.ToolTip>
                             <TextBlock x:Name="txtScan" Text="Tarama:" 
                                        VerticalAlignment="Center" 
                                        FontWeight="Bold"
@@ -844,36 +996,59 @@
                     
                     <!-- Hazır Ayar ve Düzenle Switch Yan Yana -->
                     <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,10" HorizontalAlignment="Left">
-                        <TextBlock x:Name="txtPresetZapret" Text="Hazır Ayar:" 
-                                   VerticalAlignment="Center" 
-                                   FontWeight="Bold"
-                                   FontFamily="{StaticResource PoppinsRegular}"
-                                   Margin="0,0,10,0"/>
+                        <StackPanel Orientation="Horizontal"
+                                    ToolTipService.InitialShowDelay="1000"
+                                    ToolTipService.ShowDuration="5000">
+                            <StackPanel.ToolTip>
+                                <ToolTip x:Name="tooltipPreset" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </StackPanel.ToolTip>
+                            <TextBlock x:Name="txtPresetZapret" Text="Hazır Ayar:" 
+                                       VerticalAlignment="Center" 
+                                       FontWeight="Bold"
+                                       FontFamily="{StaticResource PoppinsRegular}"
+                                       Margin="0,0,10,0"/>
+                            
+                            <ComboBox x:Name="cmbZapretPresets" 
+                                      Width="155"
+                                      FontFamily="{StaticResource PoppinsRegular}"
+                                      SelectionChanged="CmbZapretPresets_SelectionChanged"/>
+                        </StackPanel>
                         
-                        <ComboBox x:Name="cmbZapretPresets" 
-                                  Width="155"
-                                  FontFamily="{StaticResource PoppinsRegular}"
-                                  SelectionChanged="CmbZapretPresets_SelectionChanged"/>
-                        
-                        <!-- Hazır Ayarı Düzenle Toggle Switch -->
-                        <ToggleButton x:Name="chkManualParams" 
-                                     Style="{StaticResource ModernToggleSwitchStyle}"
-                                     Checked="ChkManualParams_Checked"
-                                     Unchecked="ChkManualParams_Unchecked"
-                                     Margin="20,0,0,0"/>
-                        <TextBlock x:Name="txtEditPresetZapret" Text="Hazır ayarı düzenle" 
-                                   FontFamily="{StaticResource Montserrat}"
-                                   VerticalAlignment="Center"
-                                   Margin="10,0,0,0"/>
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="20,0,0,0"
+                                    ToolTipService.InitialShowDelay="1000"
+                                    ToolTipService.ShowDuration="5000">
+                            <StackPanel.ToolTip>
+                                <ToolTip x:Name="tooltipEditPreset" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </StackPanel.ToolTip>
+                            <!-- Hazır Ayarı Düzenle Toggle Switch -->
+                            <ToggleButton x:Name="chkManualParams" 
+                                         Style="{StaticResource ModernToggleSwitchStyle}"
+                                         Checked="ChkManualParams_Checked"
+                                         Unchecked="ChkManualParams_Unchecked"/>
+                            <TextBlock x:Name="txtEditPresetZapret" Text="Hazır ayarı düzenle" 
+                                       FontFamily="{StaticResource Montserrat}"
+                                       VerticalAlignment="Center"
+                                       Margin="10,0,0,0"/>
+                        </StackPanel>
                     </StackPanel>
                     
                     <TextBox x:Name="txtZapretParams" 
                              Grid.Row="4" 
                              Height="60"
+                             Width="550"
+                             MaxWidth="550"
                              TextWrapping="Wrap"
                              AcceptsReturn="True"
                              VerticalScrollBarVisibility="Auto"
                              Margin="0,0,0,20"
+                             HorizontalAlignment="Left"
                              Visibility="Collapsed"/>
                     
                     <!-- Zapret Service Buttons -->
@@ -886,7 +1061,16 @@
                                 Style="{StaticResource MaterialDesignOutlinedButton}"
                                 Width="200"
                                 FontFamily="{StaticResource PoppinsRegular}"
-                                Click="BtnZapretCustomService_Click"/>
+                                Click="BtnZapretCustomService_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipPresetService" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                         
                         <Button x:Name="btnZapretCustomBatch" 
                                 Content="Önayarlı Tek Seferlik" 
@@ -894,7 +1078,16 @@
                                 Width="200"
                                 FontFamily="{StaticResource PoppinsRegular}"
                                 Margin="20,0,0,0"
-                                Click="BtnZapretCustomBatch_Click"/>
+                                Click="BtnZapretCustomBatch_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipPresetOnce" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                     </StackPanel>
                     
                     <!-- Remove Zapret Button -->
@@ -962,41 +1155,72 @@
                     
                     <!-- Hazır Ayar ve Düzenle Switch Yan Yana -->
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10" HorizontalAlignment="Center">
-                        <TextBlock x:Name="txtPresetGoodbyeDPI" Text="Hazır Ayar:" 
-                                   VerticalAlignment="Center" 
-                                   FontWeight="Bold"
-                                   FontFamily="{StaticResource PoppinsRegular}"
-                                   Margin="0,0,10,0"/>
+                        <StackPanel Orientation="Horizontal"
+                                    ToolTipService.InitialShowDelay="1000"
+                                    ToolTipService.ShowDuration="5000">
+                            <StackPanel.ToolTip>
+                                <ToolTip x:Name="tooltipGoodbyeDPIPreset" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </StackPanel.ToolTip>
+                            <TextBlock x:Name="txtPresetGoodbyeDPI" Text="Hazır Ayar:" 
+                                       VerticalAlignment="Center" 
+                                       FontWeight="Bold"
+                                       FontFamily="{StaticResource PoppinsRegular}"
+                                       Margin="0,0,10,0"/>
+                            
+                            <ComboBox x:Name="cmbGoodbyeDPIPresets" 
+                                      Width="100"
+                                      FontFamily="{StaticResource PoppinsRegular}"
+                                      SelectionChanged="CmbGoodbyeDPIPresets_SelectionChanged"/>
+                        </StackPanel>
                         
-                        <ComboBox x:Name="cmbGoodbyeDPIPresets" 
-                                  Width="100"
-                                  FontFamily="{StaticResource PoppinsRegular}"
-                                  SelectionChanged="CmbGoodbyeDPIPresets_SelectionChanged"/>
-                        
-                        <!-- Hazır Ayarı Düzenle Toggle Switch -->
-                        <ToggleButton x:Name="chkGoodbyeDPIManualParams" 
-                                     Style="{StaticResource ModernToggleSwitchStyle}"
-                                     Checked="ChkGoodbyeDPIManualParams_Checked"
-                                     Unchecked="ChkGoodbyeDPIManualParams_Unchecked"
-                                     Margin="20,0,0,0"/>
-                        <TextBlock x:Name="txtEditPresetGoodbyeDPI" Text="Hazır ayarı düzenle" 
-                                   FontFamily="{StaticResource Montserrat}"
-                                   VerticalAlignment="Center"
-                                   Margin="10,0,0,0"/>
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="20,0,0,0"
+                                    ToolTipService.InitialShowDelay="1000"
+                                    ToolTipService.ShowDuration="5000">
+                            <StackPanel.ToolTip>
+                                <ToolTip x:Name="tooltipGoodbyeDPIEditPreset" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </StackPanel.ToolTip>
+                            <!-- Hazır Ayarı Düzenle Toggle Switch -->
+                            <ToggleButton x:Name="chkGoodbyeDPIManualParams" 
+                                         Style="{StaticResource ModernToggleSwitchStyle}"
+                                         Checked="ChkGoodbyeDPIManualParams_Checked"
+                                         Unchecked="ChkGoodbyeDPIManualParams_Unchecked"/>
+                            <TextBlock x:Name="txtEditPresetGoodbyeDPI" Text="Hazır ayarı düzenle" 
+                                       FontFamily="{StaticResource Montserrat}"
+                                       VerticalAlignment="Center"
+                                       Margin="10,0,0,0"/>
+                        </StackPanel>
                     </StackPanel>
                     
                     <!-- Parametre TextBox -->
                     <TextBox x:Name="txtGoodbyeDPIParams" 
                              Grid.Row="2" 
                              Height="60"
+                             Width="550"
+                             MaxWidth="550"
                              TextWrapping="Wrap"
                              AcceptsReturn="True"
                              VerticalScrollBarVisibility="Auto"
                              Margin="0,0,0,20"
+                             HorizontalAlignment="Left"
                              Visibility="Collapsed"/>
                     
                     <!-- Blacklist kullan - Ortalanmış -->
-                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,10" HorizontalAlignment="Center">
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,10" HorizontalAlignment="Center"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                        <StackPanel.ToolTip>
+                            <ToolTip x:Name="tooltipGoodbyeDPIUseBlacklist" 
+                                     FontFamily="Poppins Regular"
+                                     FontSize="12"
+                                     Placement="Mouse"/>
+                        </StackPanel.ToolTip>
                         <ToggleButton x:Name="chkGoodbyeDPIUseBlacklist" 
                                      Style="{StaticResource ModernToggleSwitchStyle}"
                                      Checked="ChkGoodbyeDPIUseBlacklist_Checked"
@@ -1013,7 +1237,15 @@
                                 Orientation="Horizontal" 
                                 Margin="0,0,0,10" 
                                 HorizontalAlignment="Center"
-                                Visibility="Collapsed">
+                                Visibility="Collapsed"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                        <StackPanel.ToolTip>
+                            <ToolTip x:Name="tooltipGoodbyeDPIEditBlacklist" 
+                                     FontFamily="Poppins Regular"
+                                     FontSize="12"
+                                     Placement="Mouse"/>
+                        </StackPanel.ToolTip>
                         <ToggleButton x:Name="chkGoodbyeDPIEditBlacklist" 
                                      Style="{StaticResource ModernToggleSwitchStyle}"
                                      Checked="ChkGoodbyeDPIEditBlacklist_Checked"
@@ -1028,10 +1260,13 @@
                     <TextBox x:Name="txtGoodbyeDPIBlacklist" 
                              Grid.Row="5" 
                              Height="80"
+                             Width="550"
+                             MaxWidth="550"
                              TextWrapping="Wrap"
                              AcceptsReturn="True"
                              VerticalScrollBarVisibility="Auto"
                              Margin="0,0,0,10"
+                             HorizontalAlignment="Left"
                              Visibility="Collapsed"/>
                     
                     <!-- Kaydet Butonu -->
@@ -1043,7 +1278,16 @@
                             HorizontalAlignment="Left"
                             FontFamily="{StaticResource PoppinsRegular}"
                             Click="BtnGoodbyeDPISaveBlacklist_Click"
-                            Visibility="Collapsed"/>
+                            Visibility="Collapsed"
+                            ToolTipService.InitialShowDelay="1000"
+                            ToolTipService.ShowDuration="5000">
+                        <Button.ToolTip>
+                            <ToolTip x:Name="tooltipGoodbyeDPISaveBlacklist" 
+                                     FontFamily="Poppins Regular"
+                                     FontSize="12"
+                                     Placement="Mouse"/>
+                        </Button.ToolTip>
+                    </Button>
                     
                     <!-- Hizmet Kur ve Tek Seferlik Butonları -->
                     <StackPanel Grid.Row="7" 
@@ -1055,7 +1299,16 @@
                                 Style="{StaticResource MaterialDesignOutlinedButton}"
                                 Width="200"
                                 FontFamily="{StaticResource PoppinsBold}"
-                                Click="BtnGoodbyeDPIService_Click"/>
+                                Click="BtnGoodbyeDPIService_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipGoodbyeDPIService" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                         
                         <Button x:Name="btnGoodbyeDPIBatch" 
                                 Content="Tek Seferlik" 
@@ -1063,7 +1316,16 @@
                                 Width="200"
                                 Margin="20,0,0,0"
                                 FontFamily="{StaticResource PoppinsBold}"
-                                Click="BtnGoodbyeDPIBatch_Click"/>
+                                Click="BtnGoodbyeDPIBatch_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipGoodbyeDPIOnce" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                     </StackPanel>
                     
                     <!-- GoodbyeDPI Kaldır Butonu -->
@@ -1112,6 +1374,8 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -1127,7 +1391,16 @@
                             FontFamily="{StaticResource PoppinsBold}"
                             Background="Transparent"
                             Margin="0,0,0,15"
-                            Click="BtnDiscordRepair_Click"/>
+                            Click="BtnDiscordRepair_Click"
+                            ToolTipService.InitialShowDelay="1000"
+                            ToolTipService.ShowDuration="8000">
+                        <Button.ToolTip>
+                            <ToolTip x:Name="tooltipDiscordRepair" 
+                                     FontFamily="Poppins Regular"
+                                     FontSize="12"
+                                     Placement="Mouse"/>
+                        </Button.ToolTip>
+                    </Button>
                     
                     <!-- Discord PTB Yükle Butonu -->
                     <Button x:Name="btnDiscordPTBInstall" 
@@ -1140,13 +1413,52 @@
                             FontFamily="{StaticResource PoppinsBold}"
                             Background="Transparent"
                             Margin="0,0,0,15"
-                            Click="BtnDiscordPTBInstall_Click"/>
+                            Click="BtnDiscordPTBInstall_Click"
+                            ToolTipService.InitialShowDelay="1000"
+                            ToolTipService.ShowDuration="5000">
+                        <Button.ToolTip>
+                            <ToolTip x:Name="tooltipDiscordPTBInstall" 
+                                     FontFamily="Poppins Regular"
+                                     FontSize="12"
+                                     Placement="Mouse"/>
+                        </Button.ToolTip>
+                    </Button>
+                    
+                    <!-- WebCord Yükle Butonu -->
+                    <Button x:Name="btnWebCordInstall" 
+                            Grid.Row="2"
+                            Content="WebCord Yükle" 
+                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                            Width="300"
+                            Height="50"
+                            FontSize="16"
+                            FontFamily="{StaticResource PoppinsBold}"
+                            Background="Transparent"
+                            Margin="0,0,0,15"
+                            Click="BtnWebCordInstall_Click"
+                            ToolTipService.InitialShowDelay="1000"
+                            ToolTipService.ShowDuration="8000">
+                        <Button.ToolTip>
+                            <ToolTip x:Name="tooltipWebCordInstall" 
+                                     FontFamily="Poppins Regular"
+                                     FontSize="12"
+                                     Placement="Mouse"/>
+                        </Button.ToolTip>
+                    </Button>
                     
                     <!-- Standart Discord Kaldırma Toggle Switch -->
-                    <StackPanel Grid.Row="2" 
+                    <StackPanel Grid.Row="3" 
                                Orientation="Horizontal" 
                                HorizontalAlignment="Center" 
-                               Margin="0,5,0,20">
+                               Margin="0,5,0,20"
+                               ToolTipService.InitialShowDelay="1000"
+                               ToolTipService.ShowDuration="5000">
+                        <StackPanel.ToolTip>
+                            <ToolTip x:Name="tooltipCleanInstallPTB" 
+                                     FontFamily="Poppins Regular"
+                                     FontSize="12"
+                                     Placement="Mouse"/>
+                        </StackPanel.ToolTip>
                         <ToggleButton x:Name="chkDiscordUninstallStandard" 
                                      Style="{StaticResource ModernToggleSwitchStyle}"
                                      IsChecked="False"/>
@@ -1158,8 +1470,32 @@
                                    MaxWidth="250"/>
                     </StackPanel>
                     
+                    <!-- WebCord için Kısayol Oluştur Switch -->
+                    <StackPanel Grid.Row="4" 
+                               Orientation="Horizontal" 
+                               HorizontalAlignment="Center" 
+                               Margin="0,5,0,20"
+                               ToolTipService.InitialShowDelay="1000"
+                               ToolTipService.ShowDuration="5000">
+                        <StackPanel.ToolTip>
+                            <ToolTip x:Name="tooltipWebCordShortcut" 
+                                     FontFamily="Poppins Regular"
+                                     FontSize="12"
+                                     Placement="Mouse"/>
+                        </StackPanel.ToolTip>
+                        <ToggleButton x:Name="chkWebCordShortcut" 
+                                     Style="{StaticResource ModernToggleSwitchStyle}"
+                                     IsChecked="True"/>
+                        <TextBlock x:Name="txtWebCordShortcut" Text="WebCord için kısayol oluştur" 
+                                   FontFamily="{StaticResource Montserrat}"
+                                   VerticalAlignment="Center"
+                                   Margin="10,0,0,0"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="250"/>
+                    </StackPanel>
+                    
                     <!-- Discord Durum Kontrolü -->
-                    <Grid Grid.Row="3" Margin="0,0,0,15">
+                    <Grid Grid.Row="5" Margin="0,0,0,15">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
@@ -1197,7 +1533,16 @@
                                 FontFamily="{StaticResource PoppinsRegular}"
                                 HorizontalAlignment="Center"
                                 Margin="0,0,0,0"
-                                Click="BtnDiscordAction_Click"/>
+                                Click="BtnDiscordAction_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipDiscordAction" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                         
                         <Button Grid.Column="3"
                                 x:Name="btnDiscordRemove" 
@@ -1209,7 +1554,15 @@
                                 HorizontalAlignment="Right"
                                 Visibility="Collapsed"
                                 Click="BtnDiscordRemove_Click"
-                                Margin="10,0,0,0">
+                                Margin="10,0,0,0"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipDiscordRemove" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
                                     <Setter Property="Background" Value="#8B0000"/>
@@ -1228,7 +1581,7 @@
                     </Grid>
                     
                     <!-- Discord PTB Durum Kontrolü -->
-                    <Grid Grid.Row="4" Margin="0,0,0,15">
+                    <Grid Grid.Row="6" Margin="0,0,0,15">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
@@ -1266,7 +1619,16 @@
                                 FontFamily="{StaticResource PoppinsRegular}"
                                 HorizontalAlignment="Center"
                                 Margin="0,0,0,0"
-                                Click="BtnDiscordPTBAction_Click"/>
+                                Click="BtnDiscordPTBAction_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipDiscordPTBAction" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                         
                         <Button Grid.Column="3"
                                 x:Name="btnDiscordPTBRemove" 
@@ -1278,7 +1640,100 @@
                                 HorizontalAlignment="Right"
                                 Margin="10,0,0,0"
                                 Visibility="Collapsed"
-                                Click="BtnDiscordPTBRemove_Click">
+                                Click="BtnDiscordPTBRemove_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipDiscordPTBRemove" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+                                    <Setter Property="Background" Value="#8B0000"/>
+                                    <Setter Property="BorderBrush" Value="#FF0000"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#b83737"/>
+                                            <Setter Property="BorderBrush" Value="#FF0000"/>
+                                            <Setter Property="Foreground" Value="Red"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </Grid>
+                    
+                    <!-- WebCord Durum Kontrolü -->
+                    <Grid Grid.Row="7" Margin="0,0,0,15">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <TextBlock Grid.Column="0" 
+                                   Text="WebCord:" 
+                                   VerticalAlignment="Center" 
+                                   FontWeight="Bold"
+                                   FontFamily="{StaticResource PoppinsRegular}"
+                                   HorizontalAlignment="Left"/>
+                        
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Left" Margin="138,0,0,0">
+                            <Ellipse x:Name="webCordStatus" 
+                                     Width="12" 
+                                     Height="12" 
+                                     Fill="Gray" 
+                                     Margin="0,0,10,0"/>
+                            <TextBlock x:Name="lblWebCordStatus" 
+                                       Text="Yüklü Değil" 
+                                       VerticalAlignment="Center"
+                                       FontFamily="{StaticResource PoppinsRegular}"/>
+                        </StackPanel>
+                        
+                        <Button Grid.Column="2"
+                                x:Name="btnWebCordAction" 
+                                Content="Yükle" 
+                                Style="{StaticResource MaterialDesignOutlinedButton}"
+                                Width="80"
+                                Height="30"
+                                FontSize="12"
+                                FontFamily="{StaticResource PoppinsRegular}"
+                                HorizontalAlignment="Center"
+                                Margin="0,0,0,0"
+                                Click="BtnWebCordAction_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipWebCordAction" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
+                        
+                        <Button Grid.Column="3"
+                                x:Name="btnWebCordRemove" 
+                                Content="Kaldır" 
+                                Width="80"
+                                Height="30"
+                                FontSize="12"
+                                FontFamily="{StaticResource PoppinsRegular}"
+                                HorizontalAlignment="Right"
+                                Visibility="Collapsed"
+                                Click="BtnWebCordRemove_Click"
+                                Margin="10,0,0,0"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipWebCordRemove" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
                                     <Setter Property="Background" Value="#8B0000"/>
@@ -1298,7 +1753,7 @@
                     
                     <!-- Discord Yardım Butonu -->
                     <Button x:Name="btnHelpDiscord" 
-                            Grid.Row="6"
+                            Grid.Row="8"
                             Content="?" 
                             Style="{StaticResource InfoButtonStyle}"
                             HorizontalAlignment="Right"
@@ -1312,6 +1767,8 @@
             <TabItem Header="Gelişmiş" FontFamily="{StaticResource PoppinsBold}">
                 <Grid Margin="16">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -1369,7 +1826,16 @@
                                 Style="{StaticResource AdvancedRemoveButtonStyle}"
                                 HorizontalAlignment="Right"
                                 Visibility="Collapsed"
-                                Click="BtnWireSockRemove_Click"/>
+                                Click="BtnWireSockRemove_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipRemoveService" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                     </Grid>
                     
 
@@ -1407,7 +1873,16 @@
                                 Style="{StaticResource AdvancedRemoveButtonStyle}"
                                 HorizontalAlignment="Right"
                                 Visibility="Collapsed"
-                                Click="BtnByeDPIRemove_Click"/>
+                                Click="BtnByeDPIRemove_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipByeDPIRemoveService" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                     </Grid>
                     
                     <!-- ProxiFyre Hizmeti -->
@@ -1443,7 +1918,16 @@
                                 Style="{StaticResource AdvancedRemoveButtonStyle}"
                                 HorizontalAlignment="Right"
                                 Visibility="Collapsed"
-                                Click="BtnProxiFyreRemove_Click"/>
+                                Click="BtnProxiFyreRemove_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipProxiFyreRemoveService" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                     </Grid>
                     
                     <!-- WinWS1 Hizmeti -->
@@ -1479,7 +1963,16 @@
                                 Style="{StaticResource AdvancedRemoveButtonStyle}"
                                 HorizontalAlignment="Right"
                                 Visibility="Collapsed"
-                                Click="BtnWinWS1Remove_Click"/>
+                                Click="BtnWinWS1Remove_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipWinWS1RemoveService" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                     </Grid>
                     
                     <!-- WinWS2 Hizmeti -->
@@ -1515,7 +2008,16 @@
                                 Style="{StaticResource AdvancedRemoveButtonStyle}"
                                 HorizontalAlignment="Right"
                                 Visibility="Collapsed"
-                                Click="BtnWinWS2Remove_Click"/>
+                                Click="BtnWinWS2Remove_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipWinWS2RemoveService" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                     </Grid>
                     
                     <!-- Zapret Hizmeti -->
@@ -1551,7 +2053,16 @@
                                 Style="{StaticResource AdvancedRemoveButtonStyle}"
                                 HorizontalAlignment="Right"
                                 Visibility="Collapsed"
-                                Click="BtnZapretServiceRemove_Click"/>
+                                Click="BtnZapretServiceRemove_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipZapretServiceRemoveService" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                     </Grid>
                     
                     <!-- GoodbyeDPI Hizmeti -->
@@ -1587,7 +2098,16 @@
                                 Style="{StaticResource AdvancedRemoveButtonStyle}"
                                 HorizontalAlignment="Right"
                                 Visibility="Collapsed"
-                                Click="BtnGoodbyeDPIAdvancedRemove_Click"/>
+                                Click="BtnGoodbyeDPIAdvancedRemove_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipGoodbyeDPIAdvancedRemoveService" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                     </Grid>
                     
                     <!-- WinDivert Hizmeti -->
@@ -1623,7 +2143,16 @@
                                 Style="{StaticResource AdvancedRemoveButtonStyle}"
                                 HorizontalAlignment="Right"
                                 Visibility="Collapsed"
-                                Click="BtnWinDivertRemove_Click"/>
+                                Click="BtnWinDivertRemove_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipWinDivertRemoveService" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                     </Grid>
                     
                     <!-- Drover Dosyaları -->
@@ -1659,15 +2188,54 @@
                                 Style="{StaticResource AdvancedRemoveButtonStyle}"
                                 HorizontalAlignment="Right"
                                 Visibility="Collapsed"
-                                Click="BtnDroverRemove_Click"/>
+                                Click="BtnDroverRemove_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipDroverRemoveService" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
+                        </Button>
                     </Grid>
                     
+                    <!-- Otomatik DNS Değişikliği Switch -->
+                    <StackPanel Grid.Row="10" Orientation="Horizontal" 
+                               HorizontalAlignment="Center" 
+                               Margin="0,10,0,10"
+                               ToolTipService.InitialShowDelay="1000"
+                               ToolTipService.ShowDuration="8000">
+                        <StackPanel.ToolTip>
+                            <ToolTip x:Name="tooltipAutoDNSChange" 
+                                     FontFamily="Poppins Regular"
+                                     FontSize="12"
+                                     Placement="Mouse"/>
+                        </StackPanel.ToolTip>
+                        <ToggleButton x:Name="chkAutoDNSChange" 
+                                     Style="{StaticResource ModernToggleSwitchStyle}"
+                                     Checked="ChkAutoDNSChange_Checked"
+                                     Unchecked="ChkAutoDNSChange_Unchecked"/>
+                        <TextBlock x:Name="txtAutoDNSChange" Text="Otomatik DNS değişikliği yap" 
+                                   FontFamily="{StaticResource Montserrat}"
+                                   VerticalAlignment="Center"
+                                   Margin="10,0,0,0"/>
+                    </StackPanel>
+                    
                     <!-- Tüm Hizmetleri Kaldır Butonu -->
-                    <StackPanel Grid.Row="10" HorizontalAlignment="Center" Margin="0,20,0,0">
+                    <StackPanel Grid.Row="11" HorizontalAlignment="Center" Margin="0,20,0,0">
                         <Button x:Name="btnRemoveAllServices" 
                                 Content="Tüm Hizmetleri Kaldır" 
                                 FontFamily="{StaticResource PoppinsRegular}"
-                                Click="BtnRemoveAllServices_Click">
+                                Click="BtnRemoveAllServices_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipRemoveAllServices" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
                                     <Setter Property="Background" Value="#8B0000"/>
@@ -1686,11 +2254,19 @@
                     </StackPanel>
                     
                     <!-- DNS ve DoH Ayarlarını Geri Al Butonu -->
-                    <StackPanel Grid.Row="11" HorizontalAlignment="Center" Margin="0,15,0,0">
+                    <StackPanel Grid.Row="12" HorizontalAlignment="Center" Margin="0,15,0,0">
                         <Button x:Name="btnResetDNSDoH" 
                                 Content="DNS ve DoH Ayarlarını Geri Al" 
                                 FontFamily="{StaticResource PoppinsRegular}"
-                                Click="BtnResetDNSDoH_Click">
+                                Click="BtnResetDNSDoH_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipResetDNSDoH" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
                                     <Setter Property="Background" Value="#8B0000"/>
@@ -1709,11 +2285,19 @@
                     </StackPanel>
                     
                     <!-- SplitWire-Turkey'i Kaldır Butonu -->
-                    <StackPanel Grid.Row="12" HorizontalAlignment="Center" Margin="0,15,0,0">
+                    <StackPanel Grid.Row="13" HorizontalAlignment="Center" Margin="0,15,0,0">
                         <Button x:Name="btnUninstallSplitWire" 
                                 Content="SplitWire-Turkey'i Kaldır" 
                                 FontFamily="{StaticResource PoppinsRegular}"
-                                Click="BtnUninstallSplitWire_Click">
+                                Click="BtnUninstallSplitWire_Click"
+                                ToolTipService.InitialShowDelay="1000"
+                                ToolTipService.ShowDuration="5000">
+                            <Button.ToolTip>
+                                <ToolTip x:Name="tooltipUninstallSplitWire" 
+                                         FontFamily="Poppins Regular"
+                                         FontSize="12"
+                                         Placement="Mouse"/>
+                            </Button.ToolTip>
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
                                     <Setter Property="Background" Value="#8B0000"/>
@@ -1733,11 +2317,11 @@
                     
                     <!-- Gelişmiş Yardım Butonu -->
                     <Button x:Name="btnHelpAdvanced" 
-                            Grid.Row="12"
+                            Grid.Row="13"
                             Content="?" 
                             Style="{StaticResource InfoButtonStyle}"
                             HorizontalAlignment="Right"
-                            VerticalAlignment="Center"
+                            VerticalAlignment="Top"
                             Margin="0,3,10,0"
                             Click="BtnHelpAdvanced_Click"/>
                 </Grid>

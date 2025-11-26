@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net6.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>Resources\splitwire.ico</ApplicationIcon>
@@ -13,8 +13,8 @@
     <AssemblyCompany>Çağrı Taşkın</AssemblyCompany>
     <AssemblyProduct>SplitWire-Turkey</AssemblyProduct>
     <AssemblyCopyright>© 2025 Çağrı Taşkın</AssemblyCopyright>
-    <AssemblyVersion>1.5.4</AssemblyVersion>
-    <FileVersion>1.5.4</FileVersion>
+    <AssemblyVersion>1.5.5</AssemblyVersion>
+    <FileVersion>1.5.5</FileVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- Disable trimming for WPF -->
     <PublishTrimmed>false</PublishTrimmed>
@@ -45,6 +45,7 @@
     <Resource Include="Resources\Flags\tr_flag.png" Condition="Exists('Resources\Flags\tr_flag.png')" />
     <Resource Include="Resources\Flags\gb_flag.png" Condition="Exists('Resources\Flags\gb_flag.png')" />
     <Resource Include="Resources\Flags\ru_flag.png" Condition="Exists('Resources\Flags\ru_flag.png')" />
+    <Resource Include="Resources\Flags\es_flag.png" Condition="Exists('Resources\Flags\es_flag.png')" />
     <Resource Include="Resources\language.png" Condition="Exists('Resources\language.png')" />
     <Resource Include="Resources\language_darkmode.png" Condition="Exists('Resources\language_darkmode.png')" />
   </ItemGroup>
@@ -57,6 +58,22 @@
   </ItemGroup>
 
 </Project> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
