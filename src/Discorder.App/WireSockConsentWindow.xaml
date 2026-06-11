@@ -43,7 +43,7 @@
                            Foreground="{StaticResource SecondaryTextBrush}"
                            TextWrapping="Wrap"
                            LineHeight="21"
-                           Text="Discorder resmi WireSock VPN Client x64 MSI kurucusunu indirir; SHA-256, Windows Authenticode, yayıncı ve sürüm bilgilerini doğrular. Ardından Windows yönetici onayıyla resmi kurucuyu açar ve kurulum bitince Discord profilini otomatik hazırlar." />
+                           Text="Discorder resmi WireSock VPN Client x64 MSI kurucusunu indirir; SHA-256, Windows Authenticode, yayıncı ve sürüm bilgilerini doğrular. Ardından Windows yönetici onayıyla resmi kurucuyu açar ve kurulum bitince Discord uygulaması ve desteklenen tarayıcılar için profili otomatik hazırlar." />
             </StackPanel>
         </Border>
 

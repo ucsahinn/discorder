@@ -11,10 +11,10 @@ using Discorder.Core.WireSock;
 
 var tests = new (string Name, Func<Task> Run)[]
 {
-    ("Discord kapsamı yalnızca Discord uygulamalarını içerir", DiscordScopeIsStrictAsync),
+    ("Discord kapsamı uygulama ve desteklenen tarayıcıları içerir", DiscordScopeIncludesBrowsersAsync),
     ("Profil üretici geniş AllowedApps değerlerini değiştirir", ProfileBuilderIsStrictAsync),
     ("Profil üretici yapılandırma enjeksiyonunu reddeder", ProfileBuilderRejectsInjectionAsync),
-    ("wgcf yalnızca Discord profili üretir", WgcfProvisionerBuildsDiscordOnlyProfileAsync),
+    ("wgcf Discord uygulama ve web profili üretir", WgcfProvisionerBuildsDiscordAccessProfileAsync),
     ("SHA-256 doğrulayıcı yalnızca sabit özeti kabul eder", HashVerifierIsStrictAsync),
     ("Ayarlar WireSock onayını sürüm bazında saklar", SettingsPersistConsentAsync),
     ("WireSock hazırlığı onaysız kurulumu reddeder", BootstrapRequiresConsentAsync),
@@ -54,23 +54,37 @@ Console.WriteLine();
 Console.WriteLine($"{tests.Length} test geçti.");
 return 0;
 
-static Task DiscordScopeIsStrictAsync()
+static Task DiscordScopeIncludesBrowsersAsync()
 {
     var root = CreateTemporaryDirectory();
     Directory.CreateDirectory(Path.Combine(root, "Discord"));
-    Directory.CreateDirectory(Path.Combine(root, "Chrome"));
+    Directory.CreateDirectory(Path.Combine(
+        root,
+        "Google",
+        "Chrome",
+        "Application"));
+    Directory.CreateDirectory(Path.Combine(
+        root,
+        "Mozilla Firefox"));
 
     try
     {
-        var apps = new DiscordAppScope(root).GetAllowedApplications();
+        var apps = new DiscordAppScope(root, root, root).GetAllowedApplications();
 
         Assert(apps.Any(app => app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals("msedge.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals("firefox.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals(
             Path.Combine(root, "Discord"),
             StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.All(app => app.Contains("Discord", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals(
+            Path.Combine(root, "Google", "Chrome", "Application"),
+            StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals(
+            Path.Combine(root, "Mozilla Firefox"),
+            StringComparison.OrdinalIgnoreCase)));
         Assert(apps.All(app => !app.Equals("Update.exe", StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.All(app => !app.Contains("chrome", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.All(app => !app.Contains("roblox", StringComparison.OrdinalIgnoreCase)));
     }
     finally
@@ -97,11 +111,17 @@ static Task ProfileBuilderIsStrictAsync()
 
     var profile = WireGuardProfileBuilder.BuildDiscordOnly(
         source,
-        ["Discord.exe", @"C:\Users\test\AppData\Local\Discord"]);
+        [
+            "Discord.exe",
+            "chrome.exe",
+            "msedge.exe",
+            @"C:\Users\test\AppData\Local\Discord"
+        ]);
 
     Assert(profile.Contains("AllowedApps = ", StringComparison.Ordinal));
     Assert(profile.Contains("Discord.exe", StringComparison.Ordinal));
-    Assert(!profile.Contains("chrome.exe", StringComparison.OrdinalIgnoreCase));
+    Assert(profile.Contains("chrome.exe", StringComparison.OrdinalIgnoreCase));
+    Assert(profile.Contains("msedge.exe", StringComparison.OrdinalIgnoreCase));
     Assert(!profile.Contains("roblox.exe", StringComparison.OrdinalIgnoreCase));
     Assert(!profile.Contains("Update.exe", StringComparison.OrdinalIgnoreCase));
     Assert(profile.Split("AllowedApps =", StringSplitOptions.None).Length == 2);
@@ -124,7 +144,7 @@ static Task ProfileBuilderRejectsInjectionAsync()
     return Task.CompletedTask;
 }
 
-static async Task WgcfProvisionerBuildsDiscordOnlyProfileAsync()
+static async Task WgcfProvisionerBuildsDiscordAccessProfileAsync()
 {
     var root = CreateTemporaryDirectory();
     var paths = new AppPaths(root);
@@ -139,7 +159,7 @@ static async Task WgcfProvisionerBuildsDiscordOnlyProfileAsync()
     {
         var discordDirectory = Path.Combine(root, "Discord");
         var profilePath = await provisioner.EnsureProfileAsync(
-            ["Discord.exe", discordDirectory],
+            ["Discord.exe", "chrome.exe", "msedge.exe", discordDirectory],
             CancellationToken.None);
 
         var profile = await File.ReadAllTextAsync(profilePath);
@@ -149,9 +169,10 @@ static async Task WgcfProvisionerBuildsDiscordOnlyProfileAsync()
             .Split(["\r\n", "\n"], StringSplitOptions.None)
             .Single(line => line.StartsWith("AllowedApps =", StringComparison.Ordinal));
         Assert(allowedAppsLine.Contains("Discord.exe", StringComparison.Ordinal));
+        Assert(allowedAppsLine.Contains("chrome.exe", StringComparison.OrdinalIgnoreCase));
+        Assert(allowedAppsLine.Contains("msedge.exe", StringComparison.OrdinalIgnoreCase));
         Assert(allowedAppsLine.Contains(discordDirectory, StringComparison.OrdinalIgnoreCase));
         Assert(profile.Contains(discordDirectory, StringComparison.OrdinalIgnoreCase));
-        Assert(!profile.Contains("chrome.exe", StringComparison.OrdinalIgnoreCase));
         Assert(!profile.Contains("roblox.exe", StringComparison.OrdinalIgnoreCase));
         Assert(!profile.Contains("Update.exe", StringComparison.OrdinalIgnoreCase));
         Assert(commandRunner.Commands.SequenceEqual(
@@ -405,6 +426,8 @@ static async Task ControllerLifecycleAsync()
     var root = CreateTemporaryDirectory();
     var process = new FakeManagedProcess();
     var processLauncher = new FakeProcessLauncher(process);
+    var profileProvisioner = new FakeProfileProvisioner(
+        Path.Combine(root, "discord.conf"));
     var wireSockExecutable = Path.Combine(
         root,
         "WireSock VPN Client",
@@ -412,9 +435,9 @@ static async Task ControllerLifecycleAsync()
         WireSockPackage.CliExecutableFileName);
     var controller = new DiscordTunnelController(
         new AppPaths(root),
-        new DiscordAppScope(root),
+        new DiscordAppScope(root, root, root),
         new FakeWireSockBootstrapper(wireSockExecutable),
-        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        profileProvisioner,
         processLauncher,
         TimeSpan.Zero);
 
@@ -422,6 +445,14 @@ static async Task ControllerLifecycleAsync()
     {
         await controller.ConnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(profileProvisioner.LastAllowedApplications.Any(app =>
+            app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(profileProvisioner.LastAllowedApplications.Any(app =>
+            app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(profileProvisioner.LastAllowedApplications.Any(app =>
+            app.Equals("msedge.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(profileProvisioner.LastAllowedApplications.All(app =>
+            !app.Contains("roblox", StringComparison.OrdinalIgnoreCase)));
         Assert(processLauncher.LastExecutable == wireSockExecutable);
         Assert(processLauncher.LastArguments.SequenceEqual(
             [
@@ -455,7 +486,7 @@ static async Task ControllerBootstrapFailureAsync()
     var root = CreateTemporaryDirectory();
     var controller = new DiscordTunnelController(
         new AppPaths(root),
-        new DiscordAppScope(root),
+        new DiscordAppScope(root, root, root),
         new FakeWireSockBootstrapper(
             new InvalidOperationException(
                 "WireSock VPN Client kurulamadı.")),
@@ -703,10 +734,14 @@ file sealed class FakeInstallerLauncher(
 
 file sealed class FakeProfileProvisioner(string profilePath) : IProfileProvisioner
 {
+    public IReadOnlyList<string> LastAllowedApplications { get; private set; } = [];
+
     public Task<string> EnsureProfileAsync(
         IReadOnlyList<string> allowedApplications,
         CancellationToken cancellationToken)
     {
+        LastAllowedApplications = allowedApplications.ToArray();
+
         if (allowedApplications.Count == 0)
         {
             throw new InvalidOperationException("Uygulama listesi boş geldi.");

@@ -8,9 +8,9 @@ body:
     attributes:
       label: Ürün sözleşmesi
       options:
-        - label: Öneri yalnızca Windows ve Discord kapsamındadır.
+        - label: Öneri yalnızca Windows, Discord uygulaması ve Discord web kapsamındadır.
           required: true
-        - label: Tarayıcı, oyun, özel uygulama listesi, DNS veya başka bypass motoru istemiyorum.
+        - label: Desteklenen tarayıcılar dışında oyun, özel uygulama listesi, DNS veya başka bypass motoru istemiyorum.
           required: true
   - type: textarea
     id: problem

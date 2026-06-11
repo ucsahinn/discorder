@@ -108,7 +108,7 @@ static void RenderMainWindow()
         var bootstrapper = new FakeWireSockBootstrapper();
         var controller = new DiscordTunnelController(
             new AppPaths(root),
-            new DiscordAppScope(root),
+            new DiscordAppScope(root, root, root),
             bootstrapper,
             new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
             new FakeProcessLauncher(),
@@ -125,7 +125,7 @@ static void RenderMainWindow()
             "\n",
             FindVisualChildren<TextBlock>(window).Select(block => block.Text));
         Assert(text.Contains("Discorder", StringComparison.Ordinal));
-        Assert(text.Contains("Sadece Discord için VPN", StringComparison.Ordinal));
+        Assert(text.Contains("Discord uygulaması ve web için VPN", StringComparison.Ordinal));
         Assert(text.Contains("KAPALI", StringComparison.Ordinal));
         Assert(text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
         Assert(text.Contains("SİSTEM DNS", StringComparison.Ordinal));

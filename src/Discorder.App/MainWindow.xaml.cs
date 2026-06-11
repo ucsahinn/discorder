@@ -124,12 +124,12 @@ public partial class MainWindow : Window, IDisposable
     {
         return state switch
         {
-            TunnelState.Connected => "Discord, Discord PTB ve Discord Canary süreçleri kapsamda.",
-            TunnelState.Preparing => "Kurulum, dijital imza ve Discord profili doğrulanıyor.",
+            TunnelState.Connected => "Discord uygulamaları ve desteklenen tarayıcılar kapsamda.",
+            TunnelState.Preparing => "Kurulum, dijital imza ve Discord web profili doğrulanıyor.",
             TunnelState.Connecting => "WireSock VPN Client süreci başlatılıyor.",
             TunnelState.Disconnecting => "Tünel süreci güvenli biçimde sonlandırılıyor.",
             TunnelState.Error => "Tanılama klasörünü açarak ayrıntıları inceleyin.",
-            _ => "Diğer uygulamalar normal internet bağlantısını kullanır."
+            _ => "Discorder kapalıyken VPN süreci çalışmaz."
         };
     }
 

@@ -8,7 +8,7 @@ body:
     attributes:
       label: Kapsam kontrolü
       options:
-        - label: Sorun Discord Stable, PTB, Canary veya Development uygulamasını etkiliyor.
+        - label: Sorun Discord Stable, PTB, Canary, Development veya desteklenen tarayıcıdan Discord web kullanımını etkiliyor.
           required: true
         - label: Gizli WireGuard profili veya hesap dosyası eklemedim.
           required: true
@@ -31,8 +31,8 @@ body:
   - type: input
     id: dependencies
     attributes:
-      label: Discord ve WireSock sürümleri
-      placeholder: Discord Stable 1.0.x / WireSock VPN Client 1.4.7.1
+      label: Discord, tarayıcı ve WireSock sürümleri
+      placeholder: Discord Stable 1.0.x / Chrome 126 veya Edge 126 / WireSock VPN Client 1.4.7.1
     validations:
       required: true
   - type: input

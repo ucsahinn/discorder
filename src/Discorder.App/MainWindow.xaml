@@ -43,7 +43,7 @@
                     <TextBlock Margin="0,3,0,0"
                                FontSize="12"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="Sadece Discord için VPN" />
+                               Text="Discord uygulaması ve web için VPN" />
                 </StackPanel>
 
                 <Border Grid.Column="2"
@@ -177,7 +177,7 @@
                     <TextBlock Margin="0,7,0,0"
                                FontSize="14"
                                FontWeight="SemiBold"
-                               Text="Discord" />
+                               Text="Uygulama + web" />
                 </StackPanel>
 
                 <Border Grid.Column="1"

@@ -4,7 +4,7 @@
 
 ## Ürün sözleşmesi
 
-- [ ] Yalnızca Discord tünel kapsamı korunuyor.
+- [ ] Discord uygulaması ve desteklenen tarayıcı kapsamı korunuyor.
 - [ ] DNS, servis ve görev zamanlayıcı davranışı eklenmedi.
 - [ ] Üçüncü taraf ikili dosya, kurucu, sürücü veya arşiv eklenmedi.
 - [ ] TLS doğrulaması ve hata kontrolleri zayıflatılmadı.

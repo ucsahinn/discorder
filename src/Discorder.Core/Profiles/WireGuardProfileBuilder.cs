@@ -20,7 +20,7 @@ public static class WireGuardProfileBuilder
         if (apps.Length == 0)
         {
             throw new InvalidOperationException(
-                "At least one Discord application must be present in AllowedApps.");
+                "At least one application must be present in AllowedApps.");
         }
 
         var sourceLines = sourceProfile

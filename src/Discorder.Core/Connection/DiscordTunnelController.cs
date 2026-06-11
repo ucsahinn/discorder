@@ -110,7 +110,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
             SetStatus(
                 TunnelState.Connected,
-                "Yalnızca Discord trafiği tünelleniyor");
+                "Discord uygulaması ve web erişimi tünelleniyor");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

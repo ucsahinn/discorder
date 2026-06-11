@@ -12,7 +12,7 @@
     <AssemblyName>Discorder</AssemblyName>
     <RootNamespace>Discorder.App</RootNamespace>
     <AssemblyTitle>Discorder</AssemblyTitle>
-    <AssemblyDescription>Windows için yalnızca Discord trafiğini tünelleyen VPN denetleyicisi</AssemblyDescription>
+    <AssemblyDescription>Windows için Discord uygulaması ve web erişimini tünelleyen VPN denetleyicisi</AssemblyDescription>
     <AssemblyCompany>ucsahinn</AssemblyCompany>
     <AssemblyProduct>Discorder</AssemblyProduct>
     <Copyright>Copyright (c) 2026 ucsahinn</Copyright>

@@ -12,6 +12,7 @@ artifacts/
 
 # Tool output
 .playwright-mcp/
+.serena/
 TestResults/
 coverage/
 
