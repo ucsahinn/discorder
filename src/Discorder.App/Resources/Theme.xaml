@@ -1,29 +1,30 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <SolidColorBrush x:Key="WindowBrush" Color="#05070D" />
-    <SolidColorBrush x:Key="SurfaceBrush" Color="#151A2A" />
-    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#242944" />
-    <SolidColorBrush x:Key="BorderBrush" Color="#7F8BC7" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#111827" />
+    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#1B263A" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#7F9FD8" />
     <SolidColorBrush x:Key="PrimaryTextBrush" Color="#F5F7FB" />
     <SolidColorBrush x:Key="SecondaryTextBrush" Color="#C7D1E8" />
-    <SolidColorBrush x:Key="MutedTextBrush" Color="#98A5C4" />
-    <SolidColorBrush x:Key="AccentBrush" Color="#B8A7FF" />
-    <SolidColorBrush x:Key="AccentSoftBrush" Color="#3A477D" />
-    <SolidColorBrush x:Key="AccentCyanBrush" Color="#78E5FF" />
-    <SolidColorBrush x:Key="GlassBorderBrush" Color="#8491FF" />
+    <SolidColorBrush x:Key="MutedTextBrush" Color="#AAB6CE" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#56F07B" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#254C47" />
+    <SolidColorBrush x:Key="AccentCyanBrush" Color="#73E8FF" />
+    <SolidColorBrush x:Key="GlassBorderBrush" Color="#7FA6FF" />
     <SolidColorBrush x:Key="SuccessBrush" Color="#3BA55C" />
     <SolidColorBrush x:Key="DangerBrush" Color="#ED4245" />
 
     <Style TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI" />
         <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
         <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+        <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
     </Style>
 
     <Style x:Key="CommandButtonStyle" TargetType="Button">
         <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
-        <Setter Property="Background" Value="#63242944" />
-        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+        <Setter Property="Background" Value="#4B132033" />
+        <Setter Property="BorderBrush" Value="#8F91B7FF" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="16,9" />
         <Setter Property="FontSize" Value="13" />
@@ -36,14 +37,14 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="6"
+                            CornerRadius="7"
                             Padding="{TemplateBinding Padding}">
                         <Border.Effect>
-                            <DropShadowEffect BlurRadius="16"
+                            <DropShadowEffect BlurRadius="18"
                                               Direction="270"
-                                              Opacity="0.24"
+                                              Opacity="0.28"
                                               ShadowDepth="0"
-                                              Color="#66D9FF" />
+                                              Color="#73E8FF" />
                         </Border.Effect>
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
@@ -52,7 +53,10 @@
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="ButtonBorder"
                                     Property="Background"
-                                    Value="#8A313659" />
+                                    Value="#7A25405B" />
+                            <Setter TargetName="ButtonBorder"
+                                    Property="BorderBrush"
+                                    Value="{StaticResource AccentCyanBrush}" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="ButtonBorder"
@@ -124,19 +128,19 @@
                     <Grid Width="52" Height="30">
                         <Border x:Name="Track"
                                 CornerRadius="15"
-                                Background="#6E242944"
-                                BorderBrush="{StaticResource BorderBrush}"
+                                Background="#5A132033"
+                                BorderBrush="#9491B7FF"
                                 BorderThickness="1" />
                         <Ellipse x:Name="Knob"
                                  Width="22"
                                  Height="22"
                                  Margin="4"
                                  HorizontalAlignment="Left"
-                                 Fill="{StaticResource SecondaryTextBrush}">
+                                 Fill="#D7E4F5">
                             <Ellipse.Effect>
-                                <DropShadowEffect BlurRadius="10"
+                                <DropShadowEffect BlurRadius="12"
                                                   Direction="270"
-                                                  Opacity="0.4"
+                                                  Opacity="0.5"
                                                   ShadowDepth="0"
                                                   Color="#78E5FF" />
                             </Ellipse.Effect>
@@ -146,16 +150,16 @@
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Track"
                                     Property="Background"
-                                    Value="#A2384A7A" />
+                                    Value="#A5234B47" />
                             <Setter TargetName="Track"
                                     Property="BorderBrush"
-                                    Value="{StaticResource AccentCyanBrush}" />
+                                    Value="{StaticResource AccentBrush}" />
                             <Setter TargetName="Knob"
                                     Property="HorizontalAlignment"
                                     Value="Right" />
                             <Setter TargetName="Knob"
                                     Property="Fill"
-                                    Value="{StaticResource AccentBrush}" />
+                                    Value="{StaticResource AccentCyanBrush}" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="Track"
