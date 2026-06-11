@@ -13,7 +13,7 @@ Discorder'ın ürün sınırı bilinçli olarak dardır: Windows üzerinde tek d
 
 ## Kabul Edilmeyen Değişiklikler
 
-- Tarayıcı, oyun veya özel uygulama tünelleme.
+- Discord web modu dışındaki genel tarayıcı, oyun veya özel uygulama tünelleme.
 - Genel cihaz VPN'i.
 - DNS, DoH, proxy veya sistem servis ayarı ekleme.
 - Üçüncü taraf ikili dosya, sürücü, kurucu veya arşiv gömme.
