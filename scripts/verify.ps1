@@ -44,14 +44,31 @@ try {
         '"Update.exe"'
     )
 
-    foreach ($pattern in $forbidden) {
-        $matches = rg --line-number --ignore-case --glob '*.cs' --glob '*.xaml' $pattern src
-        if ($LASTEXITCODE -eq 0) {
-            throw "Uretim kaynaklarinda yasakli desen bulundu: '$pattern'`n$matches"
-        }
+    $productionSourceFiles = @(
+        Get-ChildItem -LiteralPath 'src' -Recurse -File |
+            Where-Object {
+                $_.Extension -in '.cs', '.xaml' -and
+                $_.FullName -notmatch '[\\/](bin|obj)[\\/]'
+            }
+    )
 
-        if ($LASTEXITCODE -ne 1) {
-            throw "'$pattern' kontrol edilirken rg basarisiz oldu"
+    if ($productionSourceFiles.Count -eq 0) {
+        throw "Uretim kaynak taramasi icin .cs veya .xaml dosyasi bulunamadi"
+    }
+
+    foreach ($pattern in $forbidden) {
+        $matches = @(
+            $productionSourceFiles |
+                Select-String -Pattern $pattern -SimpleMatch
+        )
+
+        if ($matches.Count -gt 0) {
+            $formattedMatches = $matches |
+                ForEach-Object {
+                    $relativePath = Resolve-Path -LiteralPath $_.Path -Relative
+                    "${relativePath}:$($_.LineNumber): $($_.Line.Trim())"
+                }
+            throw "Uretim kaynaklarinda yasakli desen bulundu: '$pattern'`n$($formattedMatches -join "`n")"
         }
     }
 
