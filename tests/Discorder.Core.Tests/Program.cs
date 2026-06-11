@@ -3,6 +3,7 @@ using System.Text;
 using Discorder.Core.Configuration;
 using Discorder.Core.Connection;
 using Discorder.Core.Discord;
+using Discorder.Core.Firewall;
 using Discorder.Core.Infrastructure;
 using Discorder.Core.Profiles;
 using Discorder.Core.Provisioning;
@@ -24,7 +25,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("WireSock hazırlığı resmi paketi doğrulayıp kurar", BootstrapLifecycleAsync),
     ("WireSock hazırlığı yeniden başlatma gerektiren başarı kodunu kabul eder", BootstrapAcceptsRestartRequiredExitCodeAsync),
     ("Denetleyici idempotent bağlanır ve keser", ControllerLifecycleAsync),
-    ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync)
+    ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
+    ("Windows Firewall kilidi Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync)
 };
 
 var failures = new List<string>();
@@ -470,6 +472,7 @@ static async Task ControllerLifecycleAsync()
     var root = CreateTemporaryDirectory();
     var process = new FakeManagedProcess();
     var processLauncher = new FakeProcessLauncher(process);
+    var accessLock = new FakeDiscordAccessLock();
     var profileProvisioner = new FakeProfileProvisioner(
         Path.Combine(root, "discord.conf"));
     var wireSockExecutable = Path.Combine(
@@ -483,15 +486,21 @@ static async Task ControllerLifecycleAsync()
         new FakeWireSockBootstrapper(wireSockExecutable),
         profileProvisioner,
         processLauncher,
-        TimeSpan.Zero)
+        TimeSpan.Zero,
+        accessLock)
     {
         IncludeBrowserAccess = true
     };
 
     try
     {
+        await controller.EnsureDisconnectedLockAsync();
+        Assert(accessLock.EnableCount == 1);
+        Assert(controller.Snapshot.Message.Contains("kilitli", StringComparison.Ordinal));
+
         await controller.ConnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(accessLock.DisableCount == 1);
         Assert(profileProvisioner.LastAllowedApplications.Any(app =>
             app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(profileProvisioner.LastAllowedApplications.Any(app =>
@@ -516,10 +525,12 @@ static async Task ControllerLifecycleAsync()
 
         await controller.DisconnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Disconnected);
+        Assert(accessLock.EnableCount == 2);
         Assert(process.StopCount == 1);
 
         await controller.DisconnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Disconnected);
+        Assert(accessLock.EnableCount == 3);
     }
     finally
     {
@@ -531,6 +542,7 @@ static async Task ControllerLifecycleAsync()
 static async Task ControllerBootstrapFailureAsync()
 {
     var root = CreateTemporaryDirectory();
+    var accessLock = new FakeDiscordAccessLock();
     var controller = new DiscordTunnelController(
         new AppPaths(root),
         new DiscordAppScope(root, root, root),
@@ -539,7 +551,8 @@ static async Task ControllerBootstrapFailureAsync()
                 "WireSock VPN Client kurulamadı.")),
         new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
         new FakeProcessLauncher(new FakeManagedProcess()),
-        TimeSpan.Zero);
+        TimeSpan.Zero,
+        accessLock);
 
     try
     {
@@ -548,11 +561,59 @@ static async Task ControllerBootstrapFailureAsync()
         Assert(controller.Snapshot.Message.Contains(
             "WireSock VPN Client",
             StringComparison.Ordinal));
+        Assert(accessLock.DisableCount == 1);
+        Assert(accessLock.EnableCount == 1);
         Assert(File.Exists(new AppPaths(root).ErrorLog));
     }
     finally
     {
         await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var runner = new RecordingCommandRunner();
+    var accessLock = new WindowsFirewallDiscordAccessLock(
+        new AppPaths(root),
+        runner,
+        "powershell.exe");
+
+    try
+    {
+        await accessLock.EnableAsync(CancellationToken.None);
+        await accessLock.DisableAsync(CancellationToken.None);
+
+        Assert(runner.Commands.Count == 2);
+        Assert(runner.Commands[0].Contains(
+            "New-NetFirewallDynamicKeywordAddress",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            WindowsFirewallDiscordAccessLock.KeywordId,
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "discord.com,*.discord.com",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "RemoteDynamicKeywordAddresses",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "-NewDisplayName $displayName",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "-Enabled True",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[1].Contains(
+            WindowsFirewallDiscordAccessLock.RuleName,
+            StringComparison.Ordinal));
+        Assert(runner.Commands[1].Contains(
+            "-Enabled False",
+            StringComparison.Ordinal));
+    }
+    finally
+    {
         Directory.Delete(root, recursive: true);
     }
 }
@@ -605,6 +666,27 @@ static async Task AssertThrowsAsync<TException>(Func<Task> action)
 
     throw new InvalidOperationException(
         $"{typeof(TException).Name} beklenen şekilde fırlatılmadı.");
+}
+
+file sealed class FakeDiscordAccessLock : IDiscordAccessLock
+{
+    public int EnableCount { get; private set; }
+
+    public int DisableCount { get; private set; }
+
+    public Task EnableAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        EnableCount++;
+        return Task.CompletedTask;
+    }
+
+    public Task DisableAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        DisableCount++;
+        return Task.CompletedTask;
+    }
 }
 
 file sealed class MutableWireSockLocator : IWireSockLocator

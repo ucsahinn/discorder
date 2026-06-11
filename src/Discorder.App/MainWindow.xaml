@@ -9,6 +9,7 @@
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource WindowBrush}"
         Foreground="{StaticResource PrimaryTextBrush}"
+        Loaded="Window_Loaded"
         Closing="Window_Closing">
     <Grid ClipToBounds="True">
         <MediaElement x:Name="BackgroundVideo"
@@ -287,7 +288,7 @@
                                 <TextBlock Margin="0,6,0,0"
                                            FontSize="16"
                                            FontWeight="SemiBold"
-                                           Text="WireSock durdurulur" />
+                                           Text="Discord kilitlenir" />
                             </StackPanel>
                         </Grid>
                     </Border>

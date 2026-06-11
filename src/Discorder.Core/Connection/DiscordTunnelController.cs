@@ -1,5 +1,6 @@
 using Discorder.Core.Configuration;
 using Discorder.Core.Discord;
+using Discorder.Core.Firewall;
 using Discorder.Core.Infrastructure;
 using Discorder.Core.Provisioning;
 using Discorder.Core.WireSock;
@@ -14,6 +15,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private readonly IWireSockBootstrapper _wireSockBootstrapper;
     private readonly IProfileProvisioner _provisioner;
     private readonly IProcessLauncher _processLauncher;
+    private readonly IDiscordAccessLock _accessLock;
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly TimeSpan _startupGracePeriod;
 
@@ -31,7 +33,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         IWireSockBootstrapper wireSockBootstrapper,
         IProfileProvisioner provisioner,
         IProcessLauncher processLauncher,
-        TimeSpan? startupGracePeriod = null)
+        TimeSpan? startupGracePeriod = null,
+        IDiscordAccessLock? accessLock = null)
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _discordScope = discordScope ?? throw new ArgumentNullException(nameof(discordScope));
@@ -40,6 +43,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         _provisioner = provisioner ?? throw new ArgumentNullException(nameof(provisioner));
         _processLauncher = processLauncher
             ?? throw new ArgumentNullException(nameof(processLauncher));
+        _accessLock = accessLock ?? new NullDiscordAccessLock();
         _startupGracePeriod = startupGracePeriod ?? TimeSpan.FromSeconds(2);
     }
 
@@ -48,6 +52,36 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     public TunnelSnapshot Snapshot => _snapshot;
 
     public bool IncludeBrowserAccess { get; set; }
+
+    public async Task EnsureDisconnectedLockAsync(
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        await _operationGate.WaitAsync(cancellationToken);
+
+        try
+        {
+            if (_snapshot.IsConnected || _snapshot.IsBusy)
+            {
+                return;
+            }
+
+            await _accessLock.EnableAsync(cancellationToken);
+            SetStatus(TunnelState.Disconnected, "Bağlantı kapalı, Discord kilitli");
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            WriteDiagnostic("EnableAccessLock", exception.ToString());
+            SetStatus(
+                TunnelState.Error,
+                exception.Message,
+                exception.ToString());
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
+    }
 
     public async Task ToggleAsync(CancellationToken cancellationToken = default)
     {
@@ -74,6 +108,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             }
 
             _intentionalStop = false;
+            SetStatus(TunnelState.Preparing, "Discord kilidi kaldırılıyor");
+            await _accessLock.DisableAsync(cancellationToken);
+
             SetStatus(TunnelState.Preparing, "Discord tüneli hazırlanıyor");
 
             var progress = new CallbackProgress(
@@ -120,12 +157,14 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             await DisposeProcessAsync();
+            await TryEnableAccessLockAsync("ConnectCanceled");
             SetStatus(TunnelState.Disconnected, "Bağlantı iptal edildi");
             throw;
         }
         catch (Exception exception)
         {
             await DisposeProcessAsync();
+            await TryEnableAccessLockAsync("ConnectFailure");
             WriteDiagnostic("Connect", exception.ToString());
             SetStatus(
                 TunnelState.Error,
@@ -165,7 +204,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         {
             if (_wireSockProcess is null)
             {
-                SetStatus(TunnelState.Disconnected, "Bağlantı kapalı");
+                await _accessLock.EnableAsync(cancellationToken);
+                SetStatus(TunnelState.Disconnected, "Bağlantı kapalı, Discord kilitli");
                 return;
             }
 
@@ -180,8 +220,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             }
 
             await DisposeProcessAsync();
+            await _accessLock.EnableAsync(cancellationToken);
 
-            SetStatus(TunnelState.Disconnected, "Bağlantı kapalı");
+            SetStatus(TunnelState.Disconnected, "Bağlantı kapalı, Discord kilitli");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -225,6 +266,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     CancellationToken.None);
                 await DisposeProcessAsync();
             }
+
+            await TryEnableAccessLockAsync("Dispose");
         }
         finally
         {
@@ -252,6 +295,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
                 var exitCode = _wireSockProcess?.ExitCode;
                 await DisposeProcessAsync();
+                await TryEnableAccessLockAsync("WireSockExited");
                 WriteDiagnostic(
                     "WireSockExited",
                     $"WireSock exit code: " +
@@ -282,6 +326,18 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         _wireSockProcess.Exited -= OnWireSockExited;
         await _wireSockProcess.DisposeAsync();
         _wireSockProcess = null;
+    }
+
+    private async Task TryEnableAccessLockAsync(string operation)
+    {
+        try
+        {
+            await _accessLock.EnableAsync(CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            WriteDiagnostic(operation + "AccessLock", exception.ToString());
+        }
     }
 
     private void SetStatus(

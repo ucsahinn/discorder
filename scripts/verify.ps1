@@ -8,7 +8,7 @@ Push-Location $root
 try {
     dotnet build Discorder.sln --configuration Release
     if ($LASTEXITCODE -ne 0) {
-        throw "dotnet build hata kodu $LASTEXITCODE ile başarısız oldu"
+        throw "dotnet build hata kodu $LASTEXITCODE ile basarisiz oldu"
     }
 
     dotnet run `
@@ -16,7 +16,7 @@ try {
         --configuration Release `
         --no-build
     if ($LASTEXITCODE -ne 0) {
-        throw "çekirdek testleri hata kodu $LASTEXITCODE ile başarısız oldu"
+        throw "cekirdek testleri hata kodu $LASTEXITCODE ile basarisiz oldu"
     }
 
     dotnet run `
@@ -24,7 +24,7 @@ try {
         --configuration Release `
         --no-build
     if ($LASTEXITCODE -ne 0) {
-        throw "Windows güvenlik testleri hata kodu $LASTEXITCODE ile başarısız oldu"
+        throw "Windows guvenlik testleri hata kodu $LASTEXITCODE ile basarisiz oldu"
     }
 
     $forbidden = @(
@@ -47,20 +47,20 @@ try {
     foreach ($pattern in $forbidden) {
         $matches = rg --line-number --ignore-case --glob '*.cs' --glob '*.xaml' $pattern src
         if ($LASTEXITCODE -eq 0) {
-            throw "Üretim kaynaklarında yasaklı desen bulundu: '$pattern'`n$matches"
+            throw "Uretim kaynaklarinda yasakli desen bulundu: '$pattern'`n$matches"
         }
 
         if ($LASTEXITCODE -ne 1) {
-            throw "'$pattern' kontrol edilirken rg başarısız oldu"
+            throw "'$pattern' kontrol edilirken rg basarisiz oldu"
         }
     }
 
     $manifest = Get-Content -Raw -LiteralPath 'src\Discorder.App\app.manifest'
     if ($manifest -notmatch 'requestedExecutionLevel level="requireAdministrator"') {
-        throw "Discorder WireSock VPN Client sürecini yönetmek için yönetici manifest'iyle derlenmelidir"
+        throw "Discorder WireSock VPN Client surecini yonetmek icin yonetici manifest'iyle derlenmelidir"
     }
 
-    Write-Host 'Doğrulama başarıyla tamamlandı.'
+    Write-Host 'Dogrulama basariyla tamamlandi.'
 }
 finally {
     Pop-Location

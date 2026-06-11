@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using Discorder.Core.Configuration;
 using Discorder.Core.Connection;
 using Discorder.Core.Discord;
+using Discorder.Core.Firewall;
 using Discorder.Core.Infrastructure;
 using Discorder.Core.Provisioning;
 using Discorder.Core.WireSock;
@@ -87,7 +88,10 @@ public partial class App : Application, IDisposable
             new DiscordAppScope(),
             wireSockBootstrapper,
             provisioner,
-            new ProcessLauncher());
+            new ProcessLauncher(),
+            accessLock: new WindowsFirewallDiscordAccessLock(
+                _paths,
+                commandRunner));
 
         var window = new MainWindow(
             _tunnelController,

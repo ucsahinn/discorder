@@ -10,6 +10,7 @@ Discorder tek amaçlı bir Windows uygulamasıdır: Discord uygulamasını Cloud
 - Kalıcı paket filtre sürücüsü veya DPI aşma motoru çalıştırılmaz.
 - Tünel kapsamı `AllowedApps` ile varsayılan olarak Discord uygulamalarına daraltılır.
 - Desteklenen tarayıcı süreçleri yalnızca web modu açıldığında kapsama eklenir.
+- Kapalı durumda Discorder'a ait Windows Firewall kuralı Discord alan adlarına giden trafiği kilitler.
 - Profil, ayar ve log dosyaları `%LOCALAPPDATA%\Discorder` altında tutulur.
 
 ## Bileşenler
@@ -29,17 +30,19 @@ Tünel yaşam döngüsü, Discord kapsamı, profil üretimi, indirme doğrulamas
 
 ## Bağlantı Akışı
 
-1. Kullanıcı **Bağlan** düğmesine basar.
-2. WireSock kurulumu için kullanıcı onayı yoksa onay penceresi açılır.
-3. WireSock kurulu değilse resmi kurucu indirilir.
-4. Kurucu SHA-256, Authenticode, yayıncı ve sürüm kontrolünden geçer.
-5. Kurucu Windows UAC ile sessiz modda çalıştırılır.
-6. Kurulu WireSock komut satırı aracı bulunur ve imzası doğrulanır.
-7. `wgcf` indirilir, doğrulanır ve Cloudflare WARP profili üretilir.
-8. Profildeki eski veya geniş `AllowedApps` satırları kaldırılır.
-9. Discord uygulamaları yeni `AllowedApps` satırına yazılır; web modu açıksa desteklenen tarayıcılar da eklenir.
-10. WireSock VPN Client `run -config <discord.conf> -log-level error` komutuyla kullanıcı süreci olarak başlar.
-11. Bağlantı kesilirken çalışan WireSock süreci sonlandırılır.
+1. Uygulama kapalı/boş durumdayken `Discorder.BlockDiscordDomains` kuralı etkin tutulur.
+2. Kullanıcı **Bağlan** düğmesine basar.
+3. Discorder kendi Discord firewall kilidini devre dışı bırakır.
+4. WireSock kurulumu için kullanıcı onayı yoksa onay penceresi açılır.
+5. WireSock kurulu değilse resmi kurucu indirilir.
+6. Kurucu SHA-256, Authenticode, yayıncı ve sürüm kontrolünden geçer.
+7. Kurucu Windows UAC ile sessiz modda çalıştırılır.
+8. Kurulu WireSock komut satırı aracı bulunur ve imzası doğrulanır.
+9. `wgcf` indirilir, doğrulanır ve Cloudflare WARP profili üretilir.
+10. Profildeki eski veya geniş `AllowedApps` satırları kaldırılır.
+11. Discord uygulamaları yeni `AllowedApps` satırına yazılır; web modu açıksa desteklenen tarayıcılar da eklenir.
+12. WireSock VPN Client `run -config <discord.conf> -log-level error` komutuyla kullanıcı süreci olarak başlar.
+13. Bağlantı kesilirken çalışan WireSock süreci sonlandırılır ve Discord firewall kilidi tekrar etkinleştirilir.
 
 ## WireSock Komut Satırı Uyumluluğu
 
@@ -64,7 +67,18 @@ wiresock-client.exe run -config <discord.conf> -log-level error
 - Kurulu WireSock komut satırı dosyası imza ve yayıncı kontrolünden geçmeden çalıştırılmaz.
 - Discord uygulaması ve isteğe bağlı tarayıcı kapsamı dışındaki özel uygulama adları `AllowedApps` içine testlerle alınmaz.
 - Virgül, satır sonu ve boş değer enjeksiyonu reddedilir.
-- Discorder kapalıyken kalıcı firewall, DNS, servis veya görev zamanlayıcı kuralı bırakılmaz; kapalı durum VPN sürecinin durduğu anlamına gelir.
+- Discorder yalnızca kendi `Discorder.BlockDiscordDomains` Windows Firewall kuralını yönetir; DNS, servis veya görev zamanlayıcı kuralı eklemez.
+- Firewall kilidi Windows'un dinamik anahtar adresi özelliğiyle Discord alan adlarını hedefler; Chrome veya Edge gibi tarayıcı süreçlerinin tamamını bloklamaz.
+
+## Kapalı Durum VPN Kilidi
+
+Discorder kapalıyken Discord'a doğrudan erişimi azaltmak için Windows Firewall'da şu yönetilen kuralı kullanır:
+
+```text
+Discorder.BlockDiscordDomains
+```
+
+Kural dışa giden trafiği, `AutoResolve` açık dinamik anahtar adresi üzerinden Discord alan adlarına bloklar. Bağlantı açılırken kural devre dışı bırakılır, WireSock tüneli çalışır. Bağlantı kesilirken veya uygulama kapanırken kural tekrar etkinleştirilir.
 
 ## Tarayıcı Kapsamı
 

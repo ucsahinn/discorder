@@ -9,6 +9,7 @@ Amaç basit: **Bağlan** düğmesine basınca Discord uygulaması çalışsın, 
 - ✅ Varsayılan kapsam: Discord, Discord PTB, Discord Canary ve Discord Development.
 - ✅ İsteğe bağlı web modu: Chrome, Edge, Firefox, Brave, Opera ve Vivaldi.
 - ✅ Sistem DNS, DoH, proxy, görev zamanlayıcı ve kalıcı servis ayarı değiştirilmez.
+- ✅ Discorder kapalıyken Windows Firewall üzerinde yalnızca Discord alan adlarını kilitleyen yönetilen VPN kuralı aktif kalır.
 - ✅ Eski DPI aşma motorları, oyun yönlendirmeleri ve paket filtre sürücüleri yoktur.
 - ✅ WireSock ve wgcf ikili dosyaları repoya gömülmez; ilk kullanımda resmi kaynaklardan indirilip doğrulanır.
 - ✅ WireSock kurucusu SHA-256, Authenticode imzası, yayıncı ve sürüm bilgisiyle doğrulanır.
@@ -34,9 +35,11 @@ Discorder şunları bilinçli olarak yapmaz:
 5. Cloudflare WARP profili `wgcf` ile üretilir.
 6. Profil varsayılan olarak Discord uygulamalarını içerir; web modu açıksa desteklenen tarayıcı süreçleri de eklenir.
 7. WireSock VPN Client `discord.conf` dosyasını `run -config` modeliyle çalıştırır.
-8. **Bağlantıyı Kes** düğmesi çalışan WireSock sürecini kapatır ve sistem normal rotasına döner.
+8. Bağlanırken Discord VPN kilidi kaldırılır.
+9. **Bağlantıyı Kes** düğmesi çalışan WireSock sürecini kapatır.
+10. Kapanışta Discord alan adları Windows Firewall üzerinden tekrar kilitlenir.
 
-> Tarayıcı modu varsayılan olarak kapalıdır. Açıldığında WireSock kapsamı süreç bazlı çalışır: desteklenen tarayıcıdan Discord web'e girebilirsiniz; aynı tarayıcı sürecindeki diğer sekmeler de tarayıcı süreci üzerinden çalışır. Discorder kapalıyken VPN süreci çalışmaz ve sistemde kalıcı DNS, firewall, servis veya görev zamanlayıcı kuralı bırakılmaz.
+> Tarayıcı modu varsayılan olarak kapalıdır. Açıldığında WireSock kapsamı süreç bazlı çalışır: desteklenen tarayıcıdan Discord web'e girebilirsiniz; aynı tarayıcı sürecindeki diğer sekmeler de tarayıcı süreci üzerinden çalışır. Discorder kapalıyken VPN süreci çalışmaz ve Discorder'a ait Windows Firewall kilidi Discord alan adlarını kapalı tutar.
 
 ## ⚙️ Gereksinimler
 
@@ -68,6 +71,7 @@ Discorder şunları bilinçli olarak yapmaz:
 - TLS doğrulaması devre dışı bırakılmaz.
 - Discord uygulaması ve isteğe bağlı tarayıcı kapsamı `AllowedApps` satırında testlerle kilitlenir.
 - Geniş uygulama adları, satır enjeksiyonu ve `Update.exe` gibi riskli kapsamlar reddedilir.
+- Kapalı durum kilidi `Discorder.BlockDiscordDomains` adlı Windows Firewall kuralıyla yönetilir.
 
 ## 🧪 Geliştirme
 

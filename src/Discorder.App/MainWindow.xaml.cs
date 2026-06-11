@@ -77,6 +77,17 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
+    private async void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await _controller.EnsureDisconnectedLockAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
     private void OnStatusChanged(object? sender, TunnelSnapshot snapshot)
     {
         if (!Dispatcher.CheckAccess())
@@ -138,7 +149,7 @@ public partial class MainWindow : Window, IDisposable
             TunnelState.Connecting => "WireSock VPN Client süreci başlatılıyor.",
             TunnelState.Disconnecting => "Tünel süreci güvenli biçimde sonlandırılıyor.",
             TunnelState.Error => "Tanılama klasörünü açarak ayrıntıları inceleyin.",
-            _ => "Discorder kapalıyken VPN süreci çalışmaz."
+            _ => "Discorder kapalıyken Discord VPN kilidi aktif kalır."
         };
     }
 
@@ -178,7 +189,7 @@ public partial class MainWindow : Window, IDisposable
     {
         if (IsBackgroundVideoDisabled())
         {
-            BackgroundVideo.Visibility = Visibility.Collapsed;
+            StopBackgroundVideo();
             return;
         }
 

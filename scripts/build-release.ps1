@@ -25,7 +25,7 @@ try {
         -p:DebugType=None `
         -p:DebugSymbols=false
     if ($LASTEXITCODE -ne 0) {
-        throw "dotnet publish hata kodu $LASTEXITCODE ile başarısız oldu"
+        throw "dotnet publish hata kodu $LASTEXITCODE ile basarisiz oldu"
     }
 
     if (Test-Path -LiteralPath $archive) {
