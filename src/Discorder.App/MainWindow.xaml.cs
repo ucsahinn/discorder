@@ -181,7 +181,7 @@ public partial class MainWindow : Window, IDisposable
 
         if (outerRing is not null)
         {
-            outerRing.Effect = CreateGlowEffect(58, 0.95, visual.GlowColor);
+            outerRing.Effect = CreateGlowEffect(34, 0.9, visual.GlowColor);
         }
 
         if (powerIcon is not null)
@@ -903,7 +903,10 @@ public partial class MainWindow : Window, IDisposable
                     ["state"] = _controller.Snapshot.State.ToString()
                 });
             var bundlePath = _diagnostics.CreateBundle();
-            DiagnosticsStatus.Text = "Son paket hazır. Log klasörü açıldı.";
+            var bundleDirectory = !string.IsNullOrWhiteSpace(bundlePath)
+                ? Path.GetDirectoryName(bundlePath)
+                : _paths.DiagnosticBundleDirectory;
+            DiagnosticsStatus.Text = "Son paket hazır. Paket klasörü açıldı.";
 
             if (!string.IsNullOrWhiteSpace(bundlePath))
             {
@@ -916,7 +919,7 @@ public partial class MainWindow : Window, IDisposable
 
             Process.Start(new ProcessStartInfo
             {
-                FileName = _paths.LogDirectory,
+                FileName = bundleDirectory ?? _paths.DiagnosticBundleDirectory,
                 UseShellExecute = true
             });
         }

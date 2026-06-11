@@ -1,3 +1,5 @@
+using System.Net.Http;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.IO.Compression;
@@ -30,6 +32,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici idempotent bağlanır ve keser", ControllerLifecycleAsync),
     ("Denetleyici web kapsamını bağlıyken kilitler", ControllerLocksBrowserScopeWhileConnectedAsync),
     ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
+    ("Denetleyici GitHub DNS hatasını Türkçe açıklar", ControllerNetworkFailureIsUserFriendlyAsync),
     ("Windows Firewall kilidi Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
     ("Onarım ayarları ve logları koruyup üretilen veriyi yeniler", CleanupServiceRepairsGeneratedStateAsync),
     ("Temiz kaldırma Discorder verisini ve kilidini siler", CleanupServiceRemovesDiscorderStateAsync),
@@ -648,6 +651,52 @@ static async Task ControllerBootstrapFailureAsync()
     }
 }
 
+static async Task ControllerNetworkFailureIsUserFriendlyAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var accessLock = new FakeDiscordAccessLock();
+    var paths = new AppPaths(root);
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(
+            Path.Combine(
+                root,
+                "WireSock VPN Client",
+                "bin",
+                WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(
+            Path.Combine(root, "discord.conf"),
+            new HttpRequestException(
+                "No such host is known. (github.com:443)",
+                new SocketException((int)SocketError.HostNotFound))),
+        new FakeProcessLauncher(new FakeManagedProcess()),
+        TimeSpan.Zero,
+        accessLock);
+
+    try
+    {
+        await controller.ConnectAsync();
+        Assert(controller.Snapshot.State == TunnelState.Error);
+        Assert(controller.Snapshot.Message.Contains(
+            "DNS",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!controller.Snapshot.Message.Contains(
+            "No such host",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(accessLock.EnableCount == 1);
+        Assert(File.Exists(paths.ErrorLog));
+        Assert(File.ReadAllText(paths.ErrorLog).Contains(
+            "No such host",
+            StringComparison.OrdinalIgnoreCase));
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -1139,7 +1188,9 @@ file sealed class FakeInstallerLauncher(
     }
 }
 
-file sealed class FakeProfileProvisioner(string profilePath) : IProfileProvisioner
+file sealed class FakeProfileProvisioner(
+    string profilePath,
+    Exception? exception = null) : IProfileProvisioner
 {
     public IReadOnlyList<string> LastAllowedApplications { get; private set; } = [];
 
@@ -1152,6 +1203,11 @@ file sealed class FakeProfileProvisioner(string profilePath) : IProfileProvision
         if (allowedApplications.Count == 0)
         {
             throw new InvalidOperationException("Uygulama listesi boş geldi.");
+        }
+
+        if (exception is not null)
+        {
+            return Task.FromException<string>(exception);
         }
 
         return Task.FromResult(profilePath);

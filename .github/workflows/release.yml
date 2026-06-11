@@ -100,11 +100,14 @@ jobs:
           ## Öne çıkanlar
 
           - Arayüz 1320x780 sabit premium sahneye alındı; arka plan videosu kullanıcı ayarı olmadan sürekli görünür.
+          - Güç halkası panel içinde optik olarak yeniden ölçülendirildi; parlak fosfor görünür kalırken üst-alt kesilme hissi giderildi.
+          - Sağ alt kaynak bağlantısı metin yerine ikonlu GitHub butonuna çevrildi.
           - Kapalı durum kırmızı fosfor, bağlı durum yeşil fosfor olacak şekilde bağlantı butonu, rozet ve süreç çubuğu netleştirildi.
           - Web modu sözleşmesi netleştirildi: kapalıyken yalnızca Discord uygulaması tünellenir; açıkken Discord uygulaması ve desteklenen tarayıcılar birlikte tünellenir.
           - Web modu kapalı bağlı oturumlarda desteklenen tarayıcıların Discord'a düz internetten çıkmasını azaltan geçici `Discorder.TunnelScope.Browsers` Windows Firewall kapsamı eklendi.
           - Bağlan, bağlantıyı kes ve üst üste aç/kapat geçişlerinde geçici kapsam kuralları temizlenip yeniden uygulanır.
-          - Tanılama paketi aktif log dosyaları yazılırken de staging kopyası üzerinden zip üretir; beklenmeyen hata penceresine düşmez.
+          - Tanılama paketi aktif log dosyaları yazılırken de staging kopyası üzerinden zip üretir; paket hazır olunca doğrudan tanılama paketi klasörü açılır.
+          - GitHub/DNS indirme hataları kullanıcıya Türkçe ve eyleme dönük metinle gösterilir; ayrıntılı stack trace tanılama loglarında kalır.
           - İşletim Merkezi paneli: arka planda çalışma, Windows başlangıcı ve tanılama durumu tek yerden görülür.
           - Pencere kapansa bile isteğe bağlı bildirim alanında çalışmaya devam etme desteği eklendi.
           - Windows oturumu açılınca Discorder'ı otomatik başlatma ayarı eklendi.

@@ -61,7 +61,7 @@ Discorder şunları bilinçli olarak yapmaz:
 
 ## 🚀 Kullanım
 
-1. Yayın arşivinden `Discorder-2.0.6-win-x64.zip` dosyasını indirin.
+1. Yayın arşivinden `Discorder-2.0.7-win-x64.zip` dosyasını indirin.
 2. Zip içeriğini istediğiniz klasöre çıkarın.
 3. `Discorder.exe` dosyasını çalıştırın ve Windows UAC onayını verin.
 4. Discord web kullanacaksanız ana ekrandaki **Discord web** seçeneğini açın.
@@ -84,7 +84,7 @@ Ana ekrandaki **Onar** düğmesi profil bozulması, eksik `wgcf` çıktısı vey
 
 ## 🧾 Tanılama Paketi
 
-Ana ekrandaki **Tanılama paketi** düğmesi devops incelemesi için şu dosyaları üretir ve log klasörünü açar:
+Ana ekrandaki **Tanılama paketi** düğmesi devops incelemesi için şu dosyaları üretir ve oluşan paketin klasörünü açar:
 
 - `%LOCALAPPDATA%\Discorder\logs\events.jsonl`: uygulama, UI, kilit, profil ve tünel olayları.
 - `%LOCALAPPDATA%\Discorder\logs\health.json`: son bilinen durum, sürüm, ortam ve redakte edilmiş path bilgisi.

@@ -6,6 +6,8 @@ using Discorder.Core.Infrastructure;
 using Discorder.Core.Provisioning;
 using Discorder.Core.WireSock;
 using System.Globalization;
+using System.Net.Http;
+using System.Net.Sockets;
 
 namespace Discorder.Core.Connection;
 
@@ -246,16 +248,18 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             await TryClearTunnelScopeAsync("ConnectFailure");
             await TryEnableAccessLockAsync("ConnectFailure");
             WriteDiagnostic("Connect", exception.ToString());
+            var userFacingMessage = CreateUserFacingConnectError(exception);
             _diagnostics.WriteHealth(
                 "hata",
                 new Dictionary<string, string?>
                 {
                     ["operation"] = "connect",
-                    ["message"] = exception.Message
+                    ["message"] = userFacingMessage,
+                    ["diagnostic"] = exception.Message
                 });
             SetStatus(
                 TunnelState.Error,
-                exception.Message,
+                userFacingMessage,
                 exception.ToString());
         }
         finally
@@ -462,6 +466,23 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         {
             WriteDiagnostic(operation + "TunnelScope", exception.ToString());
         }
+    }
+
+    private static string CreateUserFacingConnectError(Exception exception)
+    {
+        if (exception is HttpRequestException httpException)
+        {
+            if (httpException.InnerException is SocketException socketException
+                && socketException.SocketErrorCode is SocketError.HostNotFound
+                    or SocketError.NoData)
+            {
+                return "Gerekli GitHub dosyası indirilemedi. DNS veya internet bağlantısını kontrol edip tekrar bağlanın.";
+            }
+
+            return "Gerekli dosya indirilemedi. İnternet bağlantısını kontrol edip tekrar bağlanın.";
+        }
+
+        return exception.Message;
     }
 
     private void SetStatus(

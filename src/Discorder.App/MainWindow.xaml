@@ -203,6 +203,7 @@
                                     <Grid Width="{TemplateBinding Width}"
                                           Height="{TemplateBinding Height}">
                                         <Ellipse x:Name="OuterRing"
+                                                 Margin="22"
                                                  Stroke="{TemplateBinding BorderBrush}"
                                                  StrokeThickness="{TemplateBinding BorderThickness}">
                                             <Ellipse.Fill>
@@ -217,14 +218,14 @@
                                                 </RadialGradientBrush>
                                             </Ellipse.Fill>
                                             <Ellipse.Effect>
-                                                <DropShadowEffect BlurRadius="58"
+                                                <DropShadowEffect BlurRadius="34"
                                                                   Direction="270"
                                                                   Opacity="0.95"
                                                                   ShadowDepth="0"
                                                                   Color="#56F07B" />
                                             </Ellipse.Effect>
                                         </Ellipse>
-                                        <Ellipse Margin="14"
+                                        <Ellipse Margin="34"
                                                  Stroke="#A0B9F8FF"
                                                  StrokeThickness="1.2">
                                             <Ellipse.Fill>
@@ -236,15 +237,15 @@
                                             </Ellipse.Fill>
                                         </Ellipse>
                                         <Ellipse x:Name="StateRing"
-                                                 Width="178"
-                                                 Height="178"
+                                                 Width="152"
+                                                 Height="152"
                                                  Fill="Transparent"
                                                  Stroke="#7A66D9FF"
                                                  StrokeThickness="1"
                                                  StrokeDashArray="2 5" />
                                         <Ellipse x:Name="CoreGlow"
-                                                 Width="124"
-                                                 Height="124"
+                                                 Width="104"
+                                                 Height="104"
                                                  Fill="#2246F07B"
                                                  Stroke="#6C56F07B"
                                                  StrokeThickness="1" />
@@ -253,7 +254,7 @@
                                             <TextBlock x:Name="PowerIcon"
                                                        HorizontalAlignment="Center"
                                                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                                       FontSize="62"
+                                                       FontSize="56"
                                                        Foreground="{StaticResource AccentCyanBrush}"
                                                        Text="&#xE7E8;">
                                                 <TextBlock.Effect>
@@ -265,7 +266,7 @@
                                                 </TextBlock.Effect>
                                             </TextBlock>
                                             <TextBlock x:Name="ToggleButtonLabel"
-                                                       Margin="0,15,0,0"
+                                                       Margin="0,13,0,0"
                                                        HorizontalAlignment="Center"
                                                        FontSize="14"
                                                        FontWeight="Bold"
@@ -658,7 +659,7 @@
                             Style="{StaticResource CommandButtonStyle}"
                             Content="Tanılama paketi"
                             Click="OpenDiagnostics_Click"
-                            ToolTip="Devops incelemesi için tanılama paketini hazırla ve log klasörünü aç" />
+                            ToolTip="Devops incelemesi için tanılama paketini hazırla ve paket klasörünü aç" />
 
                     <Button Grid.Column="2"
                             x:Name="RepairButton"
@@ -685,15 +686,25 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.0.6" />
+                               Text="v2.0.7" />
 
                     <Button Grid.Column="5"
+                            Width="68"
                             Height="46"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
-                            Content="Kaynak kod"
                             Click="OpenGitHub_Click"
-                            ToolTip="Discorder kaynak deposunu aç" />
+                            ToolTip="GitHub deposunu aç"
+                            AutomationProperties.Name="GitHub deposunu aç">
+                        <Viewbox Width="22"
+                                 Height="22"
+                                 Stretch="Uniform">
+                            <Canvas Width="24" Height="24">
+                                <Path Fill="{StaticResource PrimaryTextBrush}"
+                                      Data="M12,0.5C5.65,0.5 0.5,5.65 0.5,12C0.5,17.1 3.79,21.42 8.36,22.95C8.94,23.06 9.15,22.7 9.15,22.4C9.15,22.13 9.14,21.42 9.14,20.47C5.95,21.16 5.28,19.12 5.28,19.12C4.76,17.8 4.01,17.45 4.01,17.45C2.97,16.74 4.09,16.75 4.09,16.75C5.24,16.83 5.84,17.93 5.84,17.93C6.86,19.68 8.52,19.18 9.17,18.88C9.27,18.14 9.57,17.64 9.9,17.36C7.35,17.07 4.67,16.08 4.67,11.68C4.67,10.42 5.12,9.39 5.85,8.59C5.73,8.3 5.34,7.13 5.96,5.55C5.96,5.55 6.92,5.24 9.11,6.73C10.02,6.48 11,6.35 11.97,6.35C12.94,6.35 13.92,6.48 14.83,6.73C17.02,5.24 17.98,5.55 17.98,5.55C18.6,7.13 18.21,8.3 18.09,8.59C18.83,9.39 19.27,10.42 19.27,11.68C19.27,16.09 16.58,17.07 14.03,17.35C14.44,17.7 14.81,18.4 14.81,19.47C14.81,21 14.79,22.23 14.79,22.4C14.79,22.71 15,23.07 15.59,22.95C20.18,21.42 23.5,17.1 23.5,12C23.5,5.65 18.35,0.5 12,0.5Z" />
+                            </Canvas>
+                        </Viewbox>
+                    </Button>
                 </Grid>
             </Border>
         </Grid>
