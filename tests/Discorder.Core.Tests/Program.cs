@@ -588,16 +588,25 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
 
         Assert(runner.Commands.Count == 2);
         Assert(runner.Commands[0].Contains(
-            "New-NetFirewallDynamicKeywordAddress",
+            "System32\\drivers\\etc\\hosts",
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
-            WindowsFirewallDiscordAccessLock.KeywordId,
+            "# BEGIN Discorder Discord kilidi",
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
-            "discord.com,*.discord.com",
+            "0.0.0.0 ' + $domain",
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
-            "RemoteDynamicKeywordAddresses",
+            "::1 ' + $domain",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "Resolve-DnsName",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "'gateway.discord.gg'",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "-RemoteAddress $addressList",
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
             "-NewDisplayName $displayName",
@@ -607,6 +616,9 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
             StringComparison.Ordinal));
         Assert(runner.Commands[1].Contains(
             WindowsFirewallDiscordAccessLock.RuleName,
+            StringComparison.Ordinal));
+        Assert(runner.Commands[1].Contains(
+            "# END Discorder Discord kilidi",
             StringComparison.Ordinal));
         Assert(runner.Commands[1].Contains(
             "-Enabled False",

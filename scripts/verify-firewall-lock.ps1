@@ -6,11 +6,23 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$KeywordId = '{4f8219da-70d9-4c14-a8d4-0ed28af940d0}'
-$Keyword = 'DiscorderDiscordDomains'
-$Addresses = 'discord.com,*.discord.com,discordapp.com,*.discordapp.com,discordapp.net,*.discordapp.net,discord.gg,*.discord.gg,discordcdn.com,*.discordcdn.com,media.discordapp.net,*.media.discordapp.net'
+$Domains = @(
+    'discord.com',
+    'discordapp.com',
+    'discordapp.net',
+    'discord.gg',
+    'discordcdn.com',
+    'cdn.discordapp.com',
+    'gateway.discord.gg',
+    'media.discordapp.net',
+    'images-ext-1.discordapp.net',
+    'images-ext-2.discordapp.net'
+)
 $RuleName = 'Discorder.BlockDiscordDomains'
 $DisplayName = 'Discorder VPN kilidi - Discord alan adlari'
+$HostsPath = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
+$BeginMarker = '# BEGIN Discorder Discord kilidi'
+$EndMarker = '# END Discorder Discord kilidi'
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -49,50 +61,143 @@ function Assert-RuleState {
     return $rule
 }
 
+function Invoke-DiscorderRetry {
+    param([scriptblock]$Action)
+
+    for ($attempt = 1; $attempt -le 8; $attempt++) {
+        try {
+            & $Action
+            return
+        }
+        catch {
+            if ($attempt -eq 8) {
+                throw
+            }
+
+            Start-Sleep -Milliseconds (120 * $attempt)
+        }
+    }
+}
+
+function Remove-DiscorderHostsLock {
+    if (-not (Test-Path -LiteralPath $HostsPath)) {
+        return
+    }
+
+    $content = [string](Get-Content -Raw -LiteralPath $HostsPath)
+    $pattern = '(?ms)^' +
+        [regex]::Escape($BeginMarker) +
+        '\r?\n.*?^' +
+        [regex]::Escape($EndMarker) +
+        '\r?\n?'
+    $updated = [regex]::Replace($content, $pattern, '')
+    if ($updated -ne $content) {
+        Invoke-DiscorderRetry {
+            Set-Content `
+                -LiteralPath $HostsPath `
+                -Value $updated `
+                -NoNewline `
+                -Encoding ASCII
+        }
+    }
+}
+
+function Test-DiscorderHostsLock {
+    if (-not (Test-Path -LiteralPath $HostsPath)) {
+        return $false
+    }
+
+    $content = [string](Get-Content -Raw -LiteralPath $HostsPath)
+    return $content.Contains($BeginMarker) -and
+        $content.Contains($EndMarker) -and
+        $content.Contains('0.0.0.0 discord.com') -and
+        $content.Contains('::1 discord.com')
+}
+
+function Enable-DiscorderHostsLock {
+    Remove-DiscorderHostsLock
+
+    $entries = foreach ($domain in $Domains) {
+        '0.0.0.0 ' + $domain
+        '::1 ' + $domain
+    }
+    $block = @($BeginMarker) + $entries + @($EndMarker)
+    Invoke-DiscorderRetry {
+        Add-Content `
+            -LiteralPath $HostsPath `
+            -Value ($block -join [Environment]::NewLine) `
+            -Encoding ASCII
+    }
+    ipconfig /flushdns | Out-Null
+}
+
+function Resolve-DiscordAddresses {
+    $resolvedAddresses = foreach ($domain in $Domains) {
+        try {
+            Resolve-DnsName -Name $domain -ErrorAction Stop |
+                Where-Object {
+                    -not [string]::IsNullOrWhiteSpace($_.IPAddress) -and
+                    $_.IPAddress -ne '0.0.0.0' -and
+                    $_.IPAddress -ne '::1' -and
+                    $_.IPAddress -notlike '127.*'
+                } |
+                ForEach-Object { $_.IPAddress }
+        }
+        catch {
+        }
+    }
+
+    return @($resolvedAddresses | Sort-Object -Unique)
+}
+
 function Enable-DiscorderFirewallLock {
-    $keywordObject = Get-NetFirewallDynamicKeywordAddress `
-        -Id $KeywordId `
-        -ErrorAction SilentlyContinue
+    Remove-DiscorderHostsLock
+    ipconfig /flushdns | Out-Null
 
-    if ($null -eq $keywordObject) {
-        New-NetFirewallDynamicKeywordAddress `
-            -Id $KeywordId `
-            -Keyword $Keyword `
-            -Addresses $Addresses `
-            -AutoResolve $true | Out-Null
-    }
-    else {
-        Update-NetFirewallDynamicKeywordAddress `
-            -Id $KeywordId `
-            -Addresses $Addresses | Out-Null
-    }
+    $addressList = Resolve-DiscordAddresses
 
-    $rule = Get-NetFirewallRule -Name $RuleName -ErrorAction SilentlyContinue
-    if ($null -eq $rule) {
-        New-NetFirewallRule `
-            -Name $RuleName `
-            -DisplayName $DisplayName `
-            -Direction Outbound `
-            -Action Block `
-            -RemoteDynamicKeywordAddresses $KeywordId `
-            -Enabled True | Out-Null
-    }
-    else {
-        Set-NetFirewallRule `
-            -Name $RuleName `
-            -NewDisplayName $DisplayName `
-            -Direction Outbound `
-            -Action Block `
-            -RemoteDynamicKeywordAddresses $KeywordId `
-            -Enabled True | Out-Null
+    if ($addressList.Count -gt 0) {
+        $rule = Get-NetFirewallRule -Name $RuleName -ErrorAction SilentlyContinue
+        if ($null -eq $rule) {
+            New-NetFirewallRule `
+                -Name $RuleName `
+                -DisplayName $DisplayName `
+                -Direction Outbound `
+                -Action Block `
+                -RemoteAddress $addressList `
+                -Enabled True | Out-Null
+        }
+        else {
+            Set-NetFirewallRule `
+                -Name $RuleName `
+                -NewDisplayName $DisplayName `
+                -Direction Outbound `
+                -Action Block `
+                -RemoteAddress $addressList `
+                -Enabled True | Out-Null
+        }
     }
 
-    Assert-RuleState -ExpectedEnabled 'True' -Phase 'Kilidi acma'
+    Enable-DiscorderHostsLock
+    $ruleState = Assert-RuleState -ExpectedEnabled 'True' -Phase 'Kilidi acma'
+    if (-not (Test-DiscorderHostsLock)) {
+        throw 'Hosts kilidi yazilamadi.'
+    }
+
+    return $ruleState
 }
 
 function Disable-DiscorderFirewallLock {
-    Set-NetFirewallRule -Name $RuleName -Enabled False | Out-Null
-    Assert-RuleState -ExpectedEnabled 'False' -Phase 'Kilidi kapatma'
+    Remove-DiscorderHostsLock
+    ipconfig /flushdns | Out-Null
+
+    $rule = Get-NetFirewallRule -Name $RuleName -ErrorAction SilentlyContinue
+    if ($null -ne $rule) {
+        Set-NetFirewallRule -Name $RuleName -Enabled False | Out-Null
+        return Assert-RuleState -ExpectedEnabled 'False' -Phase 'Kilidi kapatma'
+    }
+
+    return $null
 }
 
 function Test-Tcp443 {
@@ -119,12 +224,10 @@ if (-not (Test-IsAdministrator)) {
     throw "Bu script Windows yoneticisi olarak calistirilmalidir. PowerShell'i Yonetici olarak acip tekrar calistirin."
 }
 
-Assert-NetSecurityCmdlet 'Get-NetFirewallDynamicKeywordAddress'
-Assert-NetSecurityCmdlet 'New-NetFirewallDynamicKeywordAddress'
-Assert-NetSecurityCmdlet 'Update-NetFirewallDynamicKeywordAddress'
 Assert-NetSecurityCmdlet 'Get-NetFirewallRule'
 Assert-NetSecurityCmdlet 'New-NetFirewallRule'
 Assert-NetSecurityCmdlet 'Set-NetFirewallRule'
+Assert-NetSecurityCmdlet 'Resolve-DnsName'
 
 $enabledState = Enable-DiscorderFirewallLock
 $disabledState = Disable-DiscorderFirewallLock
@@ -157,6 +260,6 @@ $finalState = Enable-DiscorderFirewallLock
     FinalCheck = [string]$finalState.Enabled
     Direction = [string]$finalState.Direction
     Action = [string]$finalState.Action
-    KeywordId = $KeywordId
+    HostsLock = [string](Test-DiscorderHostsLock)
     NetworkProbe = $networkProbe
 }

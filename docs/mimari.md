@@ -10,7 +10,7 @@ Discorder tek amaçlı bir Windows uygulamasıdır: Discord uygulamasını Cloud
 - Kalıcı paket filtre sürücüsü veya DPI aşma motoru çalıştırılmaz.
 - Tünel kapsamı `AllowedApps` ile varsayılan olarak Discord uygulamalarına daraltılır.
 - Desteklenen tarayıcı süreçleri yalnızca web modu açıldığında kapsama eklenir.
-- Kapalı durumda Discorder'a ait Windows Firewall kuralı Discord alan adlarına giden trafiği kilitler.
+- Kapalı durumda Discorder'a ait yönetilen kilit Discord alan adlarına giden trafiği kapatır. Ana kilit hosts marker bloğudur; Windows Firewall policy izin verirse çözülen IP listesi de bloklanır.
 - Profil, ayar ve log dosyaları `%LOCALAPPDATA%\Discorder` altında tutulur.
 
 ## Bileşenler
@@ -67,20 +67,30 @@ wiresock-client.exe run -config <discord.conf> -log-level error
 - Kurulu WireSock komut satırı dosyası imza ve yayıncı kontrolünden geçmeden çalıştırılmaz.
 - Discord uygulaması ve isteğe bağlı tarayıcı kapsamı dışındaki özel uygulama adları `AllowedApps` içine testlerle alınmaz.
 - Virgül, satır sonu ve boş değer enjeksiyonu reddedilir.
-- Discorder yalnızca kendi `Discorder.BlockDiscordDomains` Windows Firewall kuralını yönetir; DNS, servis veya görev zamanlayıcı kuralı eklemez.
-- Firewall kilidi Windows'un dinamik anahtar adresi özelliğiyle Discord alan adlarını hedefler; Chrome veya Edge gibi tarayıcı süreçlerinin tamamını bloklamaz.
+- Discorder yalnızca kendi hosts marker bloğunu ve `Discorder.BlockDiscordDomains` Windows Firewall kuralını yönetir; servis veya görev zamanlayıcı kuralı eklemez.
+- Kapalı durum kilidi Discord alan adlarını hedefler; Chrome veya Edge gibi tarayıcı süreçlerinin tamamını bloklamaz.
 
 ## Kapalı Durum VPN Kilidi
 
-Discorder kapalıyken Discord'a doğrudan erişimi azaltmak için Windows Firewall'da şu yönetilen kuralı kullanır:
+Discorder kapalıyken Discord'a doğrudan erişimi azaltmak için iki yönetilen katman kullanır:
+
+```text
+# BEGIN Discorder Discord kilidi
+0.0.0.0 discord.com
+::1 discord.com
+...
+# END Discorder Discord kilidi
+```
+
+Windows Firewall yerel kuralları policy tarafından uygulanıyorsa ek IP kuralı da kullanılır:
 
 ```text
 Discorder.BlockDiscordDomains
 ```
 
-Kural dışa giden trafiği, `AutoResolve` açık dinamik anahtar adresi üzerinden Discord alan adlarına bloklar. Bağlantı açılırken kural devre dışı bırakılır, WireSock tüneli çalışır. Bağlantı kesilirken veya uygulama kapanırken kural tekrar etkinleştirilir.
+Hosts kilidi Discord alan adlarını yerel döngü adresine yönlendirir. Firewall katmanı dışa giden trafiği, Discorder'ın başlangıçta çözdüğü Discord alan adı IP'leri üzerinden bloklar. Bağlantı açılırken hosts marker bloğu kaldırılır ve Firewall kuralı devre dışı bırakılır, WireSock tüneli çalışır. Bağlantı kesilirken veya uygulama kapanırken kilit tekrar etkinleştirilir.
 
-Canlı doğrulama için `scripts/verify-firewall-lock.ps1` yönetici PowerShell oturumunda çalıştırılır. Script kuralı etkinleştirir, devre dışı bırakır ve finalde tekrar etkin bırakarak `Enabled`, `Direction` ve `Action` durumlarını raporlar. `-ProbeNetwork` seçeneği Discord'a TCP 443 bağlantısını da dener; ağ veya ISS tarafı Discord'a zaten ulaşamıyorsa bu prob kanıt olarak zorlanmaz.
+Canlı doğrulama için `scripts/verify-firewall-lock.ps1` yönetici PowerShell oturumunda çalıştırılır. Script kilidi etkinleştirir, devre dışı bırakır ve finalde tekrar etkin bırakarak hosts marker durumunu ve Firewall kural durumunu raporlar. `-ProbeNetwork` seçeneği Discord'a TCP 443 bağlantısını da dener; ağ veya ISS tarafı Discord'a zaten ulaşamıyorsa bu prob kanıt olarak zorlanmaz.
 
 ## Tarayıcı Kapsamı
 

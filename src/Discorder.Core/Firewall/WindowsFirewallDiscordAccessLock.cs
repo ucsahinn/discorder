@@ -6,17 +6,19 @@ namespace Discorder.Core.Firewall;
 public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
 {
     public const string RuleName = "Discorder.BlockDiscordDomains";
-    public const string KeywordId = "{4f8219da-70d9-4c14-a8d4-0ed28af940d0}";
 
-    private const string Keyword = "DiscorderDiscordDomains";
     private const string DisplayName = "Discorder VPN kilidi - Discord alan adları";
     private const string DiscordDomains =
-        "discord.com,*.discord.com," +
-        "discordapp.com,*.discordapp.com," +
-        "discordapp.net,*.discordapp.net," +
-        "discord.gg,*.discord.gg," +
-        "discordcdn.com,*.discordcdn.com," +
-        "media.discordapp.net,*.media.discordapp.net";
+        "'discord.com'," +
+        "'discordapp.com'," +
+        "'discordapp.net'," +
+        "'discord.gg'," +
+        "'discordcdn.com'," +
+        "'cdn.discordapp.com'," +
+        "'gateway.discord.gg'," +
+        "'media.discordapp.net'," +
+        "'images-ext-1.discordapp.net'," +
+        "'images-ext-2.discordapp.net'";
 
     private readonly AppPaths _paths;
     private readonly ICommandRunner _commandRunner;
@@ -72,7 +74,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             ? result.StandardOutput
             : result.StandardError;
         throw new InvalidOperationException(
-            "Discord VPN kilidi Windows Firewall üzerinde güncellenemedi: " +
+            "Discord VPN kilidi güncellenemedi: " +
             diagnostic.Trim().ReplaceLineEndings(" "));
     }
 
@@ -80,23 +82,62 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
     {
         return string.Join(Environment.NewLine, [
             "$ErrorActionPreference = 'Stop'",
-            $"$keywordId = '{KeywordId}'",
-            $"$keyword = '{Keyword}'",
-            $"$addresses = '{DiscordDomains}'",
+            $"$domains = @({DiscordDomains})",
             $"$ruleName = '{RuleName}'",
             $"$displayName = '{DisplayName}'",
-            "$keywordObject = Get-NetFirewallDynamicKeywordAddress -Id $keywordId -ErrorAction SilentlyContinue",
-            "if ($null -eq $keywordObject) {",
-            "    New-NetFirewallDynamicKeywordAddress -Id $keywordId -Keyword $keyword -Addresses $addresses -AutoResolve $true | Out-Null",
-            "} else {",
-            "    Update-NetFirewallDynamicKeywordAddress -Id $keywordId -Addresses $addresses | Out-Null",
+            "$hostsPath = Join-Path $env:SystemRoot 'System32\\drivers\\etc\\hosts'",
+            "$beginMarker = '# BEGIN Discorder Discord kilidi'",
+            "$endMarker = '# END Discorder Discord kilidi'",
+            "function Invoke-DiscorderRetry([scriptblock]$action) {",
+            "    for ($attempt = 1; $attempt -le 8; $attempt++) {",
+            "        try {",
+            "            & $action",
+            "            return",
+            "        } catch {",
+            "            if ($attempt -eq 8) { throw }",
+            "            Start-Sleep -Milliseconds (120 * $attempt)",
+            "        }",
+            "    }",
             "}",
-            "$rule = Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue",
-            "if ($null -eq $rule) {",
-            "    New-NetFirewallRule -Name $ruleName -DisplayName $displayName -Direction Outbound -Action Block -RemoteDynamicKeywordAddresses $keywordId -Enabled True | Out-Null",
-            "} else {",
-            "    Set-NetFirewallRule -Name $ruleName -NewDisplayName $displayName -Direction Outbound -Action Block -RemoteDynamicKeywordAddresses $keywordId -Enabled True | Out-Null",
-            "}"
+            "function Remove-DiscorderHostsLock {",
+            "    if (-not (Test-Path -LiteralPath $hostsPath)) { return }",
+            "    $content = [string](Get-Content -Raw -LiteralPath $hostsPath)",
+            "    $pattern = '(?ms)^' + [regex]::Escape($beginMarker) + '\\r?\\n.*?^' + [regex]::Escape($endMarker) + '\\r?\\n?'",
+            "    $updated = [regex]::Replace($content, $pattern, '')",
+            "    if ($updated -ne $content) {",
+            "        Invoke-DiscorderRetry { Set-Content -LiteralPath $hostsPath -Value $updated -NoNewline -Encoding ASCII }",
+            "    }",
+            "}",
+            "function Enable-DiscorderHostsLock {",
+            "    Remove-DiscorderHostsLock",
+            "    $entries = foreach ($domain in $domains) {",
+            "        '0.0.0.0 ' + $domain",
+            "        '::1 ' + $domain",
+            "    }",
+            "    $block = @($beginMarker) + $entries + @($endMarker)",
+            "    Invoke-DiscorderRetry { Add-Content -LiteralPath $hostsPath -Value ($block -join [Environment]::NewLine) -Encoding ASCII }",
+            "    ipconfig /flushdns | Out-Null",
+            "}",
+            "Remove-DiscorderHostsLock",
+            "ipconfig /flushdns | Out-Null",
+            "$resolvedAddresses = foreach ($domain in $domains) {",
+            "    try {",
+            "        Resolve-DnsName -Name $domain -ErrorAction Stop |",
+            "            Where-Object { -not [string]::IsNullOrWhiteSpace($_.IPAddress) -and $_.IPAddress -ne '0.0.0.0' -and $_.IPAddress -ne '::1' -and $_.IPAddress -notlike '127.*' } |",
+            "            ForEach-Object { $_.IPAddress }",
+            "    } catch {",
+            "    }",
+            "}",
+            "$addressList = @($resolvedAddresses | Sort-Object -Unique)",
+            "if ($addressList.Count -gt 0) {",
+            "    $rule = Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue",
+            "    if ($null -eq $rule) {",
+            "        New-NetFirewallRule -Name $ruleName -DisplayName $displayName -Direction Outbound -Action Block -RemoteAddress $addressList -Enabled True | Out-Null",
+            "    } else {",
+            "        Set-NetFirewallRule -Name $ruleName -NewDisplayName $displayName -Direction Outbound -Action Block -RemoteAddress $addressList -Enabled True | Out-Null",
+            "    }",
+            "}",
+            "Enable-DiscorderHostsLock"
         ]);
     }
 
@@ -105,6 +146,29 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
         return string.Join(Environment.NewLine, [
             "$ErrorActionPreference = 'Stop'",
             $"$ruleName = '{RuleName}'",
+            "$hostsPath = Join-Path $env:SystemRoot 'System32\\drivers\\etc\\hosts'",
+            "$beginMarker = '# BEGIN Discorder Discord kilidi'",
+            "$endMarker = '# END Discorder Discord kilidi'",
+            "function Invoke-DiscorderRetry([scriptblock]$action) {",
+            "    for ($attempt = 1; $attempt -le 8; $attempt++) {",
+            "        try {",
+            "            & $action",
+            "            return",
+            "        } catch {",
+            "            if ($attempt -eq 8) { throw }",
+            "            Start-Sleep -Milliseconds (120 * $attempt)",
+            "        }",
+            "    }",
+            "}",
+            "if (Test-Path -LiteralPath $hostsPath) {",
+            "    $content = [string](Get-Content -Raw -LiteralPath $hostsPath)",
+            "    $pattern = '(?ms)^' + [regex]::Escape($beginMarker) + '\\r?\\n.*?^' + [regex]::Escape($endMarker) + '\\r?\\n?'",
+            "    $updated = [regex]::Replace($content, $pattern, '')",
+            "    if ($updated -ne $content) {",
+            "        Invoke-DiscorderRetry { Set-Content -LiteralPath $hostsPath -Value $updated -NoNewline -Encoding ASCII }",
+            "        ipconfig /flushdns | Out-Null",
+            "    }",
+            "}",
             "$rule = Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue",
             "if ($null -ne $rule) {",
             "    Set-NetFirewallRule -Name $ruleName -Enabled False | Out-Null",

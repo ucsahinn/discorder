@@ -1,14 +1,16 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <SolidColorBrush x:Key="WindowBrush" Color="#080A0F" />
-    <SolidColorBrush x:Key="SurfaceBrush" Color="#111620" />
-    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#192131" />
-    <SolidColorBrush x:Key="BorderBrush" Color="#354056" />
+    <SolidColorBrush x:Key="WindowBrush" Color="#05070D" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#151A2A" />
+    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#242944" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#6E78A8" />
     <SolidColorBrush x:Key="PrimaryTextBrush" Color="#F5F7FB" />
-    <SolidColorBrush x:Key="SecondaryTextBrush" Color="#AAB3C2" />
-    <SolidColorBrush x:Key="MutedTextBrush" Color="#778195" />
-    <SolidColorBrush x:Key="AccentBrush" Color="#7C88FF" />
-    <SolidColorBrush x:Key="AccentSoftBrush" Color="#25305E" />
+    <SolidColorBrush x:Key="SecondaryTextBrush" Color="#C7D1E8" />
+    <SolidColorBrush x:Key="MutedTextBrush" Color="#98A5C4" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#A59BFF" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#33406F" />
+    <SolidColorBrush x:Key="AccentCyanBrush" Color="#66D9FF" />
+    <SolidColorBrush x:Key="GlassBorderBrush" Color="#8491FF" />
     <SolidColorBrush x:Key="SuccessBrush" Color="#3BA55C" />
     <SolidColorBrush x:Key="DangerBrush" Color="#ED4245" />
 
@@ -20,7 +22,7 @@
 
     <Style x:Key="CommandButtonStyle" TargetType="Button">
         <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
-        <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
+        <Setter Property="Background" Value="#7A242944" />
         <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="16,9" />
@@ -43,7 +45,7 @@
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="ButtonBorder"
                                     Property="Background"
-                            Value="#272C36" />
+                            Value="#A3313659" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="ButtonBorder"
@@ -115,7 +117,7 @@
                     <Grid Width="52" Height="30">
                         <Border x:Name="Track"
                                 CornerRadius="15"
-                                Background="#263044"
+                                Background="#7A242944"
                                 BorderBrush="{StaticResource BorderBrush}"
                                 BorderThickness="1" />
                         <Ellipse x:Name="Knob"
@@ -129,10 +131,10 @@
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Track"
                                     Property="Background"
-                                    Value="{StaticResource AccentSoftBrush}" />
+                                    Value="#A2384A7A" />
                             <Setter TargetName="Track"
                                     Property="BorderBrush"
-                                    Value="{StaticResource AccentBrush}" />
+                                    Value="{StaticResource AccentCyanBrush}" />
                             <Setter TargetName="Knob"
                                     Property="HorizontalAlignment"
                                     Value="Right" />
