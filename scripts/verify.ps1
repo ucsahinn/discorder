@@ -55,6 +55,20 @@ try {
         }
     }
 
+    foreach ($scriptPath in Get-ChildItem -LiteralPath 'scripts' -Filter '*.ps1') {
+        $tokens = $null
+        $parseErrors = $null
+        [System.Management.Automation.Language.Parser]::ParseFile(
+            $scriptPath.FullName,
+            [ref]$tokens,
+            [ref]$parseErrors) | Out-Null
+
+        if ($parseErrors.Count -gt 0) {
+            $messages = $parseErrors | ForEach-Object { $_.Message }
+            throw "PowerShell script parse hatasi: $($scriptPath.Name)`n$($messages -join "`n")"
+        }
+    }
+
     $manifest = Get-Content -Raw -LiteralPath 'src\Discorder.App\app.manifest'
     if ($manifest -notmatch 'requestedExecutionLevel level="requireAdministrator"') {
         throw "Discorder WireSock VPN Client surecini yonetmek icin yonetici manifest'iyle derlenmelidir"

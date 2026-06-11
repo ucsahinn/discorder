@@ -94,6 +94,19 @@ Yayın paketi:
 .\scripts\build-release.ps1
 ```
 
+Kapalı durumdaki Discord kilidini canlı Windows Firewall üzerinde doğrulamak
+için PowerShell'i yönetici olarak açıp şunu çalıştırın:
+
+```powershell
+.\scripts\verify-firewall-lock.ps1
+```
+
+İsteğe bağlı ağ probu da isterseniz:
+
+```powershell
+.\scripts\verify-firewall-lock.ps1 -ProbeNetwork
+```
+
 ## 📦 Yayın İçeriği
 
 Yayın arşivi yalnızca Discorder uygulamasını ve .NET bağımsız çalışma dosyalarını içerir. Şunlar bilerek pakete dahil edilmez:

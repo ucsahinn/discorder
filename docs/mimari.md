@@ -80,6 +80,8 @@ Discorder.BlockDiscordDomains
 
 Kural dışa giden trafiği, `AutoResolve` açık dinamik anahtar adresi üzerinden Discord alan adlarına bloklar. Bağlantı açılırken kural devre dışı bırakılır, WireSock tüneli çalışır. Bağlantı kesilirken veya uygulama kapanırken kural tekrar etkinleştirilir.
 
+Canlı doğrulama için `scripts/verify-firewall-lock.ps1` yönetici PowerShell oturumunda çalıştırılır. Script kuralı etkinleştirir, devre dışı bırakır ve finalde tekrar etkin bırakarak `Enabled`, `Direction` ve `Action` durumlarını raporlar. `-ProbeNetwork` seçeneği Discord'a TCP 443 bağlantısını da dener; ağ veya ISS tarafı Discord'a zaten ulaşamıyorsa bu prob kanıt olarak zorlanmaz.
+
 ## Tarayıcı Kapsamı
 
 Desteklenen tarayıcı süreçleri:
