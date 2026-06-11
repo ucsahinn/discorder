@@ -13,4 +13,10 @@ public sealed class NullDiscordAccessLock : IDiscordAccessLock
         cancellationToken.ThrowIfCancellationRequested();
         return Task.CompletedTask;
     }
+
+    public Task RemoveAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
 }

@@ -47,6 +47,11 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
         return RunScriptAsync(BuildDisableScript(), cancellationToken);
     }
 
+    public Task RemoveAsync(CancellationToken cancellationToken)
+    {
+        return RunScriptAsync(BuildRemoveScript(), cancellationToken);
+    }
+
     private async Task RunScriptAsync(
         string script,
         CancellationToken cancellationToken)
@@ -172,6 +177,45 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "$rule = Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue",
             "if ($null -ne $rule) {",
             "    Set-NetFirewallRule -Name $ruleName -Enabled False | Out-Null",
+            "}"
+        ]);
+    }
+
+    private static string BuildRemoveScript()
+    {
+        return string.Join(Environment.NewLine, [
+            "$ErrorActionPreference = 'Stop'",
+            $"$ruleName = '{RuleName}'",
+            "$hostsPath = Join-Path $env:SystemRoot 'System32\\drivers\\etc\\hosts'",
+            "$beginMarker = '# BEGIN Discorder Discord kilidi'",
+            "$endMarker = '# END Discorder Discord kilidi'",
+            "function Invoke-DiscorderRetry([scriptblock]$action) {",
+            "    for ($attempt = 1; $attempt -le 8; $attempt++) {",
+            "        try {",
+            "            & $action",
+            "            return",
+            "        } catch {",
+            "            if ($attempt -eq 8) { throw }",
+            "            Start-Sleep -Milliseconds (120 * $attempt)",
+            "        }",
+            "    }",
+            "}",
+            "$hostsChanged = $false",
+            "if (Test-Path -LiteralPath $hostsPath) {",
+            "    $content = [string](Get-Content -Raw -LiteralPath $hostsPath)",
+            "    $pattern = '(?ms)^' + [regex]::Escape($beginMarker) + '\\r?\\n.*?^' + [regex]::Escape($endMarker) + '\\r?\\n?'",
+            "    $updated = [regex]::Replace($content, $pattern, '')",
+            "    if ($updated -ne $content) {",
+            "        Invoke-DiscorderRetry { Set-Content -LiteralPath $hostsPath -Value $updated -NoNewline -Encoding ASCII }",
+            "        $hostsChanged = $true",
+            "    }",
+            "}",
+            "$rule = Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue",
+            "if ($null -ne $rule) {",
+            "    Remove-NetFirewallRule -Name $ruleName | Out-Null",
+            "}",
+            "if ($hostsChanged) {",
+            "    ipconfig /flushdns | Out-Null",
             "}"
         ]);
     }

@@ -15,6 +15,7 @@ Amaç basit: **Bağlan** düğmesine basınca Discord uygulaması çalışsın, 
 - ✅ WireSock kurucusu SHA-256, Authenticode imzası, yayıncı ve sürüm bilgisiyle doğrulanır.
 - ✅ Yerel profil ve tanılama dosyaları `%LOCALAPPDATA%\Discorder` altında tutulur.
 - ✅ Premium arka plan videosu varsayılan olarak açıktır; alt şeritten kapatılıp tekrar açılabilir.
+- ✅ **Temiz kaldır** işlemi Discorder kilidini geri alır ve yerel Discorder verisini sıfırlar.
 
 ## 🧭 Kapsam Dışı
 
@@ -63,6 +64,18 @@ Discorder şunları bilinçli olarak yapmaz:
 7. İlk kurulum penceresinde WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
 8. Windows UAC penceresi gelirse resmi WireSock kurulumuna izin verin.
 9. Durum **AÇIK** olduğunda seçilen kapsam tünellenir.
+
+## 🧹 Temiz Kaldırma
+
+Ana ekrandaki **Temiz kaldır** düğmesi Discorder'ı taşınabilir uygulama mantığıyla sıfırlar:
+
+- Çalışan Discorder tünelini kapatır.
+- Discorder'ın hosts dosyasına eklediği yönetilen Discord kilidi bloğunu kaldırır.
+- `Discorder.BlockDiscordDomains` Windows Firewall kuralını siler.
+- `%LOCALAPPDATA%\Discorder` altındaki ayar, profil, wgcf, kurucu ve log dosyalarını siler.
+- İşlem bitince uygulamayı kapatır.
+
+WireSock VPN Client genel Windows kurulumu otomatik kaldırılmaz; bu kurulum üçüncü taraf ve sistem genelinde paylaşılan bir bileşendir.
 
 ## 🔐 Güvenlik Modeli
 

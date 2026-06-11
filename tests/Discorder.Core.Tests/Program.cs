@@ -5,6 +5,7 @@ using Discorder.Core.Connection;
 using Discorder.Core.Discord;
 using Discorder.Core.Firewall;
 using Discorder.Core.Infrastructure;
+using Discorder.Core.Maintenance;
 using Discorder.Core.Profiles;
 using Discorder.Core.Provisioning;
 using Discorder.Core.Security;
@@ -26,7 +27,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("WireSock hazırlığı yeniden başlatma gerektiren başarı kodunu kabul eder", BootstrapAcceptsRestartRequiredExitCodeAsync),
     ("Denetleyici idempotent bağlanır ve keser", ControllerLifecycleAsync),
     ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
-    ("Windows Firewall kilidi Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync)
+    ("Windows Firewall kilidi Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
+    ("Temiz kaldırma Discorder verisini ve kilidini siler", CleanupServiceRemovesDiscorderStateAsync)
 };
 
 var failures = new List<string>();
@@ -591,8 +593,9 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
     {
         await accessLock.EnableAsync(CancellationToken.None);
         await accessLock.DisableAsync(CancellationToken.None);
+        await accessLock.RemoveAsync(CancellationToken.None);
 
-        Assert(runner.Commands.Count == 2);
+        Assert(runner.Commands.Count == 3);
         Assert(runner.Commands[0].Contains(
             "System32\\drivers\\etc\\hosts",
             StringComparison.Ordinal));
@@ -629,10 +632,48 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
         Assert(runner.Commands[1].Contains(
             "-Enabled False",
             StringComparison.Ordinal));
+        Assert(runner.Commands[2].Contains(
+            WindowsFirewallDiscordAccessLock.RuleName,
+            StringComparison.Ordinal));
+        Assert(runner.Commands[2].Contains(
+            "# END Discorder Discord kilidi",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[2].Contains(
+            "Remove-NetFirewallRule",
+            StringComparison.Ordinal));
     }
     finally
     {
         Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task CleanupServiceRemovesDiscorderStateAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var accessLock = new FakeDiscordAccessLock();
+    var cleanup = new DiscorderCleanupService(paths, accessLock);
+
+    try
+    {
+        paths.EnsureDirectories();
+        await File.WriteAllTextAsync(paths.SettingsFile, "ayar");
+        await File.WriteAllTextAsync(paths.DiscordProfile, "profil");
+        await File.WriteAllTextAsync(paths.ErrorLog, "log");
+
+        await cleanup.CleanUninstallAsync(CancellationToken.None);
+
+        Assert(accessLock.RemoveCount == 1);
+        Assert(!Directory.Exists(paths.DataDirectory));
+        Assert(Directory.Exists(root));
+    }
+    finally
+    {
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 }
 
@@ -692,6 +733,8 @@ file sealed class FakeDiscordAccessLock : IDiscordAccessLock
 
     public int DisableCount { get; private set; }
 
+    public int RemoveCount { get; private set; }
+
     public Task EnableAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -703,6 +746,13 @@ file sealed class FakeDiscordAccessLock : IDiscordAccessLock
     {
         cancellationToken.ThrowIfCancellationRequested();
         DisableCount++;
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        RemoveCount++;
         return Task.CompletedTask;
     }
 }

@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Media;
 using Discorder.Core.Configuration;
 using Discorder.Core.Connection;
+using Discorder.Core.Maintenance;
 using Discorder.Core.WireSock;
 
 namespace Discorder.App;
@@ -19,6 +20,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly AppPaths _paths;
     private readonly IWireSockBootstrapper _wireSockBootstrapper;
     private readonly AppSettingsStore _settingsStore;
+    private readonly DiscorderCleanupService _cleanupService;
     private bool _isApplyingSettings;
     private bool _isBackgroundVideoEnabled = true;
     private CancellationTokenSource? _operationCancellation;
@@ -30,7 +32,8 @@ public partial class MainWindow : Window, IDisposable
         DiscordTunnelController controller,
         AppPaths paths,
         IWireSockBootstrapper wireSockBootstrapper,
-        AppSettingsStore settingsStore)
+        AppSettingsStore settingsStore,
+        DiscorderCleanupService cleanupService)
     {
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
@@ -38,6 +41,8 @@ public partial class MainWindow : Window, IDisposable
             ?? throw new ArgumentNullException(nameof(wireSockBootstrapper));
         _settingsStore = settingsStore
             ?? throw new ArgumentNullException(nameof(settingsStore));
+        _cleanupService = cleanupService
+            ?? throw new ArgumentNullException(nameof(cleanupService));
 
         InitializeComponent();
         ApplyBrowserAccessSetting(_settingsStore.IsBrowserAccessEnabled());
@@ -232,6 +237,56 @@ public partial class MainWindow : Window, IDisposable
         if (BackgroundVideo.IsLoaded)
         {
             BackgroundVideo.Play();
+        }
+    }
+
+    private async void CleanUninstall_Click(object sender, RoutedEventArgs e)
+    {
+        var confirmation = MessageBox.Show(
+            "Discorder bağlantıyı kapatacak, hosts ve Windows Firewall üzerindeki Discorder kilidini geri alacak, " +
+            "%LOCALAPPDATA%\\Discorder altındaki profil, ayar, wgcf, kurucu ve log dosyalarını silecek. " +
+            "WireSock VPN Client genel kurulumu kaldırılmaz.\n\nDevam edilsin mi?",
+            "Discorder temiz kaldır",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+
+        if (confirmation != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        IsEnabled = false;
+        _operationCancellation?.Cancel();
+        StopBackgroundVideo();
+        StatusMessage.Text = "Temiz kaldırma çalışıyor";
+        StatusDetail.Text = "Tünel kapatılıyor, Discorder kilidi geri alınıyor ve yerel veriler siliniyor.";
+
+        try
+        {
+            await _controller.DisposeAsync();
+            await _cleanupService.CleanUninstallAsync(CancellationToken.None);
+
+            MessageBox.Show(
+                "Discorder temiz kaldırıldı. Uygulama kapanacak.",
+                "Discorder",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            _allowClose = true;
+            Application.Current.Shutdown();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            IsEnabled = true;
+            StatusMessage.Text = "Temiz kaldırma tamamlanamadı";
+            StatusDetail.Text = exception.Message;
+
+            MessageBox.Show(
+                "Temiz kaldırma tamamlanamadı.\n\n" + exception.Message,
+                "Discorder",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 

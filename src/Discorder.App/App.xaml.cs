@@ -10,6 +10,7 @@ using Discorder.Core.Connection;
 using Discorder.Core.Discord;
 using Discorder.Core.Firewall;
 using Discorder.Core.Infrastructure;
+using Discorder.Core.Maintenance;
 using Discorder.Core.Provisioning;
 using Discorder.Core.WireSock;
 using Discorder.App.Installation;
@@ -82,6 +83,9 @@ public partial class App : Application, IDisposable
             _paths,
             downloader,
             commandRunner);
+        var accessLock = new WindowsFirewallDiscordAccessLock(
+            _paths,
+            commandRunner);
 
         _tunnelController = new DiscordTunnelController(
             _paths,
@@ -89,15 +93,14 @@ public partial class App : Application, IDisposable
             wireSockBootstrapper,
             provisioner,
             new ProcessLauncher(),
-            accessLock: new WindowsFirewallDiscordAccessLock(
-                _paths,
-                commandRunner));
+            accessLock: accessLock);
 
         var window = new MainWindow(
             _tunnelController,
             _paths,
             wireSockBootstrapper,
-            settingsStore);
+            settingsStore,
+            new DiscorderCleanupService(_paths, accessLock));
         MainWindow = window;
         window.Show();
     }

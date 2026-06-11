@@ -8,7 +8,9 @@ using Discorder.App.Security;
 using Discorder.Core.Configuration;
 using Discorder.Core.Connection;
 using Discorder.Core.Discord;
+using Discorder.Core.Firewall;
 using Discorder.Core.Infrastructure;
+using Discorder.Core.Maintenance;
 using Discorder.Core.Provisioning;
 using Discorder.Core.WireSock;
 
@@ -124,7 +126,10 @@ static void RenderMainWindow()
             controller,
             new AppPaths(root),
             bootstrapper,
-            new AppSettingsStore(new AppPaths(root)));
+            new AppSettingsStore(new AppPaths(root)),
+            new DiscorderCleanupService(
+                new AppPaths(root),
+                new NullDiscordAccessLock()));
         window.Show();
         window.UpdateLayout();
 
@@ -137,6 +142,11 @@ static void RenderMainWindow()
         Assert(text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
         Assert(text.Contains("Discord web", StringComparison.Ordinal));
         Assert(text.Contains("Video açık", StringComparison.Ordinal));
+        var buttons = FindVisualChildren<Button>(window)
+            .Select(button => button.Content?.ToString())
+            .Where(content => !string.IsNullOrWhiteSpace(content))
+            .ToArray();
+        Assert(buttons.Contains("Temiz kaldır"));
         var switches = FindVisualChildren<CheckBox>(window).ToArray();
         var browserSwitch = switches.Single(toggle =>
             toggle.Name == "BrowserAccessToggle");
