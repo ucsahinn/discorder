@@ -2,10 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Discorder"
-        Width="1240"
-        Height="760"
-        MinWidth="1240"
-        MinHeight="760"
+        Width="1320"
+        Height="780"
+        MinWidth="1320"
+        MinHeight="780"
         ResizeMode="CanMinimize"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource WindowBrush}"
@@ -21,7 +21,7 @@
                       UnloadedBehavior="Stop"
                       Stretch="UniformToFill"
                       Volume="0"
-                      Opacity="0.98"
+                      Opacity="1"
                       IsHitTestVisible="False"
                       Loaded="BackgroundVideo_Loaded"
                       MediaEnded="BackgroundVideo_MediaEnded"
@@ -30,10 +30,10 @@
         <Rectangle IsHitTestVisible="False">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                    <GradientStop Color="#82040710" Offset="0" />
-                    <GradientStop Color="#4A071120" Offset="0.36" />
-                    <GradientStop Color="#13071120" Offset="0.72" />
-                    <GradientStop Color="#16040710" Offset="1" />
+                    <GradientStop Color="#76040710" Offset="0" />
+                    <GradientStop Color="#43071120" Offset="0.36" />
+                    <GradientStop Color="#0E071120" Offset="0.72" />
+                    <GradientStop Color="#10040710" Offset="1" />
                 </LinearGradientBrush>
             </Rectangle.Fill>
         </Rectangle>
@@ -75,11 +75,11 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Grid Margin="26">
+        <Grid Margin="28">
             <Grid.RowDefinitions>
-                <RowDefinition Height="74" />
+                <RowDefinition Height="76" />
                 <RowDefinition Height="*" />
-                <RowDefinition Height="72" />
+                <RowDefinition Height="74" />
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0"
@@ -88,7 +88,7 @@
                     BorderThickness="1"
                     CornerRadius="8"
                     Padding="18,0"
-                    MaxWidth="1188">
+                    MaxWidth="1264">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="28"
                                       Direction="270"
@@ -117,7 +117,7 @@
                         <TextBlock Margin="0,3,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Discord uygulaması için hazır, web modu isteğe bağlı" />
+                                   Text="Uygulama modu hazır, web modu ayrı çalışır" />
                     </StackPanel>
 
                     <Border Grid.Column="2"
@@ -145,7 +145,7 @@
 
             <Grid Grid.Row="1" Margin="0,24">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="540" />
+                    <ColumnDefinition Width="560" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
@@ -155,7 +155,7 @@
                         BorderThickness="1"
                         CornerRadius="8"
                         Padding="32,30"
-                        MaxHeight="500"
+                        MaxHeight="514"
                         VerticalAlignment="Center">
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="54"
@@ -373,8 +373,8 @@
 
                     <Border Grid.Row="0"
                             HorizontalAlignment="Right"
-                            Width="610"
-                            Background="#35101827"
+                            Width="650"
+                            Background="#30101827"
                             BorderBrush="#8D7EDBFF"
                             BorderThickness="1"
                             CornerRadius="8"
@@ -389,7 +389,7 @@
                         <StackPanel>
                             <TextBlock FontSize="13"
                                        Foreground="{StaticResource MutedTextBrush}"
-                                       Text="TÜNEL KAPSAMI" />
+                                       Text="MOD SEÇİMİ" />
                             <Grid Margin="0,16,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -399,14 +399,14 @@
                                 <StackPanel Grid.Column="0">
                                     <TextBlock FontSize="18"
                                                FontWeight="SemiBold"
-                                               Text="Discord web" />
+                                               Text="Discord web modu" />
                                     <TextBlock x:Name="BrowserAccessStatus"
                                                Margin="0,6,18,0"
                                                TextWrapping="Wrap"
                                                FontSize="12"
                                                LineHeight="18"
                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="Varsayılan mod. Yalnızca Discord uygulaması tünellenir." />
+                                               Text="Kapalı. Uygulama modunda yalnızca Discord uygulaması tünellenir." />
                                 </StackPanel>
 
                                 <CheckBox Grid.Column="1"
@@ -415,7 +415,7 @@
                                           VerticalAlignment="Top"
                                           Checked="BrowserAccessToggle_Changed"
                                           Unchecked="BrowserAccessToggle_Changed"
-                                          ToolTip="Chrome, Edge, Firefox, Brave, Opera ve Vivaldi ile Discord web tünelini aç" />
+                                          ToolTip="Web modu açıkken Discord uygulaması ve desteklenen tarayıcılar tünellenir" />
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -423,8 +423,8 @@
                     <Border Grid.Row="1"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center"
-                            Width="610"
-                            Background="#30101827"
+                            Width="650"
+                            Background="#2B101827"
                             BorderBrush="#7478E5FF"
                             BorderThickness="1"
                             CornerRadius="8"
@@ -444,7 +444,7 @@
 
                             <TextBlock FontSize="13"
                                        Foreground="{StaticResource MutedTextBrush}"
-                                       Text="KONTROL MERKEZİ" />
+                                       Text="İŞLETİM MERKEZİ" />
 
                             <Grid Grid.Row="1"
                                   Margin="0,14,0,0">
@@ -545,7 +545,7 @@
                                             BorderThickness="1">
                                         <TextBlock FontSize="11"
                                                    FontWeight="SemiBold"
-                                                   Text="Sürekli açık" />
+                                                   Text="Kayıt hazır" />
                                     </Border>
                                 </Grid>
                             </Grid>
@@ -554,8 +554,8 @@
 
                     <Border Grid.Row="2"
                             HorizontalAlignment="Right"
-                            Width="610"
-                            Background="#30101827"
+                            Width="650"
+                            Background="#2D101827"
                             BorderBrush="#7473DBFF"
                             BorderThickness="1"
                             CornerRadius="8"
@@ -625,7 +625,7 @@
                     BorderThickness="1"
                     CornerRadius="8"
                     Padding="16,0"
-                    MaxWidth="1188">
+                    MaxWidth="1264">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="24"
                                       Direction="270"
@@ -685,7 +685,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.0.5" />
+                               Text="v2.0.6" />
 
                     <Button Grid.Column="5"
                             Height="46"

@@ -6,5 +6,11 @@ public interface IDiscordAccessLock
 
     Task DisableAsync(CancellationToken cancellationToken);
 
+    Task ApplyTunnelScopeAsync(
+        bool includeBrowserAccess,
+        CancellationToken cancellationToken);
+
+    Task ClearTunnelScopeAsync(CancellationToken cancellationToken);
+
     Task RemoveAsync(CancellationToken cancellationToken);
 }

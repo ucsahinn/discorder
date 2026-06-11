@@ -16,7 +16,7 @@ using Discorder.Core.WireSock;
 var tests = new (string Name, Func<Task> Run)[]
 {
     ("Discord kapsamı varsayılan olarak tarayıcıları kapalı tutar", DiscordScopeDefaultsToAppOnlyAsync),
-    ("Discord web modu desteklenen tarayıcıları içerir", DiscordScopeIncludesBrowsersWhenEnabledAsync),
+    ("Discord web modu uygulama ve desteklenen tarayıcıları içerir", DiscordScopeIncludesBrowsersWhenEnabledAsync),
     ("Profil üretici geniş AllowedApps değerlerini değiştirir", ProfileBuilderIsStrictAsync),
     ("Profil üretici yapılandırma enjeksiyonunu reddeder", ProfileBuilderRejectsInjectionAsync),
     ("wgcf Discord uygulama ve web profili üretir", WgcfProvisionerBuildsDiscordAccessProfileAsync),
@@ -109,10 +109,10 @@ static Task DiscordScopeIncludesBrowsersWhenEnabledAsync()
         var apps = new DiscordAppScope(root, root, root)
             .GetAllowedApplications(includeBrowserAccess: true);
 
-        Assert(apps.Any(app => app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals("msedge.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals("firefox.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals(
             Path.Combine(root, "Discord"),
             StringComparison.OrdinalIgnoreCase)));
@@ -529,6 +529,8 @@ static async Task ControllerLifecycleAsync()
         await controller.ConnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Connected);
         Assert(accessLock.DisableCount == 1);
+        Assert(accessLock.ApplyTunnelScopeCount == 1);
+        Assert(accessLock.LastIncludeBrowserAccess == true);
         Assert(profileProvisioner.LastAllowedApplications.Any(app =>
             app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(profileProvisioner.LastAllowedApplications.Any(app =>
@@ -554,11 +556,13 @@ static async Task ControllerLifecycleAsync()
         await controller.DisconnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Disconnected);
         Assert(accessLock.EnableCount == 2);
+        Assert(accessLock.ClearTunnelScopeCount == 1);
         Assert(process.StopCount == 1);
 
         await controller.DisconnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Disconnected);
         Assert(accessLock.EnableCount == 3);
+        Assert(accessLock.ClearTunnelScopeCount == 2);
     }
     finally
     {
@@ -570,6 +574,9 @@ static async Task ControllerLifecycleAsync()
 static async Task ControllerLocksBrowserScopeWhileConnectedAsync()
 {
     var root = CreateTemporaryDirectory();
+    var accessLock = new FakeDiscordAccessLock();
+    var profileProvisioner = new FakeProfileProvisioner(
+        Path.Combine(root, "discord.conf"));
     var controller = new DiscordTunnelController(
         new AppPaths(root),
         new DiscordAppScope(root, root, root),
@@ -578,16 +585,21 @@ static async Task ControllerLocksBrowserScopeWhileConnectedAsync()
             "WireSock VPN Client",
             "bin",
             WireSockPackage.CliExecutableFileName)),
-        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        profileProvisioner,
         new FakeProcessLauncher(new FakeManagedProcess()),
         TimeSpan.Zero,
-        new FakeDiscordAccessLock());
+        accessLock);
 
     try
     {
         Assert(controller.TrySetBrowserAccess(false));
         await controller.ConnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(accessLock.LastIncludeBrowserAccess == false);
+        Assert(profileProvisioner.LastAllowedApplications.Any(app =>
+            app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(profileProvisioner.LastAllowedApplications.All(app =>
+            !app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(!controller.TrySetBrowserAccess(true));
         Assert(!controller.IncludeBrowserAccess);
 
@@ -649,9 +661,15 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
     {
         await accessLock.EnableAsync(CancellationToken.None);
         await accessLock.DisableAsync(CancellationToken.None);
+        await accessLock.ApplyTunnelScopeAsync(
+            includeBrowserAccess: false,
+            CancellationToken.None);
+        await accessLock.ApplyTunnelScopeAsync(
+            includeBrowserAccess: true,
+            CancellationToken.None);
         await accessLock.RemoveAsync(CancellationToken.None);
 
-        Assert(runner.Commands.Count == 3);
+        Assert(runner.Commands.Count == 5);
         Assert(runner.Commands[0].Contains(
             "System32\\drivers\\etc\\hosts",
             StringComparison.Ordinal));
@@ -674,7 +692,7 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
             "-RemoteAddress $addressList",
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
-            "-NewDisplayName $displayName",
+            "-DisplayName $displayName",
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
             "-Enabled True",
@@ -689,12 +707,30 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
             "-Enabled False",
             StringComparison.Ordinal));
         Assert(runner.Commands[2].Contains(
+            WindowsFirewallDiscordAccessLock.BrowserScopeGroup,
+            StringComparison.Ordinal));
+        Assert(runner.Commands[2].Contains(
+            "Get-DiscorderBrowserPrograms",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[2].Contains(
+            "-Program $program",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[2].Contains(
+            "-RemoteAddress $addressList",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[3].Contains(
+            "$includeBrowserAccess = $true",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[3].Contains(
+            "if ($includeBrowserAccess) { return }",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[4].Contains(
             WindowsFirewallDiscordAccessLock.RuleName,
             StringComparison.Ordinal));
-        Assert(runner.Commands[2].Contains(
+        Assert(runner.Commands[4].Contains(
             "# END Discorder Discord kilidi",
             StringComparison.Ordinal));
-        Assert(runner.Commands[2].Contains(
+        Assert(runner.Commands[4].Contains(
             "Remove-NetFirewallRule",
             StringComparison.Ordinal));
     }
@@ -884,6 +920,12 @@ file sealed class FakeDiscordAccessLock : IDiscordAccessLock
 
     public int DisableCount { get; private set; }
 
+    public int ApplyTunnelScopeCount { get; private set; }
+
+    public bool? LastIncludeBrowserAccess { get; private set; }
+
+    public int ClearTunnelScopeCount { get; private set; }
+
     public int RemoveCount { get; private set; }
 
     public Task EnableAsync(CancellationToken cancellationToken)
@@ -897,6 +939,23 @@ file sealed class FakeDiscordAccessLock : IDiscordAccessLock
     {
         cancellationToken.ThrowIfCancellationRequested();
         DisableCount++;
+        return Task.CompletedTask;
+    }
+
+    public Task ApplyTunnelScopeAsync(
+        bool includeBrowserAccess,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ApplyTunnelScopeCount++;
+        LastIncludeBrowserAccess = includeBrowserAccess;
+        return Task.CompletedTask;
+    }
+
+    public Task ClearTunnelScopeAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ClearTunnelScopeCount++;
         return Task.CompletedTask;
     }
 

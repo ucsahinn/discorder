@@ -14,6 +14,20 @@ public sealed class NullDiscordAccessLock : IDiscordAccessLock
         return Task.CompletedTask;
     }
 
+    public Task ApplyTunnelScopeAsync(
+        bool includeBrowserAccess,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public Task ClearTunnelScopeAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
     public Task RemoveAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

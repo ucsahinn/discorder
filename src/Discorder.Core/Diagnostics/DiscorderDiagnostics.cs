@@ -93,7 +93,7 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
         lock (_gate)
         {
             _paths.EnsureDirectories();
-            WriteSummaryLocked("tanılama paketi hazırlandı");
+            WriteSummaryLocked("tanılama paketi hazırlanıyor");
 
             var timestamp = DateTimeOffset.Now.ToString(
                 "yyyyMMdd-HHmmss",
@@ -102,21 +102,94 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
                 _paths.DiagnosticBundleDirectory,
                 $"discorder-diagnostics-{timestamp}.zip");
             var temporaryPath = finalPath + ".tmp";
+            var stagingDirectory = Path.Combine(
+                _paths.DiagnosticBundleDirectory,
+                "staging-" + timestamp);
 
             if (File.Exists(temporaryPath))
             {
                 File.Delete(temporaryPath);
             }
 
-            ZipFile.CreateFromDirectory(
-                _paths.LogDirectory,
-                temporaryPath,
-                CompressionLevel.Optimal,
-                includeBaseDirectory: false);
+            if (Directory.Exists(stagingDirectory))
+            {
+                Directory.Delete(stagingDirectory, recursive: true);
+            }
+
+            Directory.CreateDirectory(stagingDirectory);
+
+            try
+            {
+                var warnings = CopyLogFilesToStaging(stagingDirectory);
+                if (warnings.Count > 0)
+                {
+                    File.WriteAllLines(
+                        Path.Combine(stagingDirectory, "bundle-warnings.txt"),
+                        warnings,
+                        new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                }
+
+                if (!Directory.EnumerateFiles(stagingDirectory).Any())
+                {
+                    File.WriteAllText(
+                        Path.Combine(stagingDirectory, "bundle-info.txt"),
+                        "Tanılama klasöründe paketlenecek log dosyası bulunamadı.",
+                        new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                }
+
+                ZipFile.CreateFromDirectory(
+                    stagingDirectory,
+                    temporaryPath,
+                    CompressionLevel.Optimal,
+                    includeBaseDirectory: false);
+            }
+            finally
+            {
+                if (Directory.Exists(stagingDirectory))
+                {
+                    Directory.Delete(stagingDirectory, recursive: true);
+                }
+            }
 
             File.Move(temporaryPath, finalPath, overwrite: true);
+            WriteSummaryLocked("tanılama paketi hazırlandı");
             return finalPath;
         }
+    }
+
+    private List<string> CopyLogFilesToStaging(string stagingDirectory)
+    {
+        var warnings = new List<string>();
+
+        foreach (var file in Directory.EnumerateFiles(_paths.LogDirectory)
+                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+        {
+            var fileName = Path.GetFileName(file);
+            var destination = Path.Combine(stagingDirectory, fileName);
+
+            try
+            {
+                using var source = new FileStream(
+                    file,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete);
+                using var target = new FileStream(
+                    destination,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None);
+                source.CopyTo(target);
+            }
+            catch (Exception exception)
+                when (exception is IOException or UnauthorizedAccessException)
+            {
+                warnings.Add(
+                    $"{fileName}: paket kopyasına alınamadı - {Redact(exception.Message)}");
+            }
+        }
+
+        return warnings;
     }
 
     private void WriteEvent(

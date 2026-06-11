@@ -10,6 +10,7 @@ Discorder tek amaçlı bir Windows uygulamasıdır: Discord uygulamasını Cloud
 - Kalıcı paket filtre sürücüsü veya DPI aşma motoru çalıştırılmaz.
 - Tünel kapsamı `AllowedApps` ile varsayılan olarak Discord uygulamalarına daraltılır.
 - Desteklenen tarayıcı süreçleri yalnızca web modu açıldığında kapsama eklenir.
+- Bağlantı açıkken web modu kapalıysa desteklenen tarayıcıların Discord alan adlarına düz internetten çıkmasını azaltmak için geçici tarayıcı firewall kapsamı uygulanır; web modu açıksa ek tarayıcı engeli kaldırılır.
 - Kapalı durumda Discorder'a ait yönetilen kilit Discord alan adlarına giden trafiği kapatır. Ana kilit hosts marker bloğudur; Windows Firewall policy izin verirse çözülen IP listesi de bloklanır.
 - Profil, ayar ve log dosyaları `%LOCALAPPDATA%\Discorder` altında tutulur.
 
@@ -41,8 +42,9 @@ Tünel yaşam döngüsü, Discord kapsamı, profil üretimi, indirme doğrulamas
 9. `wgcf` indirilir, doğrulanır ve Cloudflare WARP profili üretilir.
 10. Profildeki eski veya geniş `AllowedApps` satırları kaldırılır.
 11. Discord uygulamaları yeni `AllowedApps` satırına yazılır; web modu açıksa desteklenen tarayıcılar da eklenir.
-12. WireSock VPN Client `run -config <discord.conf> -log-level error` komutuyla kullanıcı süreci olarak başlar.
-13. Bağlantı kesilirken çalışan WireSock süreci sonlandırılır ve Discord firewall kilidi tekrar etkinleştirilir.
+12. Web modu kapalıysa desteklenen tarayıcılar için geçici `Discorder.TunnelScope.Browsers` Windows Firewall kuralları uygulanır; web modu açıksa bu geçici kurallar temiz kalır.
+13. WireSock VPN Client `run -config <discord.conf> -log-level error` komutuyla kullanıcı süreci olarak başlar.
+14. Bağlantı kesilirken çalışan WireSock süreci sonlandırılır, geçici tarayıcı kapsamı temizlenir ve Discord firewall kilidi tekrar etkinleştirilir.
 
 ## WireSock Komut Satırı Uyumluluğu
 
@@ -67,7 +69,7 @@ wiresock-client.exe run -config <discord.conf> -log-level error
 - Kurulu WireSock komut satırı dosyası imza ve yayıncı kontrolünden geçmeden çalıştırılmaz.
 - Discord uygulaması ve isteğe bağlı tarayıcı kapsamı dışındaki özel uygulama adları `AllowedApps` içine testlerle alınmaz.
 - Virgül, satır sonu ve boş değer enjeksiyonu reddedilir.
-- Discorder yalnızca kendi hosts marker bloğunu ve `Discorder.BlockDiscordDomains` Windows Firewall kuralını yönetir; servis veya görev zamanlayıcı kuralı eklemez.
+- Discorder kendi hosts marker bloğunu, `Discorder.BlockDiscordDomains` Windows Firewall kuralını ve bağlantı süresine bağlı geçici `Discorder.TunnelScope.Browsers` kural grubunu yönetir; servis veya görev zamanlayıcı kuralı eklemez.
 - Kapalı durum kilidi Discord alan adlarını hedefler; Chrome veya Edge gibi tarayıcı süreçlerinin tamamını bloklamaz.
 
 ## Kapalı Durum VPN Kilidi
@@ -90,6 +92,8 @@ Discorder.BlockDiscordDomains
 
 Hosts kilidi Discord alan adlarını yerel döngü adresine yönlendirir. Firewall katmanı dışa giden trafiği, Discorder'ın başlangıçta çözdüğü Discord alan adı IP'leri üzerinden bloklar. Bağlantı açılırken hosts marker bloğu kaldırılır ve Firewall kuralı devre dışı bırakılır, WireSock tüneli çalışır. Bağlantı kesilirken veya uygulama kapanırken kilit tekrar etkinleştirilir.
 
+Bağlı durumdayken web modu kapalıysa Discorder desteklenen tarayıcı kurulum yollarını bulur ve bu tarayıcı programları için Discord alan adı IP'lerine geçici outbound blok kuralları ekler. Bu kural grubu web modu açıkken, bağlantı kesilirken, uygulama kapanırken ve temiz kaldırma sırasında temizlenir.
+
 Canlı doğrulama için `scripts/verify-firewall-lock.ps1` yönetici PowerShell oturumunda çalıştırılır. Script kilidi etkinleştirir, devre dışı bırakır ve finalde tekrar etkin bırakarak hosts marker durumunu ve Firewall kural durumunu raporlar. `-ProbeNetwork` seçeneği Discord'a TCP 443 bağlantısını da dener; ağ veya ISS tarafı Discord'a zaten ulaşamıyorsa bu prob kanıt olarak zorlanmaz.
 
 ## Tarayıcı Kapsamı
@@ -103,7 +107,7 @@ Desteklenen tarayıcı süreçleri:
 - Opera: `opera.exe`
 - Vivaldi: `vivaldi.exe`
 
-Tarayıcı modu varsayılan kapalıdır. Açıldığında WireSock süreç bazlı filtreleme kullandığı için tarayıcı içinde yalnızca tek bir sekmeyi ayırmak yerine desteklenen tarayıcı sürecini tüneller. Bu karar Discord web erişimini çalıştırmak için bilinçli olarak alınır; oyunlar, sistem DNS'i, kalıcı servisler ve eski DPI motorları yine kapsam dışındadır.
+Tarayıcı modu varsayılan kapalıdır. Kapalıyken Discord uygulaması tünellenir ve desteklenen tarayıcıların Discord web'e düz internetten çıkmasını azaltan geçici firewall kapsamı uygulanır. Açıldığında Discord uygulaması ve desteklenen tarayıcı süreçleri birlikte tünellenir. WireSock süreç bazlı filtreleme kullandığı için tarayıcı içinde yalnızca tek bir sekmeyi ayırmak yerine desteklenen tarayıcı sürecini tüneller. Bu karar Discord web erişimini çalıştırmak için bilinçli olarak alınır; oyunlar, sistem DNS'i, kalıcı servisler ve eski DPI motorları yine kapsam dışındadır.
 
 ## Yayın Modeli
 

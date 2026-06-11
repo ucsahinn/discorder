@@ -6,8 +6,11 @@ namespace Discorder.Core.Firewall;
 public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
 {
     public const string RuleName = "Discorder.BlockDiscordDomains";
+    public const string BrowserScopeGroup = "Discorder.TunnelScope.Browsers";
 
     private const string DisplayName = "Discorder VPN kilidi - Discord alan adları";
+    private const string BrowserScopeDisplayName =
+        "Discorder tünel kapsamı - tarayıcı Discord engeli";
     private const string DiscordDomains =
         "'discord.com'," +
         "'discordapp.com'," +
@@ -45,6 +48,20 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
     public Task DisableAsync(CancellationToken cancellationToken)
     {
         return RunScriptAsync(BuildDisableScript(), cancellationToken);
+    }
+
+    public Task ApplyTunnelScopeAsync(
+        bool includeBrowserAccess,
+        CancellationToken cancellationToken)
+    {
+        return RunScriptAsync(
+            BuildApplyTunnelScopeScript(includeBrowserAccess),
+            cancellationToken);
+    }
+
+    public Task ClearTunnelScopeAsync(CancellationToken cancellationToken)
+    {
+        return RunScriptAsync(BuildClearTunnelScopeScript(), cancellationToken);
     }
 
     public Task RemoveAsync(CancellationToken cancellationToken)
@@ -93,6 +110,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "$hostsPath = Join-Path $env:SystemRoot 'System32\\drivers\\etc\\hosts'",
             "$beginMarker = '# BEGIN Discorder Discord kilidi'",
             "$endMarker = '# END Discorder Discord kilidi'",
+            $"$browserScopeGroup = '{BrowserScopeGroup}'",
             "function Invoke-DiscorderRetry([scriptblock]$action) {",
             "    for ($attempt = 1; $attempt -le 8; $attempt++) {",
             "        try {",
@@ -123,6 +141,9 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "    Invoke-DiscorderRetry { Add-Content -LiteralPath $hostsPath -Value ($block -join [Environment]::NewLine) -Encoding ASCII }",
             "    ipconfig /flushdns | Out-Null",
             "}",
+            "foreach ($group in @($browserScopeGroup)) {",
+            "    Get-NetFirewallRule -Group $group -ErrorAction SilentlyContinue | Remove-NetFirewallRule | Out-Null",
+            "}",
             "Remove-DiscorderHostsLock",
             "ipconfig /flushdns | Out-Null",
             "$resolvedAddresses = foreach ($domain in $domains) {",
@@ -136,11 +157,10 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "$addressList = @($resolvedAddresses | Sort-Object -Unique)",
             "if ($addressList.Count -gt 0) {",
             "    $rule = Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue",
-            "    if ($null -eq $rule) {",
-            "        New-NetFirewallRule -Name $ruleName -DisplayName $displayName -Direction Outbound -Action Block -RemoteAddress $addressList -Enabled True | Out-Null",
-            "    } else {",
-            "        Set-NetFirewallRule -Name $ruleName -NewDisplayName $displayName -Direction Outbound -Action Block -RemoteAddress $addressList -Enabled True | Out-Null",
+            "    if ($null -ne $rule) {",
+            "        Remove-NetFirewallRule -Name $ruleName | Out-Null",
             "    }",
+            "    New-NetFirewallRule -Name $ruleName -DisplayName $displayName -Direction Outbound -Action Block -RemoteAddress $addressList -Enabled True | Out-Null",
             "}",
             "Enable-DiscorderHostsLock"
         ]);
@@ -181,11 +201,88 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
         ]);
     }
 
+    private static string BuildApplyTunnelScopeScript(bool includeBrowserAccess)
+    {
+        var includeBrowserAccessLiteral = includeBrowserAccess ? "$true" : "$false";
+        return string.Join(Environment.NewLine, [
+            "$ErrorActionPreference = 'Stop'",
+            $"$includeBrowserAccess = {includeBrowserAccessLiteral}",
+            $"$domains = @({DiscordDomains})",
+            $"$browserScopeGroup = '{BrowserScopeGroup}'",
+            $"$browserScopeDisplayName = '{BrowserScopeDisplayName}'",
+            "function Join-DiscorderPath([string]$root, [string]$relative) {",
+            "    if ([string]::IsNullOrWhiteSpace($root)) { return $null }",
+            "    return (Join-Path $root $relative)",
+            "}",
+            "function Clear-DiscorderTunnelScope {",
+            "    foreach ($group in @($browserScopeGroup)) {",
+            "        Get-NetFirewallRule -Group $group -ErrorAction SilentlyContinue | Remove-NetFirewallRule | Out-Null",
+            "    }",
+            "}",
+            "function Get-DiscorderAddresses {",
+            "    $resolvedAddresses = foreach ($domain in $domains) {",
+            "        try {",
+            "            Resolve-DnsName -Name $domain -ErrorAction Stop |",
+            "                Where-Object { -not [string]::IsNullOrWhiteSpace($_.IPAddress) -and $_.IPAddress -ne '0.0.0.0' -and $_.IPAddress -ne '::1' -and $_.IPAddress -notlike '127.*' } |",
+            "                ForEach-Object { $_.IPAddress }",
+            "        } catch {",
+            "        }",
+            "    }",
+            "    return @($resolvedAddresses | Sort-Object -Unique)",
+            "}",
+            "function Get-DiscorderBrowserPrograms {",
+            "    $programFilesX86 = ${env:ProgramFiles(x86)}",
+            "    $candidates = @(",
+            "        (Join-DiscorderPath $env:ProgramFiles 'Google\\Chrome\\Application\\chrome.exe'),",
+            "        (Join-DiscorderPath $programFilesX86 'Google\\Chrome\\Application\\chrome.exe'),",
+            "        (Join-DiscorderPath $env:LOCALAPPDATA 'Google\\Chrome\\Application\\chrome.exe'),",
+            "        (Join-DiscorderPath $env:ProgramFiles 'Microsoft\\Edge\\Application\\msedge.exe'),",
+            "        (Join-DiscorderPath $programFilesX86 'Microsoft\\Edge\\Application\\msedge.exe'),",
+            "        (Join-DiscorderPath $env:ProgramFiles 'BraveSoftware\\Brave-Browser\\Application\\brave.exe'),",
+            "        (Join-DiscorderPath $programFilesX86 'BraveSoftware\\Brave-Browser\\Application\\brave.exe'),",
+            "        (Join-DiscorderPath $env:LOCALAPPDATA 'BraveSoftware\\Brave-Browser\\Application\\brave.exe'),",
+            "        (Join-DiscorderPath $env:ProgramFiles 'Mozilla Firefox\\firefox.exe'),",
+            "        (Join-DiscorderPath $programFilesX86 'Mozilla Firefox\\firefox.exe'),",
+            "        (Join-DiscorderPath $env:LOCALAPPDATA 'Programs\\Opera\\opera.exe'),",
+            "        (Join-DiscorderPath $env:LOCALAPPDATA 'Programs\\Opera GX\\opera.exe'),",
+            "        (Join-DiscorderPath $env:ProgramFiles 'Opera\\opera.exe'),",
+            "        (Join-DiscorderPath $programFilesX86 'Opera\\opera.exe'),",
+            "        (Join-DiscorderPath $env:LOCALAPPDATA 'Vivaldi\\Application\\vivaldi.exe'),",
+            "        (Join-DiscorderPath $env:ProgramFiles 'Vivaldi\\Application\\vivaldi.exe'),",
+            "        (Join-DiscorderPath $programFilesX86 'Vivaldi\\Application\\vivaldi.exe')",
+            "    )",
+            "    return @($candidates | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_) } | Sort-Object -Unique)",
+            "}",
+            "Clear-DiscorderTunnelScope",
+            "if ($includeBrowserAccess) { return }",
+            "$addressList = Get-DiscorderAddresses",
+            "if ($addressList.Count -eq 0) { return }",
+            "$programs = Get-DiscorderBrowserPrograms",
+            "$index = 0",
+            "foreach ($program in $programs) {",
+            "    $index++",
+            "    New-NetFirewallRule -Name ($browserScopeGroup + '.' + $index) -DisplayName ($browserScopeDisplayName + ' ' + $index) -Group $browserScopeGroup -Direction Outbound -Action Block -Program $program -RemoteAddress $addressList -Enabled True | Out-Null",
+            "}"
+        ]);
+    }
+
+    private static string BuildClearTunnelScopeScript()
+    {
+        return string.Join(Environment.NewLine, [
+            "$ErrorActionPreference = 'Stop'",
+            $"$browserScopeGroup = '{BrowserScopeGroup}'",
+            "foreach ($group in @($browserScopeGroup)) {",
+            "    Get-NetFirewallRule -Group $group -ErrorAction SilentlyContinue | Remove-NetFirewallRule | Out-Null",
+            "}"
+        ]);
+    }
+
     private static string BuildRemoveScript()
     {
         return string.Join(Environment.NewLine, [
             "$ErrorActionPreference = 'Stop'",
             $"$ruleName = '{RuleName}'",
+            $"$browserScopeGroup = '{BrowserScopeGroup}'",
             "$hostsPath = Join-Path $env:SystemRoot 'System32\\drivers\\etc\\hosts'",
             "$beginMarker = '# BEGIN Discorder Discord kilidi'",
             "$endMarker = '# END Discorder Discord kilidi'",
@@ -213,6 +310,9 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "$rule = Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue",
             "if ($null -ne $rule) {",
             "    Remove-NetFirewallRule -Name $ruleName | Out-Null",
+            "}",
+            "foreach ($group in @($browserScopeGroup)) {",
+            "    Get-NetFirewallRule -Group $group -ErrorAction SilentlyContinue | Remove-NetFirewallRule | Out-Null",
             "}",
             "if ($hostsChanged) {",
             "    ipconfig /flushdns | Out-Null",

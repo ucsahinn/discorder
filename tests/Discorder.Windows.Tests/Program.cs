@@ -141,15 +141,14 @@ static void RenderMainWindow()
             "\n",
             FindVisualChildren<TextBlock>(window).Select(block => block.Text));
         Assert(text.Contains("Discorder", StringComparison.Ordinal));
-        Assert(text.Contains("Discord uygulaması için hazır", StringComparison.Ordinal));
-        Assert(text.Contains("KAPALI", StringComparison.Ordinal));
-        Assert(text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
-        Assert(text.Contains("Discord web", StringComparison.Ordinal));
-        Assert(text.Contains("KONTROL MERKEZİ", StringComparison.Ordinal));
+        Assert(text.Contains("Uygulama modu hazır", StringComparison.Ordinal));
+        Assert(text.Contains("MOD SEÇİMİ", StringComparison.Ordinal));
+        Assert(text.Contains("Discord web modu", StringComparison.Ordinal));
+        Assert(text.Contains("İŞLETİM MERKEZİ", StringComparison.Ordinal));
         Assert(text.Contains("Arka planda çalış", StringComparison.Ordinal));
         Assert(text.Contains("Windows başlangıcı", StringComparison.Ordinal));
         Assert(text.Contains("Tanılama paketi", StringComparison.Ordinal));
-        Assert(text.Contains("Sürekli açık", StringComparison.Ordinal));
+        Assert(text.Contains("Kayıt hazır", StringComparison.Ordinal));
         Assert(text.Contains("Hazır, Discord kilidi aktif", StringComparison.Ordinal));
         var buttons = FindVisualChildren<Button>(window)
             .Select(button => button.Content?.ToString())

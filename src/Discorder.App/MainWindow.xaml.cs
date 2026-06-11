@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 using Discorder.App.Installation;
 using Discorder.Core.Configuration;
 using Discorder.Core.Connection;
@@ -162,6 +163,9 @@ public partial class MainWindow : Window, IDisposable
         var coreGlow = ToggleButton.Template.FindName(
             "CoreGlow",
             ToggleButton) as System.Windows.Shapes.Ellipse;
+        var outerRing = ToggleButton.Template.FindName(
+            "OuterRing",
+            ToggleButton) as System.Windows.Shapes.Ellipse;
         var visual = GetStateVisual(snapshot.State);
 
         if (templateLabel is not null)
@@ -173,12 +177,17 @@ public partial class MainWindow : Window, IDisposable
         StatusDot.Fill = visual.StatusBrush;
         StatusBadge.BorderBrush = visual.StatusBrush;
         StatusBadge.Background = visual.BadgeBackground;
-        ToggleButton.BorderBrush = (System.Windows.Media.Brush)
-            System.Windows.Application.Current.Resources["AccentBrush"];
+        ToggleButton.BorderBrush = visual.StatusBrush;
+
+        if (outerRing is not null)
+        {
+            outerRing.Effect = CreateGlowEffect(58, 0.95, visual.GlowColor);
+        }
 
         if (powerIcon is not null)
         {
             powerIcon.Foreground = visual.PowerBrush;
+            powerIcon.Effect = CreateGlowEffect(18, 0.86, visual.GlowColor);
         }
 
         if (stateRing is not null)
@@ -195,6 +204,21 @@ public partial class MainWindow : Window, IDisposable
         ApplyProgress(snapshot, visual.StatusBrush);
     }
 
+    private static DropShadowEffect CreateGlowEffect(
+        double blurRadius,
+        double opacity,
+        MediaColor color)
+    {
+        return new DropShadowEffect
+        {
+            BlurRadius = blurRadius,
+            Direction = 270,
+            Opacity = opacity,
+            ShadowDepth = 0,
+            Color = color
+        };
+    }
+
     private static StateVisual GetStateVisual(TunnelState state)
     {
         return state switch
@@ -204,31 +228,36 @@ public partial class MainWindow : Window, IDisposable
                 "BAĞLANTIYI KES",
                 MediaColor.FromRgb(86, 240, 123),
                 MediaColor.FromRgb(128, 255, 167),
-                MediaColor.FromRgb(26, 80, 48)),
+                MediaColor.FromRgb(26, 80, 48),
+                MediaColor.FromRgb(86, 240, 123)),
             TunnelState.Preparing or TunnelState.Connecting => new StateVisual(
                 "BAĞLANIYOR",
                 "BAĞLANIYOR",
                 MediaColor.FromRgb(249, 214, 107),
                 MediaColor.FromRgb(115, 232, 255),
-                MediaColor.FromRgb(82, 62, 22)),
+                MediaColor.FromRgb(82, 62, 22),
+                MediaColor.FromRgb(249, 214, 107)),
             TunnelState.Disconnecting => new StateVisual(
                 "KAPANIYOR",
                 "KAPATILIYOR",
                 MediaColor.FromRgb(255, 163, 92),
                 MediaColor.FromRgb(115, 232, 255),
-                MediaColor.FromRgb(86, 43, 22)),
+                MediaColor.FromRgb(86, 43, 22),
+                MediaColor.FromRgb(255, 163, 92)),
             TunnelState.Error => new StateVisual(
                 "HATA",
                 "TEKRAR DENE",
                 MediaColor.FromRgb(255, 107, 122),
                 MediaColor.FromRgb(255, 176, 187),
-                MediaColor.FromRgb(86, 24, 34)),
+                MediaColor.FromRgb(86, 24, 34),
+                MediaColor.FromRgb(255, 68, 92)),
             _ => new StateVisual(
                 "KAPALI",
                 "BAĞLAN",
-                MediaColor.FromRgb(157, 184, 205),
-                MediaColor.FromRgb(115, 232, 255),
-                MediaColor.FromRgb(20, 50, 62))
+                MediaColor.FromRgb(255, 78, 106),
+                MediaColor.FromRgb(255, 118, 135),
+                MediaColor.FromRgb(90, 28, 42),
+                MediaColor.FromRgb(255, 78, 106))
         };
     }
 
@@ -239,12 +268,14 @@ public partial class MainWindow : Window, IDisposable
             string buttonText,
             MediaColor statusColor,
             MediaColor powerColor,
-            MediaColor coreColor)
+            MediaColor coreColor,
+            MediaColor glowColor)
         {
             BadgeText = badgeText;
             ButtonText = buttonText;
             StatusBrush = new SolidColorBrush(statusColor);
             PowerBrush = new SolidColorBrush(powerColor);
+            GlowColor = glowColor;
             CoreFill = new SolidColorBrush(MediaColor.FromArgb(
                 76,
                 coreColor.R,
@@ -264,6 +295,8 @@ public partial class MainWindow : Window, IDisposable
         public SolidColorBrush StatusBrush { get; }
 
         public SolidColorBrush PowerBrush { get; }
+
+        public MediaColor GlowColor { get; }
 
         public SolidColorBrush CoreFill { get; }
 
@@ -337,8 +370,8 @@ public partial class MainWindow : Window, IDisposable
         return state switch
         {
             TunnelState.Connected => _controller.IncludeBrowserAccess
-                ? "Discord uygulamaları ve desteklenen tarayıcılar kapsamda."
-                : "Varsayılan modda yalnızca Discord uygulamaları kapsamda.",
+                ? "Web modunda Discord uygulaması ve desteklenen tarayıcılar kapsamda."
+                : "Uygulama modunda yalnızca Discord uygulaması kapsamda.",
             TunnelState.Preparing => "Kurulum, dijital imza ve tünel profili doğrulanıyor.",
             TunnelState.Connecting => "WireSock VPN Client süreci başlatılıyor.",
             TunnelState.Disconnecting => "Tünel süreci güvenli biçimde sonlandırılıyor.",
@@ -392,11 +425,11 @@ public partial class MainWindow : Window, IDisposable
             BrowserAccessToggle.IsEnabled = !locked;
             BrowserAccessStatus.Text = enabled
                 ? locked
-                    ? "Web kapsamı bu oturumda açık. Değiştirmek için önce bağlantıyı kes."
-                    : "Web kapsamı açık. Discord web desteklenen tarayıcılardan tünellenir."
+                    ? "Web modu bu oturumda açık. Uygulama moduna geçmek için önce bağlantıyı kes."
+                    : "Web modu açık. Discord uygulaması ve desteklenen tarayıcılar tünellenir."
                 : locked
-                    ? "Web kapsamı bu oturumda kapalı. Açmak için önce bağlantıyı kes."
-                    : "Web kapsamı kapalı. Yalnızca Discord uygulaması tünellenir.";
+                    ? "Uygulama modu bu oturumda açık. Web moduna geçmek için önce bağlantıyı kes."
+                    : "Uygulama modu açık. Yalnızca Discord uygulaması tünellenir.";
         }
         finally
         {
@@ -858,29 +891,48 @@ public partial class MainWindow : Window, IDisposable
 
     private void OpenDiagnostics_Click(object sender, RoutedEventArgs e)
     {
-        _paths.EnsureDirectories();
-        _diagnostics.WriteHealth(
-            "tanılama paketi istendi",
-            new Dictionary<string, string?>
-            {
-                ["browserAccess"] = _controller.IncludeBrowserAccess.ToString(),
-                ["state"] = _controller.Snapshot.State.ToString()
-            });
-        var bundlePath = _diagnostics.CreateBundle();
-        if (!string.IsNullOrWhiteSpace(bundlePath))
+        try
         {
+            _paths.EnsureDirectories();
+            _diagnostics.Info("ui.diagnostics", "Tanılama paketi istendi.");
+            _diagnostics.WriteHealth(
+                "tanılama paketi istendi",
+                new Dictionary<string, string?>
+                {
+                    ["browserAccess"] = _controller.IncludeBrowserAccess.ToString(),
+                    ["state"] = _controller.Snapshot.State.ToString()
+                });
+            var bundlePath = _diagnostics.CreateBundle();
+            DiagnosticsStatus.Text = "Son paket hazır. Log klasörü açıldı.";
+
+            if (!string.IsNullOrWhiteSpace(bundlePath))
+            {
+                MessageBox.Show(
+                    "Tanılama paketi hazırlandı.\n\n" + bundlePath,
+                    "Discorder tanılama",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = _paths.LogDirectory,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception exception)
+        {
+            DiagnosticsStatus.Text = "Tanılama paketi hazırlanamadı. Ayrıntı loglara yazıldı.";
+            _diagnostics.Failure(
+                "ui.diagnostics",
+                "Tanılama paketi hazırlanamadı.",
+                exception);
             MessageBox.Show(
-                "Tanılama paketi hazırlandı.\n\n" + bundlePath,
+                "Tanılama paketi hazırlanamadı.\n\n" + exception.Message,
                 "Discorder tanılama",
                 MessageBoxButton.OK,
-                MessageBoxImage.Information);
+                MessageBoxImage.Error);
         }
-
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = _paths.LogDirectory,
-            UseShellExecute = true
-        });
     }
 
     private void OpenGitHub_Click(object sender, RoutedEventArgs e)

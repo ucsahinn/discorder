@@ -68,7 +68,6 @@ public sealed class DiscordAppScope
             {
                 allowed.Add(browserProcessName);
             }
-
         }
 
         return allowed.ToArray();

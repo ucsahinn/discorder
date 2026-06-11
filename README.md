@@ -8,6 +8,7 @@ Amaç basit: **Bağlan** düğmesine basınca Discord uygulaması çalışsın, 
 
 - ✅ Varsayılan kapsam: Discord, Discord PTB, Discord Canary ve Discord Development.
 - ✅ İsteğe bağlı web modu: Chrome, Edge, Firefox, Brave, Opera ve Vivaldi.
+- ✅ Web modu kapalıyken bağlantı açık olsa bile desteklenen tarayıcılar için geçici Discord web engeli uygulanır; web modu açıksa Discord uygulaması ve desteklenen tarayıcılar birlikte tünellenir.
 - ✅ Sistem DNS, DoH, proxy, görev zamanlayıcı ve kalıcı servis ayarı değiştirilmez.
 - ✅ Discorder kapalıyken yönetilen Discord kilidi aktif kalır: hosts kilidi alan adlarını kapatır, Windows Firewall kuralı policy izin verirse çözülen IP'leri de bloklar.
 - ✅ Eski DPI aşma motorları, oyun yönlendirmeleri ve paket filtre sürücüleri yoktur.
@@ -17,7 +18,7 @@ Amaç basit: **Bağlan** düğmesine basınca Discord uygulaması çalışsın, 
 - ✅ Premium arka plan videosu arayüz sahnesinin sabit parçasıdır; kullanıcı tarafından kapatılıp görsel düzen bozulmaz.
 - ✅ İlk kurulum ve bağlantı adımları ana ekrandaki süreç çubuğunda izlenir.
 - ✅ **Onar** işlemi ayarları, WireSock kurulumunu ve tanılama kayıtlarını koruyup profil, wgcf ve kurucu önbelleğini yeniden üretilecek hale getirir.
-- ✅ **Tanılama paketi** JSONL olay akışı, sağlık raporu, okunabilir özet ve WireSock loglarını tek zip içinde hazırlar.
+- ✅ **Tanılama paketi** JSONL olay akışı, sağlık raporu, okunabilir özet ve aktif WireSock loglarını kilitlenmeden tek zip içinde hazırlar.
 - ✅ İsteğe bağlı arka plan modu pencere kapansa bile Discorder'ı bildirim alanında çalıştırır.
 - ✅ İsteğe bağlı Windows başlangıcı ayarı Discorder'ı oturum açılışında başlatır.
 - ✅ **Temiz kaldır** işlemi Discorder kilidini, başlangıç kaydını, yerel veriyi ve Discorder'ın kurduğu WireSock VPN Client kurulumunu geri alır.
@@ -60,7 +61,7 @@ Discorder şunları bilinçli olarak yapmaz:
 
 ## 🚀 Kullanım
 
-1. Yayın arşivinden `Discorder-2.0.5-win-x64.zip` dosyasını indirin.
+1. Yayın arşivinden `Discorder-2.0.6-win-x64.zip` dosyasını indirin.
 2. Zip içeriğini istediğiniz klasöre çıkarın.
 3. `Discorder.exe` dosyasını çalıştırın ve Windows UAC onayını verin.
 4. Discord web kullanacaksanız ana ekrandaki **Discord web** seçeneğini açın.
@@ -69,7 +70,7 @@ Discorder şunları bilinçli olarak yapmaz:
 7. **Bağlan** düğmesine basın.
 8. İlk kurulum penceresinde WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
 9. Windows UAC penceresi gelirse resmi WireSock kurulumuna izin verin.
-10. Durum **AÇIK** olduğunda seçilen kapsam tünellenir.
+10. Durum **BAĞLI** olduğunda seçilen kapsam tünellenir.
 
 ## 🛠️ Onar
 
@@ -90,6 +91,8 @@ Ana ekrandaki **Tanılama paketi** düğmesi devops incelemesi için şu dosyala
 - `%LOCALAPPDATA%\Discorder\logs\diagnostics.md`: okunabilir tanılama özeti.
 - `%LOCALAPPDATA%\Discorder\logs\tunnel.log`: WireSock süreç çıktısı.
 - `%LOCALAPPDATA%\Discorder\diagnostic-bundles\discorder-diagnostics-*.zip`: paylaşılabilir tanılama paketi.
+
+Paket oluşturulurken loglar önce güvenli bir geçici kopyaya alınır. WireSock açıkken `tunnel.log` yazılıyor olsa bile paket üretimi beklenmeyen hata penceresine düşmez; okunamayan dosya varsa pakete `bundle-warnings.txt` eklenir.
 
 ## 🧹 Temiz Kaldırma
 
@@ -126,6 +129,7 @@ Self-signed sertifika yalnızca yerel test içindir; public kullanıcılarda Sma
 - Beklenen yayıncı: `IP SMIRNOV VADIM VALERIEVICH`.
 - TLS doğrulaması devre dışı bırakılmaz.
 - Discord uygulaması ve isteğe bağlı tarayıcı kapsamı `AllowedApps` satırında testlerle kilitlenir.
+- Web modu kapalı bağlantılarda desteklenen tarayıcıların Discord alan adlarına düz internetten çıkmasını azaltmak için bağlantı süresince geçici `Discorder.TunnelScope.Browsers` Windows Firewall kuralları yönetilir.
 - Geniş uygulama adları, satır enjeksiyonu ve `Update.exe` gibi riskli kapsamlar reddedilir.
 - Kapalı durum kilidi Discorder'ın marker bloğuyla hosts dosyasında, policy izin verirse `Discorder.BlockDiscordDomains` adlı Windows Firewall kuralında yönetilir.
 
