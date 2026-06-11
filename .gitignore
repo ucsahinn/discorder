@@ -1,0 +1,30 @@
+# Build output
+bin/
+obj/
+artifacts/
+
+# IDE and local state
+.vs/
+.vscode/
+.dotnet-home/
+*.user
+*.suo
+
+# Tool output
+.playwright-mcp/
+TestResults/
+coverage/
+
+# Local runtime data
+*.log
+*.tmp
+wgcf-account.toml
+wgcf-profile.conf
+discord.conf
+
+# Release payloads belong in GitHub Releases, not source control
+*.exe
+*.msi
+*.msix
+*.zip
+*.7z

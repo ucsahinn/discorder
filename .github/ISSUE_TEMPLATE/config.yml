@@ -1,1 +1,8 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Güvenlik açığı
+    url: https://github.com/ucsahinn/discorder/security/advisories/new
+    about: Güvenlik açıklarını herkese açık bildirim olarak paylaşmayın.
+  - name: WireSock desteği
+    url: https://www.wiresock.net/
+    about: WireSock kurulumu, lisansı ve istemci hataları için üretici desteğini kullanın.

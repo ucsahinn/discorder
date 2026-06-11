@@ -1,0 +1,65 @@
+name: Hata raporu
+description: Discorder bağlantı davranışındaki tekrar üretilebilir bir hatayı bildirin
+title: "[HATA] "
+labels: ["hata", "inceleme-gerekli"]
+body:
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Kapsam kontrolü
+      options:
+        - label: Sorun Discord Stable, PTB, Canary veya Development uygulamasını etkiliyor.
+          required: true
+        - label: Gizli WireGuard profili veya hesap dosyası eklemedim.
+          required: true
+        - label: Sorunu en son sürümde tekrar ürettim.
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: Discorder sürümü
+      placeholder: 2.0.0
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows sürümü
+      placeholder: Windows 11 24H2, build 26100
+    validations:
+      required: true
+  - type: input
+    id: dependencies
+    attributes:
+      label: Discord ve WireSock sürümleri
+      placeholder: Discord Stable 1.0.x / WireSock VPN Client 1.4.7.1
+    validations:
+      required: true
+  - type: input
+    id: isp
+    attributes:
+      label: İnternet sağlayıcı
+      placeholder: Kablonet, Türk Telekom, Superonline
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Tekrar üretme adımları
+      placeholder: |
+        1. Discorder uygulamasını açtım.
+        2. Bağlan düğmesine bastım.
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Beklenen ve gerçekleşen davranış
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redakte edilmiş tanılama
+      description: Özel anahtar, profil içeriği veya wgcf-account.toml eklemeyin.

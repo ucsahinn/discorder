@@ -1,0 +1,36 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Discorder.Core", "src\Discorder.Core\Discorder.Core.csproj", "{34788D84-88D1-4490-A5FE-D4481DCD72CA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Discorder.App", "src\Discorder.App\Discorder.App.csproj", "{7F18FBF1-1AA4-4F37-86E7-138DF684C900}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Discorder.Core.Tests", "tests\Discorder.Core.Tests\Discorder.Core.Tests.csproj", "{4D76B8B6-2DDB-49F7-8E53-DA2E6A5F9B1D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Discorder.Windows.Tests", "tests\Discorder.Windows.Tests\Discorder.Windows.Tests.csproj", "{B7A62EC8-30C4-4FB6-8131-6720D9CF935E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{34788D84-88D1-4490-A5FE-D4481DCD72CA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{34788D84-88D1-4490-A5FE-D4481DCD72CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{34788D84-88D1-4490-A5FE-D4481DCD72CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{34788D84-88D1-4490-A5FE-D4481DCD72CA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F18FBF1-1AA4-4F37-86E7-138DF684C900}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F18FBF1-1AA4-4F37-86E7-138DF684C900}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F18FBF1-1AA4-4F37-86E7-138DF684C900}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F18FBF1-1AA4-4F37-86E7-138DF684C900}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4D76B8B6-2DDB-49F7-8E53-DA2E6A5F9B1D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4D76B8B6-2DDB-49F7-8E53-DA2E6A5F9B1D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4D76B8B6-2DDB-49F7-8E53-DA2E6A5F9B1D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4D76B8B6-2DDB-49F7-8E53-DA2E6A5F9B1D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B7A62EC8-30C4-4FB6-8131-6720D9CF935E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7A62EC8-30C4-4FB6-8131-6720D9CF935E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7A62EC8-30C4-4FB6-8131-6720D9CF935E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7A62EC8-30C4-4FB6-8131-6720D9CF935E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

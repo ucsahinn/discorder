@@ -1,0 +1,33 @@
+name: Özellik önerisi
+description: Discorder ürün sınırı içinde bir geliştirme önerin
+title: "[ÖNERİ] "
+labels: ["iyileştirme", "inceleme-gerekli"]
+body:
+  - type: checkboxes
+    id: contract
+    attributes:
+      label: Ürün sözleşmesi
+      options:
+        - label: Öneri yalnızca Windows ve Discord kapsamındadır.
+          required: true
+        - label: Tarayıcı, oyun, özel uygulama listesi, DNS veya başka bypass motoru istemiyorum.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Çözülecek sorun
+      description: Çözümden önce kullanıcı sorununu açıklayın.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Önerilen davranış
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Kabul ölçütleri
+    validations:
+      required: true

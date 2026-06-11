@@ -1,0 +1,54 @@
+name: Doğrulama
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dogrulama-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Windows doğrulama
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Kaynak kodu al
+        uses: actions/checkout@v4
+
+      - name: .NET kur
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Test ve güvenlik taraması
+        shell: pwsh
+        run: ./scripts/verify.ps1
+
+      - name: Windows x64 paketi üret
+        shell: pwsh
+        run: >-
+          dotnet publish
+          src/Discorder.App/Discorder.App.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          --output artifacts/publish/win-x64
+          -p:DebugType=None
+          -p:DebugSymbols=false
+
+      - name: Uygulama paketini yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Discorder-win-x64
+          path: artifacts/publish/win-x64
+          if-no-files-found: error
+          retention-days: 14
