@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Media;
@@ -9,6 +10,7 @@ using Discorder.Core.Configuration;
 using Discorder.Core.Connection;
 using Discorder.Core.Diagnostics;
 using Discorder.Core.Maintenance;
+using Discorder.Core.Updates;
 using Discorder.Core.WireSock;
 using Drawing = System.Drawing;
 using Forms = System.Windows.Forms;
@@ -35,10 +37,12 @@ public partial class MainWindow : Window, IDisposable
     private readonly DiscorderCleanupService _cleanupService;
     private readonly IStartupLaunchService _startupLaunchService;
     private readonly IWireSockUninstaller _wireSockUninstaller;
+    private readonly AppUpdateService _updateService;
     private readonly IDiscorderDiagnostics _diagnostics;
     private bool _isApplyingSettings;
     private bool _isRunInBackgroundEnabled;
     private bool _isToggleOperationRunning;
+    private bool _isUpdateOperationRunning;
     private bool _backgroundVideoRemoteFallbackTried;
     private Forms.NotifyIcon? _trayIcon;
     private bool _hasShownTrayNotice;
@@ -55,6 +59,7 @@ public partial class MainWindow : Window, IDisposable
         DiscorderCleanupService cleanupService,
         IStartupLaunchService startupLaunchService,
         IWireSockUninstaller wireSockUninstaller,
+        AppUpdateService updateService,
         IDiscorderDiagnostics? diagnostics = null)
     {
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
@@ -69,6 +74,8 @@ public partial class MainWindow : Window, IDisposable
             ?? throw new ArgumentNullException(nameof(startupLaunchService));
         _wireSockUninstaller = wireSockUninstaller
             ?? throw new ArgumentNullException(nameof(wireSockUninstaller));
+        _updateService = updateService
+            ?? throw new ArgumentNullException(nameof(updateService));
         _diagnostics = diagnostics ?? NullDiscorderDiagnostics.Instance;
 
         InitializeComponent();
@@ -157,6 +164,7 @@ public partial class MainWindow : Window, IDisposable
     {
         ToggleButton.IsEnabled = !_isToggleOperationRunning && !snapshot.IsBusy;
         RepairButton.IsEnabled = !snapshot.IsBusy;
+        AutoUpdateButton.IsEnabled = !_isUpdateOperationRunning && !snapshot.IsBusy;
         StatusMessage.Text = snapshot.Message;
         StatusDetail.Text = GetDetail(snapshot.State);
         ApplyBrowserAccessView(
@@ -440,8 +448,8 @@ public partial class MainWindow : Window, IDisposable
                     ? "Web modu bu oturumda açık. Uygulama moduna geçmek için önce bağlantıyı kes."
                     : "Web modu açık. Discord uygulaması ve desteklenen tarayıcılar tünellenir."
                 : locked
-                    ? "Uygulama modu bu oturumda açık. Web moduna geçmek için önce bağlantıyı kes."
-                    : "Uygulama modu açık. Yalnızca Discord uygulaması tünellenir.";
+                    ? "Bu oturumda kilitli. Web modunu değiştirmek için önce bağlantıyı kes."
+                    : "Kapalıyken yalnızca Discord uygulaması tünellenir.";
         }
         finally
         {
@@ -474,8 +482,8 @@ public partial class MainWindow : Window, IDisposable
             _isRunInBackgroundEnabled = enabled;
             RunInBackgroundToggle.IsChecked = enabled;
             RunInBackgroundStatus.Text = enabled
-                ? "Pencere kapanınca tray'de kalır."
-                : "Pencere kapanınca güvenli biçimde kapanır.";
+                ? "Pencere kapanınca bildirim alanında kalır."
+                : "Pencere kapanınca bildirim alanında kalmaz.";
             CloseBehaviorSummary.Text = enabled
                 ? "Arka planda kalır"
                 : "Discord kilitlenir";
@@ -539,8 +547,8 @@ public partial class MainWindow : Window, IDisposable
         {
             StartupToggle.IsChecked = enabled;
             StartupStatus.Text = enabled
-                ? "Oturum açılışında otomatik başlar."
-                : "Oturum açılışında başlamaz.";
+                ? "Açıkken Windows oturumunda başlar."
+                : "Kapalıyken Windows oturumunda başlamaz.";
         }
         finally
         {
@@ -664,6 +672,7 @@ public partial class MainWindow : Window, IDisposable
 
         ToggleButton.IsEnabled = false;
         RepairButton.IsEnabled = false;
+        AutoUpdateButton.IsEnabled = false;
         BrowserAccessToggle.IsEnabled = false;
         _operationCancellation?.Cancel();
         StatusMessage.Text = "Onarım çalışıyor";
@@ -703,6 +712,8 @@ public partial class MainWindow : Window, IDisposable
         {
             ToggleButton.IsEnabled = !_controller.Snapshot.IsBusy;
             RepairButton.IsEnabled = !_controller.Snapshot.IsBusy;
+            AutoUpdateButton.IsEnabled =
+                !_isUpdateOperationRunning && !_controller.Snapshot.IsBusy;
             BrowserAccessToggle.IsEnabled = !_controller.Snapshot.IsBusy
                 && !_controller.Snapshot.IsConnected;
         }
@@ -979,6 +990,157 @@ public partial class MainWindow : Window, IDisposable
     private void OpenGitHub_Click(object sender, RoutedEventArgs e)
     {
         OpenUri(RepositoryUri);
+    }
+
+    private async void AutoUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isUpdateOperationRunning)
+        {
+            return;
+        }
+
+        if (_controller.Snapshot.IsBusy)
+        {
+            MessageBox.Show(
+                "Devam eden işlem bitince güncellemeyi tekrar başlatın.",
+                "Discorder güncelleme",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        _isUpdateOperationRunning = true;
+        AutoUpdateButton.IsEnabled = false;
+        ToggleButton.IsEnabled = false;
+        RepairButton.IsEnabled = false;
+
+        try
+        {
+            _diagnostics.Info("ui.update", "Otomatik güncelleme istendi.");
+            DiagnosticsStatus.Text = "Güncelleme kontrol ediliyor...";
+
+            if (_controller.Snapshot.IsConnected)
+            {
+                DiagnosticsStatus.Text = "Bağlantı kapatılıyor, sonra güncelleme hazırlanacak.";
+                await _controller.DisconnectAsync(CancellationToken.None);
+            }
+
+            using var timeoutSource = new CancellationTokenSource(
+                TimeSpan.FromMinutes(10));
+            var executableName = Path.GetFileName(Environment.ProcessPath);
+            if (string.IsNullOrWhiteSpace(executableName))
+            {
+                executableName = "Discorder.exe";
+            }
+
+            var update = await _updateService.PrepareLatestUpdateAsync(
+                GetCurrentVersion(),
+                AppContext.BaseDirectory,
+                executableName,
+                timeoutSource.Token);
+
+            if (update.Status == AppUpdatePreparationStatus.UpToDate)
+            {
+                DiagnosticsStatus.Text = "Discorder zaten güncel.";
+                MessageBox.Show(
+                    $"Discorder zaten güncel.\n\nKurulu sürüm: v{AppUpdateService.FormatVersion(update.CurrentVersion)}",
+                    "Discorder güncelleme",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            DiagnosticsStatus.Text =
+                $"v{AppUpdateService.FormatVersion(update.LatestVersion)} indirildi. Güncelleme uygulanıyor...";
+            _diagnostics.Info(
+                "ui.update.prepared",
+                "Otomatik güncelleme paketi hazırlandı.",
+                new Dictionary<string, string?>
+                {
+                    ["latestVersion"] = AppUpdateService.FormatVersion(update.LatestVersion),
+                    ["packagePath"] = update.PackagePath,
+                    ["payloadDirectory"] = update.PayloadDirectory,
+                    ["expectedSha256"] = update.ExpectedSha256
+                });
+
+            StartUpdateApplicator(update, executableName);
+            _allowClose = true;
+            System.Windows.Application.Current.Shutdown();
+        }
+        catch (OperationCanceledException)
+        {
+            DiagnosticsStatus.Text = "Güncelleme iptal edildi.";
+        }
+        catch (Exception exception)
+        {
+            DiagnosticsStatus.Text = "Güncelleme tamamlanamadı. Ayrıntı loglara yazıldı.";
+            _diagnostics.Failure(
+                "ui.update",
+                "Otomatik güncelleme tamamlanamadı.",
+                exception);
+            MessageBox.Show(
+                "Güncelleme tamamlanamadı.\n\n" + exception.Message,
+                "Discorder güncelleme",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            _isUpdateOperationRunning = false;
+
+            if (!_allowClose)
+            {
+                ApplySnapshot(_controller.Snapshot);
+            }
+        }
+    }
+
+    private void StartUpdateApplicator(
+        AppUpdatePreparation update,
+        string executableName)
+    {
+        if (string.IsNullOrWhiteSpace(update.ScriptPath)
+            || string.IsNullOrWhiteSpace(update.PayloadDirectory))
+        {
+            throw new InvalidOperationException(
+                "Güncelleme hazırlığı eksik olduğu için uygulanamadı.");
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WindowStyle = ProcessWindowStyle.Hidden
+        };
+        startInfo.ArgumentList.Add("-NoProfile");
+        startInfo.ArgumentList.Add("-ExecutionPolicy");
+        startInfo.ArgumentList.Add("Bypass");
+        startInfo.ArgumentList.Add("-File");
+        startInfo.ArgumentList.Add(update.ScriptPath);
+        startInfo.ArgumentList.Add("-ProcessId");
+        startInfo.ArgumentList.Add(Environment.ProcessId.ToString(
+            CultureInfo.InvariantCulture));
+        startInfo.ArgumentList.Add("-SourceDirectory");
+        startInfo.ArgumentList.Add(update.PayloadDirectory);
+        startInfo.ArgumentList.Add("-TargetDirectory");
+        startInfo.ArgumentList.Add(AppContext.BaseDirectory);
+        startInfo.ArgumentList.Add("-ExecutableName");
+        startInfo.ArgumentList.Add(executableName);
+        startInfo.ArgumentList.Add("-LogPath");
+        startInfo.ArgumentList.Add(Path.Combine(_paths.LogDirectory, "update.log"));
+
+        if (Process.Start(startInfo) is null)
+        {
+            throw new InvalidOperationException(
+                "Güncelleme uygulayıcısı başlatılamadı.");
+        }
+    }
+
+    private static Version GetCurrentVersion()
+    {
+        return typeof(MainWindow).Assembly.GetName().Version
+            ?? new Version(0, 0, 0, 0);
     }
 
     private static void OpenUri(Uri uri)

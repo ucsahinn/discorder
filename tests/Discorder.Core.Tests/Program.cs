@@ -14,6 +14,7 @@ using Discorder.Core.Maintenance;
 using Discorder.Core.Profiles;
 using Discorder.Core.Provisioning;
 using Discorder.Core.Security;
+using Discorder.Core.Updates;
 using Discorder.Core.WireSock;
 
 var tests = new (string Name, Func<Task> Run)[]
@@ -26,6 +27,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("wgcf boş hata çıktısını tanısız bırakmaz", WgcfProvisionerEmptyFailureIsDiagnosticAsync),
     ("SHA-256 doğrulayıcı yalnızca sabit özeti kabul eder", HashVerifierIsStrictAsync),
     ("Doğrulanmış indirici geçici zaman aşımını tekrar dener", VerifiedDownloaderRetriesTransientTimeoutAsync),
+    ("Otomatik güncelleme güncel sürümde indirme yapmaz", AppUpdateSkipsCurrentReleaseAsync),
+    ("Otomatik güncelleme yeni GitHub paketini hazırlar", AppUpdatePreparesVerifiedReleaseAsync),
     ("Ayarlar WireSock onayını sürüm bazında saklar", SettingsPersistConsentAsync),
     ("WireSock hazırlığı onaysız kurulumu reddeder", BootstrapRequiresConsentAsync),
     ("WireSock hazırlığı güvenilir kurulumu yeniden kullanır", BootstrapReusesTrustedInstallAsync),
@@ -308,6 +311,104 @@ static async Task VerifiedDownloaderRetriesTransientTimeoutAsync()
         Assert(handler.RequestCount == 2);
         Assert(await File.ReadAllTextAsync(destination) == "dogrulanmis-kurucu");
         Assert(!File.Exists(destination + ".download"));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task AppUpdateSkipsCurrentReleaseAsync()
+{
+    var root = CreateTemporaryDirectory();
+    try
+    {
+        var latestUri = new Uri("https://updates.example.test/releases/latest");
+        var handler = new MapHttpMessageHandler();
+        handler.AddJson(latestUri, """
+            {
+              "tag_name": "v2.0.10",
+              "html_url": "https://github.com/ucsahinn/discorder/releases/tag/v2.0.10",
+              "assets": []
+            }
+            """);
+        using var httpClient = new HttpClient(handler);
+        var downloader = new CapturingVerifiedDownloader([]);
+        var service = new AppUpdateService(
+            httpClient,
+            new AppPaths(root),
+            downloader,
+            latestUri);
+
+        var update = await service.PrepareLatestUpdateAsync(
+            new Version(2, 0, 10, 0),
+            root,
+            "Discorder.exe",
+            CancellationToken.None);
+
+        Assert(update.Status == AppUpdatePreparationStatus.UpToDate);
+        Assert(downloader.DownloadCount == 0);
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task AppUpdatePreparesVerifiedReleaseAsync()
+{
+    var root = CreateTemporaryDirectory();
+    try
+    {
+        var latestUri = new Uri("https://updates.example.test/releases/latest");
+        var zipUri = new Uri("https://updates.example.test/releases/download/v2.0.11/Discorder-2.0.11-win-x64.zip");
+        var checksumUri = new Uri("https://updates.example.test/releases/download/v2.0.11/Discorder-2.0.11-win-x64.sha256.txt");
+        var packageBytes = CreateUpdatePackage();
+        var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
+        var handler = new MapHttpMessageHandler();
+        handler.AddJson(latestUri, $$"""
+            {
+              "tag_name": "v2.0.11",
+              "html_url": "https://github.com/ucsahinn/discorder/releases/tag/v2.0.11",
+              "assets": [
+                {
+                  "name": "Discorder-2.0.11-win-x64.zip",
+                  "browser_download_url": "{{zipUri.AbsoluteUri}}"
+                },
+                {
+                  "name": "Discorder-2.0.11-win-x64.sha256.txt",
+                  "browser_download_url": "{{checksumUri.AbsoluteUri}}"
+                }
+              ]
+            }
+            """);
+        handler.AddText(
+            checksumUri,
+            $"{expectedSha256}  Discorder-2.0.11-win-x64.zip");
+        using var httpClient = new HttpClient(handler);
+        var downloader = new CapturingVerifiedDownloader(packageBytes);
+        var service = new AppUpdateService(
+            httpClient,
+            new AppPaths(root),
+            downloader,
+            latestUri);
+
+        var update = await service.PrepareLatestUpdateAsync(
+            new Version(2, 0, 10, 0),
+            root,
+            "Discorder.exe",
+            CancellationToken.None);
+
+        Assert(update.Status == AppUpdatePreparationStatus.Prepared);
+        Assert(downloader.DownloadCount == 1);
+        Assert(downloader.LastSource == zipUri);
+        Assert(downloader.LastExpectedSha256 == expectedSha256);
+        Assert(File.Exists(update.PackagePath));
+        Assert(File.Exists(Path.Combine(update.PayloadDirectory!, "Discorder.exe")));
+        Assert(File.Exists(update.ScriptPath));
+        Assert((await File.ReadAllTextAsync(update.ScriptPath!)).Contains(
+            "Copy-Item",
+            StringComparison.Ordinal));
     }
     finally
     {
@@ -1090,6 +1191,20 @@ static string CreateTemporaryDirectory()
     return path;
 }
 
+static byte[] CreateUpdatePackage()
+{
+    using var buffer = new MemoryStream();
+    using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+    {
+        var executable = archive.CreateEntry("Discorder.exe");
+        using var stream = executable.Open();
+        var bytes = Encoding.UTF8.GetBytes("discorder-update");
+        stream.Write(bytes);
+    }
+
+    return buffer.ToArray();
+}
+
 static void Assert(bool condition)
 {
     if (!condition)
@@ -1263,6 +1378,65 @@ file sealed class FlakyDownloadHandler(
         {
             Content = new ByteArrayContent(payload)
         });
+    }
+}
+
+file sealed class MapHttpMessageHandler : HttpMessageHandler
+{
+    private readonly Dictionary<string, Func<HttpResponseMessage>> _responses = [];
+
+    public void AddJson(Uri uri, string json)
+    {
+        _responses[uri.AbsoluteUri] = () => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+    }
+
+    public void AddText(Uri uri, string text)
+    {
+        _responses[uri.AbsoluteUri] = () => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(text, Encoding.UTF8, "text/plain")
+        };
+    }
+
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (request.RequestUri is not null
+            && _responses.TryGetValue(request.RequestUri.AbsoluteUri, out var response))
+        {
+            return Task.FromResult(response());
+        }
+
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+    }
+}
+
+file sealed class CapturingVerifiedDownloader(byte[] payload) : IVerifiedDownloader
+{
+    public int DownloadCount { get; private set; }
+
+    public Uri? LastSource { get; private set; }
+
+    public string? LastExpectedSha256 { get; private set; }
+
+    public async Task DownloadAsync(
+        Uri source,
+        string destination,
+        string expectedSha256,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        DownloadCount++;
+        LastSource = source;
+        LastExpectedSha256 = expectedSha256;
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        await File.WriteAllBytesAsync(destination, payload, cancellationToken);
     }
 }
 

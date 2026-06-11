@@ -29,15 +29,15 @@
         <Rectangle IsHitTestVisible="False">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                    <GradientStop Color="#76040710" Offset="0" />
-                    <GradientStop Color="#43071120" Offset="0.36" />
-                    <GradientStop Color="#0E071120" Offset="0.72" />
-                    <GradientStop Color="#10040710" Offset="1" />
+                    <GradientStop Color="#90040710" Offset="0" />
+                    <GradientStop Color="#65071120" Offset="0.36" />
+                    <GradientStop Color="#36071120" Offset="0.72" />
+                    <GradientStop Color="#2B040710" Offset="1" />
                 </LinearGradientBrush>
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.42">
+        <Rectangle IsHitTestVisible="False" Opacity="0.34">
             <Rectangle.Fill>
                 <RadialGradientBrush Center="0.72,0.42"
                                      GradientOrigin="0.72,0.38"
@@ -51,7 +51,7 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.55">
+        <Rectangle IsHitTestVisible="False" Opacity="0.68">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
                     <GradientStop Color="#85040710" Offset="0" />
@@ -82,8 +82,8 @@
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0"
-                    Background="#47101827"
-                    BorderBrush="#8A8EA7FF"
+                    Background="#5C0B1422"
+                    BorderBrush="#A89FCEFF"
                     BorderThickness="1"
                     CornerRadius="8"
                     Padding="18,0"
@@ -91,7 +91,7 @@
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="28"
                                       Direction="270"
-                                      Opacity="0.24"
+                                      Opacity="0.32"
                                       ShadowDepth="0"
                                       Color="#63D9FF" />
                 </Border.Effect>
@@ -116,7 +116,7 @@
                         <TextBlock Margin="0,3,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Uygulama modu hazır, web modu ayrı çalışır" />
+                                   Text="Uygulama modu hazır. Web modu isteğe bağlı." />
                     </StackPanel>
 
                     <Border Grid.Column="2"
@@ -149,8 +149,8 @@
                 </Grid.ColumnDefinitions>
 
                 <Border Grid.Column="0"
-                        Background="#59101827"
-                        BorderBrush="#A184E8FF"
+                        Background="#6F0B1422"
+                        BorderBrush="#B895DFFF"
                         BorderThickness="1"
                         CornerRadius="8"
                         Padding="32,30"
@@ -159,7 +159,7 @@
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="54"
                                           Direction="270"
-                                          Opacity="0.45"
+                                          Opacity="0.54"
                                           ShadowDepth="0"
                                           Color="#66D9FF" />
                     </Border.Effect>
@@ -180,7 +180,7 @@
                                        FontWeight="SemiBold"
                                        LineHeight="41"
                                        TextWrapping="Wrap"
-                                       Text="Discord bağlantısını yönet" />
+                                       Text="Discord tünelini yönet" />
                         </StackPanel>
 
                         <Button Grid.Row="1"
@@ -374,8 +374,8 @@
                     <Border Grid.Row="0"
                             HorizontalAlignment="Right"
                             Width="650"
-                            Background="#30101827"
-                            BorderBrush="#8D7EDBFF"
+                            Background="#4D0B1422"
+                            BorderBrush="#9A86DFFF"
                             BorderThickness="1"
                             CornerRadius="8"
                             Padding="22,20">
@@ -399,14 +399,14 @@
                                 <StackPanel Grid.Column="0">
                                     <TextBlock FontSize="18"
                                                FontWeight="SemiBold"
-                                               Text="Discord web modu" />
+                                               Text="Web modu" />
                                     <TextBlock x:Name="BrowserAccessStatus"
                                                Margin="0,6,18,0"
                                                TextWrapping="Wrap"
                                                FontSize="12"
                                                LineHeight="18"
                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="Kapalı. Uygulama modunda yalnızca Discord uygulaması tünellenir." />
+                                               Text="Açıkken Discord web erişimi de tünellenir." />
                                 </StackPanel>
 
                                 <CheckBox Grid.Column="1"
@@ -424,8 +424,8 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center"
                             Width="650"
-                            Background="#2B101827"
-                            BorderBrush="#7478E5FF"
+                            Background="#4F0B1422"
+                            BorderBrush="#9A86DFFF"
                             BorderThickness="1"
                             CornerRadius="8"
                             Padding="20,18">
@@ -465,7 +465,7 @@
                                     </Grid.RowDefinitions>
                                     <TextBlock FontSize="15"
                                                FontWeight="SemiBold"
-                                               Text="Arka planda çalış" />
+                                               Text="Arka plan" />
                                     <TextBlock Grid.Row="1"
                                                x:Name="RunInBackgroundStatus"
                                                Margin="0,5,0,10"
@@ -473,7 +473,7 @@
                                                FontSize="12"
                                                LineHeight="17"
                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="Pencere kapanınca tüneli kapatır." />
+                                               Text="Pencere kapanınca bildirim alanında kalmaz." />
                                     <CheckBox Grid.Row="2"
                                               x:Name="RunInBackgroundToggle"
                                               Style="{StaticResource BrowserSwitchStyle}"
@@ -496,7 +496,7 @@
                                     </Grid.RowDefinitions>
                                     <TextBlock FontSize="15"
                                                FontWeight="SemiBold"
-                                               Text="Windows başlangıcı" />
+                                               Text="Başlangıçta çalış" />
                                     <TextBlock Grid.Row="1"
                                                x:Name="StartupStatus"
                                                Margin="0,5,0,10"
@@ -504,7 +504,7 @@
                                                FontSize="12"
                                                LineHeight="17"
                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="Oturum açılışında başlamaz." />
+                                               Text="Kapalıyken Windows oturumunda başlamaz." />
                                     <CheckBox Grid.Row="2"
                                               x:Name="StartupToggle"
                                               Style="{StaticResource BrowserSwitchStyle}"
@@ -527,7 +527,7 @@
                                     </Grid.RowDefinitions>
                                     <TextBlock FontSize="15"
                                                FontWeight="SemiBold"
-                                               Text="Tanılama paketi" />
+                                               Text="Tanılama" />
                                     <TextBlock Grid.Row="1"
                                                x:Name="DiagnosticsStatus"
                                                Margin="0,5,0,10"
@@ -535,7 +535,7 @@
                                                FontSize="12"
                                                LineHeight="17"
                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="Olay, sağlık ve WireSock logları hazır tutulur." />
+                                               Text="Loglar hazır, tek tıkla paketlenir." />
                                     <Border Grid.Row="2"
                                             HorizontalAlignment="Left"
                                             Padding="12,6"
@@ -545,7 +545,7 @@
                                             BorderThickness="1">
                                         <TextBlock FontSize="11"
                                                    FontWeight="SemiBold"
-                                                   Text="Kayıt hazır" />
+                                                   Text="Hazır" />
                                     </Border>
                                 </Grid>
                             </Grid>
@@ -555,8 +555,8 @@
                     <Border Grid.Row="2"
                             HorizontalAlignment="Right"
                             Width="650"
-                            Background="#2D101827"
-                            BorderBrush="#7473DBFF"
+                            Background="#4D0B1422"
+                            BorderBrush="#9A86DFFF"
                             BorderThickness="1"
                             CornerRadius="8"
                             Padding="20,18">
@@ -579,7 +579,7 @@
                             <StackPanel Grid.Column="0">
                                 <TextBlock FontSize="11"
                                            Foreground="{StaticResource MutedTextBrush}"
-                                           Text="DNS AYARI" />
+                                           Text="DNS" />
                                 <TextBlock Margin="0,6,0,0"
                                            FontSize="16"
                                            FontWeight="SemiBold"
@@ -593,7 +593,7 @@
                             <StackPanel Grid.Column="2" Margin="20,0">
                                 <TextBlock FontSize="11"
                                            Foreground="{StaticResource MutedTextBrush}"
-                                           Text="TÜNEL MODELİ" />
+                                           Text="TÜNEL" />
                                 <TextBlock Margin="0,6,0,0"
                                            FontSize="16"
                                            FontWeight="SemiBold"
@@ -607,7 +607,7 @@
                             <StackPanel Grid.Column="4" Margin="20,0,0,0">
                                 <TextBlock FontSize="11"
                                            Foreground="{StaticResource MutedTextBrush}"
-                                           Text="KAPANIŞ DAVRANIŞI" />
+                                           Text="KAPANIŞ" />
                                 <TextBlock x:Name="CloseBehaviorSummary"
                                            Margin="0,6,0,0"
                                            FontSize="16"
@@ -620,8 +620,8 @@
             </Grid>
 
             <Border Grid.Row="2"
-                    Background="#42101827"
-                    BorderBrush="#8A8B7DFF"
+                    Background="#640B1422"
+                    BorderBrush="#A58B7DFF"
                     BorderThickness="1"
                     CornerRadius="8"
                     Padding="16,0"
@@ -629,7 +629,7 @@
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="24"
                                       Direction="270"
-                                      Opacity="0.22"
+                                      Opacity="0.34"
                                       ShadowDepth="0"
                                       Color="#63D9FF" />
                 </Border.Effect>
@@ -641,6 +641,7 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <Button Grid.Column="0"
@@ -648,17 +649,17 @@
                             Height="46"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
-                            Content="WireSock sitesi"
+                            Content="WireSock"
                             Click="OpenWireSock_Click"
-                            ToolTip="WireSock VPN Client resmi sitesi" />
+                            ToolTip="WireSock VPN Client resmi sayfası" />
 
                     <Button Grid.Column="1"
                             Height="46"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
-                            Content="Tanılama paketi"
+                            Content="Tanılama"
                             Click="OpenDiagnostics_Click"
-                            ToolTip="Devops incelemesi için tanılama paketini hazırla ve paket klasörünü aç" />
+                            ToolTip="Tanılama dosyalarını hazırla ve klasörü aç" />
 
                     <Button Grid.Column="2"
                             x:Name="RepairButton"
@@ -685,9 +686,33 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.0.9" />
+                               Text="v2.0.10" />
 
                     <Button Grid.Column="5"
+                            x:Name="AutoUpdateButton"
+                            Margin="0,0,8,0"
+                            Width="56"
+                            Height="46"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CommandButtonStyle}"
+                            Click="AutoUpdate_Click"
+                            ToolTip="Güncellemeyi denetle ve uygula"
+                            AutomationProperties.Name="Otomatik güncelle">
+                        <Viewbox Width="23"
+                                 Height="23"
+                                 Stretch="Uniform">
+                            <Canvas Width="24" Height="24">
+                                <Path Stroke="{StaticResource PrimaryTextBrush}"
+                                      StrokeThickness="2"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Data="M21,2 L21,8 L15,8 M20.49,15 A9,9 0 0 1 5.64,18.36 L3,16 M3,22 L3,16 L9,16 M3.51,9 A9,9 0 0 1 18.36,5.64 L21,8" />
+                            </Canvas>
+                        </Viewbox>
+                    </Button>
+
+                    <Button Grid.Column="6"
                             Width="68"
                             Height="46"
                             VerticalAlignment="Center"

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Http;
 using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -14,6 +15,7 @@ using Discorder.Core.Firewall;
 using Discorder.Core.Infrastructure;
 using Discorder.Core.Maintenance;
 using Discorder.Core.Provisioning;
+using Discorder.Core.Updates;
 using Discorder.Core.WireSock;
 
 if (!OperatingSystem.IsWindows())
@@ -126,8 +128,9 @@ static void RenderMainWindow()
             "1");
 
         var bootstrapper = new FakeWireSockBootstrapper();
+        var paths = new AppPaths(root);
         var controller = new DiscordTunnelController(
-            new AppPaths(root),
+            paths,
             new DiscordAppScope(root, root, root),
             bootstrapper,
             new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
@@ -136,14 +139,18 @@ static void RenderMainWindow()
 
         window = new MainWindow(
             controller,
-            new AppPaths(root),
+            paths,
             bootstrapper,
-            new AppSettingsStore(new AppPaths(root)),
+            new AppSettingsStore(paths),
             new DiscorderCleanupService(
-                new AppPaths(root),
+                paths,
                 new NullDiscordAccessLock()),
             new FakeStartupLaunchService(),
-            new FakeWireSockUninstaller());
+            new FakeWireSockUninstaller(),
+            new AppUpdateService(
+                new HttpClient(),
+                paths,
+                new FakeVerifiedDownloader()));
         window.Show();
         window.UpdateLayout();
 
@@ -153,12 +160,12 @@ static void RenderMainWindow()
         Assert(text.Contains("Discorder", StringComparison.Ordinal));
         Assert(text.Contains("Uygulama modu hazır", StringComparison.Ordinal));
         Assert(text.Contains("MOD SEÇİMİ", StringComparison.Ordinal));
-        Assert(text.Contains("Discord web modu", StringComparison.Ordinal));
+        Assert(text.Contains("Web modu", StringComparison.Ordinal));
         Assert(text.Contains("İŞLETİM MERKEZİ", StringComparison.Ordinal));
-        Assert(text.Contains("Arka planda çalış", StringComparison.Ordinal));
-        Assert(text.Contains("Windows başlangıcı", StringComparison.Ordinal));
-        Assert(text.Contains("Tanılama paketi", StringComparison.Ordinal));
-        Assert(text.Contains("Kayıt hazır", StringComparison.Ordinal));
+        Assert(text.Contains("Arka plan", StringComparison.Ordinal));
+        Assert(text.Contains("Başlangıçta çalış", StringComparison.Ordinal));
+        Assert(text.Contains("Tanılama", StringComparison.Ordinal));
+        Assert(text.Contains("Hazır", StringComparison.Ordinal));
         Assert(text.Contains("Hazır, Discord kilidi aktif", StringComparison.Ordinal));
         var buttons = FindVisualChildren<Button>(window)
             .Select(button => button.Content?.ToString())
@@ -166,7 +173,7 @@ static void RenderMainWindow()
             .ToArray();
         Assert(buttons.Contains("Onar"));
         Assert(buttons.Contains("Temiz kaldır"));
-        Assert(buttons.Contains("Tanılama paketi"));
+        Assert(buttons.Contains("Tanılama"));
         var switches = FindVisualChildren<CheckBox>(window).ToArray();
         var browserSwitch = switches.Single(toggle =>
             toggle.Name == "BrowserAccessToggle");
@@ -178,8 +185,8 @@ static void RenderMainWindow()
         Assert(runInBackgroundSwitch.IsChecked == false);
         Assert(startupSwitch.IsChecked == false);
         Assert(FindVisualChildren<ProgressBar>(window).Any());
-        Assert(text.Contains("DNS AYARI", StringComparison.Ordinal));
-        Assert(text.Contains("TÜNEL MODELİ", StringComparison.Ordinal));
+        Assert(text.Contains("DNS", StringComparison.Ordinal));
+        Assert(text.Contains("TÜNEL", StringComparison.Ordinal));
         Assert(!text.Contains("Advanced SplitWire", StringComparison.OrdinalIgnoreCase));
         Assert(!text.Contains("Discord-only", StringComparison.OrdinalIgnoreCase));
 
@@ -357,6 +364,18 @@ file sealed class FakeWireSockUninstaller : IWireSockUninstaller
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.CompletedTask;
+    }
+}
+
+file sealed class FakeVerifiedDownloader : IVerifiedDownloader
+{
+    public Task DownloadAsync(
+        Uri source,
+        string destination,
+        string expectedSha256,
+        CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
     }
 }
 

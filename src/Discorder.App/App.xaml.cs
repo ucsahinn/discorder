@@ -13,6 +13,7 @@ using Discorder.Core.Firewall;
 using Discorder.Core.Infrastructure;
 using Discorder.Core.Maintenance;
 using Discorder.Core.Provisioning;
+using Discorder.Core.Updates;
 using Discorder.Core.WireSock;
 using Discorder.App.Installation;
 using Discorder.App.Security;
@@ -78,7 +79,7 @@ public partial class App : System.Windows.Application, IDisposable
             Timeout = TimeSpan.FromMinutes(5)
         };
         _httpClient.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("Discorder", "2.0.9"));
+            new ProductInfoHeaderValue("Discorder", "2.0.10"));
 
         var downloader = new VerifiedDownloader(_httpClient);
         var wireSockLocator = new WireSockLocator();
@@ -90,6 +91,7 @@ public partial class App : System.Windows.Application, IDisposable
             downloader,
             new WireSockPackageVerifier(),
             new WindowsElevatedInstallerLauncher());
+        var updateService = new AppUpdateService(_httpClient, _paths, downloader);
         var commandRunner = new CommandRunner();
         var provisioner = new WgcfProvisioner(
             _paths,
@@ -116,6 +118,7 @@ public partial class App : System.Windows.Application, IDisposable
             new DiscorderCleanupService(_paths, accessLock, _diagnostics),
             new WindowsStartupLaunchService(),
             new WindowsWireSockUninstaller(_diagnostics),
+            updateService,
             _diagnostics);
         MainWindow = window;
         window.Show();

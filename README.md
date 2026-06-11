@@ -18,7 +18,7 @@ Amaç basit: **Bağlan** düğmesine basınca Discord uygulaması çalışsın, 
 - ✅ Premium arka plan videosu arayüz sahnesinin sabit parçasıdır; yayın paketinde yerel dosya olarak gelir ve kullanıcı tarafından kapatılıp görsel düzen bozulmaz.
 - ✅ İlk kurulum ve bağlantı adımları ana ekrandaki süreç çubuğunda izlenir.
 - ✅ **Onar** işlemi ayarları, WireSock kurulumunu ve tanılama kayıtlarını koruyup profil, wgcf ve kurucu önbelleğini yeniden üretilecek hale getirir.
-- ✅ **Tanılama paketi** JSONL olay akışı, sağlık raporu, okunabilir özet ve aktif WireSock loglarını kilitlenmeden tek zip içinde hazırlar.
+- ✅ **Tanılama** JSONL olay akışı, sağlık raporu, okunabilir özet ve aktif WireSock loglarını kilitlenmeden tek zip içinde hazırlar.
 - ✅ İsteğe bağlı arka plan modu pencere kapansa bile Discorder'ı bildirim alanında çalıştırır.
 - ✅ İsteğe bağlı Windows başlangıcı ayarı Discorder'ı oturum açılışında başlatır.
 - ✅ **Temiz kaldır** işlemi Discorder kilidini, başlangıç kaydını, yerel veriyi ve Discorder'ın kurduğu WireSock VPN Client kurulumunu geri alır.
@@ -61,12 +61,12 @@ Discorder şunları bilinçli olarak yapmaz:
 
 ## 🚀 Kullanım
 
-1. Yayın arşivinden `Discorder-2.0.9-win-x64.zip` dosyasını indirin.
+1. Yayın arşivinden `Discorder-2.0.10-win-x64.zip` dosyasını indirin.
 2. Zip içeriğini istediğiniz klasöre çıkarın.
 3. `Discorder.exe` dosyasını çalıştırın ve Windows UAC onayını verin.
-4. Discord web kullanacaksanız ana ekrandaki **Discord web** seçeneğini açın.
-5. Pencere kapansa bile çalışmasını istiyorsanız **Arka planda çalış** seçeneğini açın.
-6. Windows oturumu açılınca başlamasını istiyorsanız **Windows başlangıcı** seçeneğini açın.
+4. Discord web kullanacaksanız ana ekrandaki **Web modu** seçeneğini açın.
+5. Pencere kapansa bile çalışmasını istiyorsanız **Arka plan** seçeneğini açın.
+6. Windows oturumu açılınca başlamasını istiyorsanız **Başlangıçta çalış** seçeneğini açın.
 7. **Bağlan** düğmesine basın.
 8. İlk kurulum penceresinde WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
 9. Windows UAC penceresi gelirse resmi WireSock kurulumuna izin verin.
@@ -82,9 +82,9 @@ Ana ekrandaki **Onar** düğmesi profil bozulması, eksik `wgcf` çıktısı vey
 - Tarayıcı modu, arka planda çalışma, başlangıç, WireSock onayı, WireSock kurulum izi ve tanılama kayıtlarını korur.
 - Sonraki **Bağlan** işleminde profil ve `wgcf` dosyaları yeniden üretilir.
 
-## 🧾 Tanılama Paketi
+## 🧾 Tanılama
 
-Ana ekrandaki **Tanılama paketi** düğmesi devops incelemesi için şu dosyaları üretir ve oluşan paketin klasörünü açar:
+Ana ekrandaki **Tanılama** düğmesi devops incelemesi için şu dosyaları üretir ve oluşan paketin klasörünü açar:
 
 - `%LOCALAPPDATA%\Discorder\logs\events.jsonl`: uygulama, UI, kilit, profil ve tünel olayları.
 - `%LOCALAPPDATA%\Discorder\logs\health.json`: son bilinen durum, sürüm, ortam ve redakte edilmiş path bilgisi.
