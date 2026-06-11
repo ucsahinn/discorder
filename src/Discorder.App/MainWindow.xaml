@@ -678,7 +678,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.0.3" />
+                               Text="v2.0.4" />
 
                     <Button Grid.Column="5"
                             Height="46"

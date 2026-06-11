@@ -1,6 +1,10 @@
 [CmdletBinding()]
 param(
-    [string]$Runtime = 'win-x64'
+    [string]$Runtime = 'win-x64',
+    [string]$CodeSigningCertificatePath,
+    [string]$CodeSigningCertificatePassword,
+    [string]$TimestampUrl = 'http://timestamp.digicert.com',
+    [switch]$RequireCodeSigning
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,6 +18,8 @@ if ([string]::IsNullOrWhiteSpace($version)) {
 }
 
 $archive = Join-Path $root "artifacts\Discorder-$version-$Runtime.zip"
+$shaPath = Join-Path $root "artifacts\Discorder-$version-$Runtime.sha256.txt"
+$signingStatusPath = Join-Path $root 'artifacts\signing-status.txt'
 
 Push-Location $root
 
@@ -35,12 +41,37 @@ try {
         throw "dotnet publish hata kodu $LASTEXITCODE ile basarisiz oldu"
     }
 
+    $signed = $false
+    if (-not [string]::IsNullOrWhiteSpace($CodeSigningCertificatePath) -or $RequireCodeSigning) {
+        & "$PSScriptRoot\sign-release.ps1" `
+            -PublishDirectory $output `
+            -CertificatePath $CodeSigningCertificatePath `
+            -CertificatePassword $CodeSigningCertificatePassword `
+            -TimestampUrl $TimestampUrl
+        $signed = $true
+    }
+    else {
+        Write-Host 'Kod imzalama atlandi: sertifika yapilandirilmadi.'
+    }
+
+    if ($signed) {
+        Set-Content -LiteralPath $signingStatusPath -Value 'signed' -Encoding ASCII
+    }
+    else {
+        Set-Content -LiteralPath $signingStatusPath -Value 'unsigned' -Encoding ASCII
+    }
+
     if (Test-Path -LiteralPath $archive) {
         Remove-Item -LiteralPath $archive -Force
     }
 
     Compress-Archive -Path (Join-Path $output '*') -DestinationPath $archive
-    Get-FileHash -Algorithm SHA256 -LiteralPath $archive
+    $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $archive
+    Set-Content `
+        -LiteralPath $shaPath `
+        -Value "$($hash.Hash)  $(Split-Path -Leaf $archive)" `
+        -Encoding ASCII
+    $hash
 }
 finally {
     Pop-Location

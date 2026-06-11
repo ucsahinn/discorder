@@ -59,7 +59,7 @@ Discorder şunları bilinçli olarak yapmaz:
 
 ## 🚀 Kullanım
 
-1. Yayın arşivinden `Discorder-2.0.3-win-x64.zip` dosyasını indirin.
+1. Yayın arşivinden `Discorder-2.0.4-win-x64.zip` dosyasını indirin.
 2. Zip içeriğini istediğiniz klasöre çıkarın.
 3. `Discorder.exe` dosyasını çalıştırın ve Windows UAC onayını verin.
 4. Discord web kullanacaksanız ana ekrandaki **Discord web** seçeneğini açın.
@@ -94,6 +94,19 @@ Ana ekrandaki **Temiz kaldır** düğmesi Discorder'ı taşınabilir uygulama ma
 - İşlem bitince uygulamayı kapatır.
 
 WireSock VPN Client Discorder'dan önce sistemde zaten kuruluysa korunur; Discorder yalnızca kendi ilk kurulumda başlattığı WireSock kurulumunu kaldırır.
+
+## 🪪 Kod İmzalama ve SmartScreen
+
+Windows SmartScreen'de **Publisher: Unknown publisher** uyarısının kalkması için `Discorder.exe` güvenilir bir Authenticode kod imzalama sertifikasıyla imzalanmalıdır. Manifest, ikon, uygulama adı veya repo ayarı bu publisher bilgisini tek başına düzeltemez.
+
+Release workflow'u imzalamaya hazırdır:
+
+- `DISCORDER_CODESIGN_PFX_B64`: OV/EV ya da kurumsal güvenilir kod imzalama sertifikasının PFX dosyası, Base64 olarak.
+- `DISCORDER_CODESIGN_PFX_PASSWORD`: PFX parolası.
+
+Bu secret'lar GitHub repo ayarlarına eklendiğinde tag yayını sırasında `Discorder.exe` ve yayın klasöründeki `.dll` dosyaları SHA-256 timestamp ile imzalanır. Secret yoksa paket bilinçli olarak imzasız üretilir ve release notunda SmartScreen uyarısı beklenebileceği yazılır.
+
+Self-signed sertifika yalnızca yerel test içindir; public kullanıcılarda SmartScreen güveni sağlamaz.
 
 ## 🔐 Güvenlik Modeli
 

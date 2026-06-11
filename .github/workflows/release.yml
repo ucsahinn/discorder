@@ -33,7 +33,31 @@ jobs:
 
       - name: Paket üret
         shell: pwsh
-        run: ./scripts/build-release.ps1
+        env:
+          DISCORDER_CODESIGN_PFX_B64: ${{ secrets.DISCORDER_CODESIGN_PFX_B64 }}
+          DISCORDER_CODESIGN_PFX_PASSWORD: ${{ secrets.DISCORDER_CODESIGN_PFX_PASSWORD }}
+        run: |
+          $signArgs = @()
+          if (-not [string]::IsNullOrWhiteSpace($env:DISCORDER_CODESIGN_PFX_B64)) {
+            $certificatePath = Join-Path $env:RUNNER_TEMP 'discorder-codesign.pfx'
+            [IO.File]::WriteAllBytes(
+              $certificatePath,
+              [Convert]::FromBase64String($env:DISCORDER_CODESIGN_PFX_B64))
+            $signArgs += @(
+              '-CodeSigningCertificatePath',
+              $certificatePath,
+              '-RequireCodeSigning'
+            )
+
+            if (-not [string]::IsNullOrWhiteSpace($env:DISCORDER_CODESIGN_PFX_PASSWORD)) {
+              $signArgs += @(
+                '-CodeSigningCertificatePassword',
+                $env:DISCORDER_CODESIGN_PFX_PASSWORD
+              )
+            }
+          }
+
+          ./scripts/build-release.ps1 @signArgs
 
       - name: Yayın notu ve SHA-256 hazırla
         id: package
@@ -53,6 +77,19 @@ jobs:
             -LiteralPath $shaPath `
             -Value "$hash  $($archive.Name)" `
             -Encoding ASCII
+
+          $signingStatusPath = Join-Path 'artifacts' 'signing-status.txt'
+          $signingStatus = 'unsigned'
+          if (Test-Path -LiteralPath $signingStatusPath) {
+            $signingStatus = (Get-Content -Raw -LiteralPath $signingStatusPath).Trim()
+          }
+
+          if ($signingStatus -eq 'signed') {
+            $signingText = 'Kod imzalama: Authenticode imzalı paket.'
+          }
+          else {
+            $signingText = 'Kod imzalama: imzasız paket. Windows SmartScreen Unknown publisher uyarısı gösterebilir.'
+          }
 
           $notesPath = Join-Path 'artifacts' "release-notes-$tag.md"
           $notes = @"
@@ -75,6 +112,7 @@ jobs:
           - $($archive.Name) dosyasını indirin.
           - Zip'i çıkarın ve Discorder.exe dosyasını çalıştırın.
           - SHA-256: $hash
+          - $signingText
 
           ## Doğrulama
 
@@ -87,6 +125,7 @@ jobs:
           "archive=$($archive.FullName)" >> $env:GITHUB_OUTPUT
           "sha=$shaPath" >> $env:GITHUB_OUTPUT
           "notes=$notesPath" >> $env:GITHUB_OUTPUT
+          "signed=$signingStatus" >> $env:GITHUB_OUTPUT
 
       - name: GitHub Release yayınla
         shell: pwsh
@@ -95,9 +134,26 @@ jobs:
         run: |
           $tag = '${{ github.event.inputs.tag || github.ref_name }}'
           $version = $tag.TrimStart('v')
-          gh release create $tag `
-            '${{ steps.package.outputs.archive }}' `
-            '${{ steps.package.outputs.sha }}' `
-            --title "Discorder $version" `
-            --notes-file '${{ steps.package.outputs.notes }}' `
-            --latest
+          $repo = '${{ github.repository }}'
+          gh release view $tag --repo $repo *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag `
+              '${{ steps.package.outputs.archive }}' `
+              '${{ steps.package.outputs.sha }}' `
+              --repo $repo `
+              --clobber
+            gh release edit $tag `
+              --repo $repo `
+              --title "Discorder $version" `
+              --notes-file '${{ steps.package.outputs.notes }}' `
+              --latest
+          }
+          else {
+            gh release create $tag `
+              '${{ steps.package.outputs.archive }}' `
+              '${{ steps.package.outputs.sha }}' `
+              --repo $repo `
+              --title "Discorder $version" `
+              --notes-file '${{ steps.package.outputs.notes }}' `
+              --latest
+          }
