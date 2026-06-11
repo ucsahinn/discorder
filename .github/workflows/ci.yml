@@ -17,15 +17,15 @@ concurrency:
 jobs:
   verify:
     name: Windows doğrulama
-    runs-on: windows-latest
+    runs-on: windows-2025
     timeout-minutes: 15
 
     steps:
       - name: Kaynak kodu al
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: .NET kur
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
@@ -45,8 +45,12 @@ jobs:
           -p:DebugType=None
           -p:DebugSymbols=false
 
+      - name: Arka plan videosunu pakete ekle
+        shell: pwsh
+        run: ./scripts/prepare-background-video.ps1 -PublishDirectory artifacts/publish/win-x64
+
       - name: Uygulama paketini yükle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Discorder-win-x64
           path: artifacts/publish/win-x64

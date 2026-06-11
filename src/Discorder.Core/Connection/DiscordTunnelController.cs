@@ -470,6 +470,12 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
     private static string CreateUserFacingConnectError(Exception exception)
     {
+        if (exception is TaskCanceledException
+            && exception.InnerException is TimeoutException)
+        {
+            return "Gerekli dosya indirilemedi. Bağlantı zaman aşımına uğradı; internet erişimini kontrol edip tekrar bağlanın.";
+        }
+
         if (exception is HttpRequestException httpException)
         {
             if (httpException.InnerException is SocketException socketException
@@ -480,6 +486,14 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             }
 
             return "Gerekli dosya indirilemedi. İnternet bağlantısını kontrol edip tekrar bağlanın.";
+        }
+
+        if (exception is InvalidOperationException
+            && exception.Message.Contains(
+                "Discord VPN kilidi",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Discord kilidi güncellenemedi. Discorder'ı yönetici olarak açıp tekrar deneyin; hosts dosyasını koruyan güvenlik yazılımı varsa izin verin.";
         }
 
         return exception.Message;

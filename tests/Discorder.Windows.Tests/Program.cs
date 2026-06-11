@@ -64,11 +64,9 @@ static void RenderWindows()
     Exception? failure = null;
     var thread = new Thread(() =>
     {
-        Application? application = null;
-
         try
         {
-            application = new Application
+            var application = new Application
             {
                 ShutdownMode = ShutdownMode.OnExplicitShutdown
             };
@@ -79,16 +77,28 @@ static void RenderWindows()
                     UriKind.Absolute)
             });
 
-            RenderMainWindow();
-            RenderConsentWindow();
+            application.Startup += (_, _) =>
+            {
+                try
+                {
+                    RenderMainWindow();
+                    RenderConsentWindow();
+                }
+                catch (Exception exception)
+                {
+                    failure = exception;
+                }
+                finally
+                {
+                    application.Shutdown();
+                }
+            };
+
+            application.Run();
         }
         catch (Exception exception)
         {
-            failure = exception;
-        }
-        finally
-        {
-            application?.Shutdown();
+            failure ??= exception;
         }
     });
 

@@ -16,7 +16,6 @@
         Closing="Window_Closing">
     <Grid ClipToBounds="True">
         <MediaElement x:Name="BackgroundVideo"
-                      Source="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4"
                       LoadedBehavior="Manual"
                       UnloadedBehavior="Stop"
                       Stretch="UniformToFill"
@@ -686,7 +685,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.0.7" />
+                               Text="v2.0.8" />
 
                     <Button Grid.Column="5"
                             Width="68"

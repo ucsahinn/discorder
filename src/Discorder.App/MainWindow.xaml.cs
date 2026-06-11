@@ -23,6 +23,10 @@ public partial class MainWindow : Window, IDisposable
         "https://github.com/ucsahinn/discorder");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
+    private static readonly string LocalBackgroundVideoPath = Path.Combine(
+        AppContext.BaseDirectory,
+        "Assets",
+        "background.mp4");
 
     private readonly DiscordTunnelController _controller;
     private readonly AppPaths _paths;
@@ -35,6 +39,7 @@ public partial class MainWindow : Window, IDisposable
     private bool _isApplyingSettings;
     private bool _isRunInBackgroundEnabled;
     private bool _isToggleOperationRunning;
+    private bool _backgroundVideoRemoteFallbackTried;
     private Forms.NotifyIcon? _trayIcon;
     private bool _hasShownTrayNotice;
     private CancellationTokenSource? _operationCancellation;
@@ -725,6 +730,24 @@ public partial class MainWindow : Window, IDisposable
         object sender,
         ExceptionRoutedEventArgs e)
     {
+        if (!_backgroundVideoRemoteFallbackTried
+            && BackgroundVideo.Source is not null
+            && BackgroundVideo.Source.IsFile)
+        {
+            _backgroundVideoRemoteFallbackTried = true;
+            _diagnostics.Warning(
+                "ui.backgroundVideo",
+                "Yerel arka plan videosu oynatılamadı, uzak video deneniyor.",
+                new Dictionary<string, string?>
+                {
+                    ["path"] = LocalBackgroundVideoPath,
+                    ["error"] = e.ErrorException?.Message
+                });
+            BackgroundVideo.Source = BackgroundVideoUri;
+            BackgroundVideo.Play();
+            return;
+        }
+
         BackgroundVideo.Visibility = Visibility.Collapsed;
         _diagnostics.Warning(
             "ui.backgroundVideo",
@@ -764,13 +787,21 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
+        _backgroundVideoRemoteFallbackTried = false;
         BackgroundVideo.Visibility = Visibility.Visible;
-        BackgroundVideo.Source ??= BackgroundVideoUri;
+        BackgroundVideo.Source ??= GetBackgroundVideoUri();
 
         if (BackgroundVideo.IsLoaded)
         {
             BackgroundVideo.Play();
         }
+    }
+
+    private static Uri GetBackgroundVideoUri()
+    {
+        return File.Exists(LocalBackgroundVideoPath)
+            ? new Uri(LocalBackgroundVideoPath, UriKind.Absolute)
+            : BackgroundVideoUri;
     }
 
     public void HideToTrayOnStartup()

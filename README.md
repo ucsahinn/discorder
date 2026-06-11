@@ -15,7 +15,7 @@ Amaç basit: **Bağlan** düğmesine basınca Discord uygulaması çalışsın, 
 - ✅ WireSock ve wgcf ikili dosyaları repoya gömülmez; ilk kullanımda resmi kaynaklardan indirilip doğrulanır.
 - ✅ WireSock kurucusu SHA-256, Authenticode imzası, yayıncı ve sürüm bilgisiyle doğrulanır.
 - ✅ Yerel profil ve tanılama dosyaları `%LOCALAPPDATA%\Discorder` altında tutulur.
-- ✅ Premium arka plan videosu arayüz sahnesinin sabit parçasıdır; kullanıcı tarafından kapatılıp görsel düzen bozulmaz.
+- ✅ Premium arka plan videosu arayüz sahnesinin sabit parçasıdır; yayın paketinde yerel dosya olarak gelir ve kullanıcı tarafından kapatılıp görsel düzen bozulmaz.
 - ✅ İlk kurulum ve bağlantı adımları ana ekrandaki süreç çubuğunda izlenir.
 - ✅ **Onar** işlemi ayarları, WireSock kurulumunu ve tanılama kayıtlarını koruyup profil, wgcf ve kurucu önbelleğini yeniden üretilecek hale getirir.
 - ✅ **Tanılama paketi** JSONL olay akışı, sağlık raporu, okunabilir özet ve aktif WireSock loglarını kilitlenmeden tek zip içinde hazırlar.
@@ -61,7 +61,7 @@ Discorder şunları bilinçli olarak yapmaz:
 
 ## 🚀 Kullanım
 
-1. Yayın arşivinden `Discorder-2.0.7-win-x64.zip` dosyasını indirin.
+1. Yayın arşivinden `Discorder-2.0.8-win-x64.zip` dosyasını indirin.
 2. Zip içeriğini istediğiniz klasöre çıkarın.
 3. `Discorder.exe` dosyasını çalıştırın ve Windows UAC onayını verin.
 4. Discord web kullanacaksanız ana ekrandaki **Discord web** seçeneğini açın.

@@ -41,6 +41,8 @@ try {
         throw "dotnet publish hata kodu $LASTEXITCODE ile basarisiz oldu"
     }
 
+    & "$PSScriptRoot\prepare-background-video.ps1" -PublishDirectory $output
+
     $signed = $false
     if (-not [string]::IsNullOrWhiteSpace($CodeSigningCertificatePath) -or $RequireCodeSigning) {
         & "$PSScriptRoot\sign-release.ps1" `

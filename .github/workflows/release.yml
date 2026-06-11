@@ -17,17 +17,17 @@ permissions:
 jobs:
   release:
     name: Windows x64 yayını
-    runs-on: windows-latest
+    runs-on: windows-2025
     timeout-minutes: 20
 
     steps:
       - name: Kaynak kodu al
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.tag || github.ref_name }}
 
       - name: .NET kur
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
@@ -100,6 +100,9 @@ jobs:
           ## Öne çıkanlar
 
           - Arayüz 1320x780 sabit premium sahneye alındı; arka plan videosu kullanıcı ayarı olmadan sürekli görünür.
+          - Arka plan videosu release zip içine `Assets/background.mp4` olarak eklenir; uygulama önce yerel videoyu oynatır, yalnızca gerekirse uzak kaynağa düşer.
+          - Windows hosts kilidi PowerShell `Set-Content` yerine doğrulanmış .NET dosya yazımıyla güncellenir; bazı Windows 10 makinelerde görülen hosts yazım hatası giderildi.
+          - WireSock/GitHub indirme timeout hataları kullanıcıya Türkçe ve eyleme dönük mesajla gösterilir.
           - Güç halkası panel içinde optik olarak yeniden ölçülendirildi; parlak fosfor görünür kalırken üst-alt kesilme hissi giderildi.
           - Sağ alt kaynak bağlantısı metin yerine ikonlu GitHub butonuna çevrildi.
           - Kapalı durum kırmızı fosfor, bağlı durum yeşil fosfor olacak şekilde bağlantı butonu, rozet ve süreç çubuğu netleştirildi.

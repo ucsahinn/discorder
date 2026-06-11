@@ -33,6 +33,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici web kapsamını bağlıyken kilitler", ControllerLocksBrowserScopeWhileConnectedAsync),
     ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
     ("Denetleyici GitHub DNS hatasını Türkçe açıklar", ControllerNetworkFailureIsUserFriendlyAsync),
+    ("Denetleyici indirme zaman aşımını Türkçe açıklar", ControllerDownloadTimeoutIsUserFriendlyAsync),
+    ("Denetleyici hosts kilidi hatasını Türkçe açıklar", ControllerAccessLockFailureIsUserFriendlyAsync),
     ("Windows Firewall kilidi Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
     ("Onarım ayarları ve logları koruyup üretilen veriyi yeniler", CleanupServiceRepairsGeneratedStateAsync),
     ("Temiz kaldırma Discorder verisini ve kilidini siler", CleanupServiceRemovesDiscorderStateAsync),
@@ -697,6 +699,89 @@ static async Task ControllerNetworkFailureIsUserFriendlyAsync()
     }
 }
 
+static async Task ControllerDownloadTimeoutIsUserFriendlyAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var accessLock = new FakeDiscordAccessLock();
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(
+            Path.Combine(
+                root,
+                "WireSock VPN Client",
+                "bin",
+                WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(
+            Path.Combine(root, "discord.conf"),
+            new TaskCanceledException(
+                "The operation was canceled.",
+                new TimeoutException(
+                    "A connection could not be established within the configured ConnectTimeout."))),
+        new FakeProcessLauncher(new FakeManagedProcess()),
+        TimeSpan.Zero,
+        accessLock);
+
+    try
+    {
+        await controller.ConnectAsync();
+        Assert(controller.Snapshot.State == TunnelState.Error);
+        Assert(controller.Snapshot.Message.Contains(
+            "zaman aşımına",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!controller.Snapshot.Message.Contains(
+            "operation was canceled",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(accessLock.EnableCount == 1);
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerAccessLockFailureIsUserFriendlyAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var accessLock = new FakeDiscordAccessLock(
+        disableException: new InvalidOperationException(
+            "Discord VPN kilidi güncellenemedi: Set-Content : Akış okunabilir değildi."));
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(
+            Path.Combine(
+                root,
+                "WireSock VPN Client",
+                "bin",
+                WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(new FakeManagedProcess()),
+        TimeSpan.Zero,
+        accessLock);
+
+    try
+    {
+        await controller.ConnectAsync();
+        Assert(controller.Snapshot.State == TunnelState.Error);
+        Assert(controller.Snapshot.Message.Contains(
+            "Discord kilidi güncellenemedi",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(controller.Snapshot.Message.Contains(
+            "yönetici",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!controller.Snapshot.Message.Contains(
+            "Set-Content",
+            StringComparison.OrdinalIgnoreCase));
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -745,6 +830,15 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
             "-Enabled True",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "[IO.File]::WriteAllText",
+            StringComparison.Ordinal));
+        Assert(!runner.Commands[0].Contains(
+            "Set-Content -LiteralPath $hostsPath",
+            StringComparison.Ordinal));
+        Assert(!runner.Commands[0].Contains(
+            "Add-Content -LiteralPath $hostsPath",
             StringComparison.Ordinal));
         Assert(runner.Commands[1].Contains(
             WindowsFirewallDiscordAccessLock.RuleName,
@@ -963,7 +1057,7 @@ static async Task AssertThrowsAsync<TException>(Func<Task> action)
         $"{typeof(TException).Name} beklenen şekilde fırlatılmadı.");
 }
 
-file sealed class FakeDiscordAccessLock : IDiscordAccessLock
+file sealed class FakeDiscordAccessLock(Exception? disableException = null) : IDiscordAccessLock
 {
     public int EnableCount { get; private set; }
 
@@ -988,6 +1082,11 @@ file sealed class FakeDiscordAccessLock : IDiscordAccessLock
     {
         cancellationToken.ThrowIfCancellationRequested();
         DisableCount++;
+        if (disableException is not null)
+        {
+            return Task.FromException(disableException);
+        }
+
         return Task.CompletedTask;
     }
 
