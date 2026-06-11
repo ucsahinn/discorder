@@ -112,7 +112,14 @@ public partial class MainWindow : Window, IDisposable
             _operationCancellation?.Dispose();
             _operationCancellation = new CancellationTokenSource();
 
-            await _controller.ToggleAsync(_operationCancellation.Token);
+            if (_controller.Snapshot.IsConnected)
+            {
+                await _controller.DisconnectAsync(CancellationToken.None);
+            }
+            else
+            {
+                await _controller.ConnectAsync(_operationCancellation.Token);
+            }
         }
         catch (OperationCanceledException)
         {

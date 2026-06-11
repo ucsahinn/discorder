@@ -95,6 +95,11 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
         var diagnostic = string.IsNullOrWhiteSpace(result.StandardError)
             ? result.StandardOutput
             : result.StandardError;
+        if (string.IsNullOrWhiteSpace(diagnostic))
+        {
+            diagnostic = $"PowerShell exit code {result.ExitCode}.";
+        }
+
         throw new InvalidOperationException(
             "Discord VPN kilidi güncellenemedi: " +
             diagnostic.Trim().ReplaceLineEndings(" "));
@@ -112,9 +117,10 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "$endMarker = '# END Discorder Discord kilidi'",
             $"$browserScopeGroup = '{BrowserScopeGroup}'",
             .. BuildHostsFileFunctions(),
+            .. BuildFirewallGroupFunctions(),
             "$script:discorderHostsChanged = $false",
             "foreach ($group in @($browserScopeGroup)) {",
-            "    Get-NetFirewallRule -Group $group -ErrorAction SilentlyContinue | Remove-NetFirewallRule | Out-Null",
+            "    Clear-DiscorderFirewallGroup $group",
             "}",
             "Remove-DiscorderHostsLock",
             "ipconfig /flushdns | Out-Null",
@@ -168,13 +174,14 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             $"$domains = @({DiscordDomains})",
             $"$browserScopeGroup = '{BrowserScopeGroup}'",
             $"$browserScopeDisplayName = '{BrowserScopeDisplayName}'",
+            .. BuildFirewallGroupFunctions(),
             "function Join-DiscorderPath([string]$root, [string]$relative) {",
             "    if ([string]::IsNullOrWhiteSpace($root)) { return $null }",
             "    return (Join-Path $root $relative)",
             "}",
             "function Clear-DiscorderTunnelScope {",
             "    foreach ($group in @($browserScopeGroup)) {",
-            "        Get-NetFirewallRule -Group $group -ErrorAction SilentlyContinue | Remove-NetFirewallRule | Out-Null",
+            "        Clear-DiscorderFirewallGroup $group",
             "    }",
             "}",
             "function Get-DiscorderAddresses {",
@@ -229,8 +236,9 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
         return string.Join(Environment.NewLine, [
             "$ErrorActionPreference = 'Stop'",
             $"$browserScopeGroup = '{BrowserScopeGroup}'",
+            .. BuildFirewallGroupFunctions(),
             "foreach ($group in @($browserScopeGroup)) {",
-            "    Get-NetFirewallRule -Group $group -ErrorAction SilentlyContinue | Remove-NetFirewallRule | Out-Null",
+            "    Clear-DiscorderFirewallGroup $group",
             "}"
         ]);
     }
@@ -245,6 +253,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "$beginMarker = '# BEGIN Discorder Discord kilidi'",
             "$endMarker = '# END Discorder Discord kilidi'",
             .. BuildHostsFileFunctions(),
+            .. BuildFirewallGroupFunctions(),
             "$script:discorderHostsChanged = $false",
             "Remove-DiscorderHostsLock",
             "$rule = Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue",
@@ -252,12 +261,29 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "    Remove-NetFirewallRule -Name $ruleName | Out-Null",
             "}",
             "foreach ($group in @($browserScopeGroup)) {",
-            "    Get-NetFirewallRule -Group $group -ErrorAction SilentlyContinue | Remove-NetFirewallRule | Out-Null",
+            "    Clear-DiscorderFirewallGroup $group",
             "}",
             "if ($script:discorderHostsChanged) {",
             "    ipconfig /flushdns | Out-Null",
             "}"
         ]);
+    }
+
+    private static string[] BuildFirewallGroupFunctions()
+    {
+        return [
+            "function Clear-DiscorderFirewallGroup([string]$group) {",
+            "    $rules = @(Get-NetFirewallRule -Group $group -ErrorAction SilentlyContinue)",
+            "    foreach ($rule in $rules) {",
+            "        try {",
+            "            Remove-NetFirewallRule -Name $($rule.Name) -ErrorAction Stop | Out-Null",
+            "        } catch {",
+            "            $remaining = Get-NetFirewallRule -Name $($rule.Name) -ErrorAction SilentlyContinue",
+            "            if ($null -ne $remaining) { throw }",
+            "        }",
+            "    }",
+            "}"
+        ];
     }
 
     private static string[] BuildHostsFileFunctions()

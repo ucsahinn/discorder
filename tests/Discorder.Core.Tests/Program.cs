@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -22,7 +23,9 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Profil üretici geniş AllowedApps değerlerini değiştirir", ProfileBuilderIsStrictAsync),
     ("Profil üretici yapılandırma enjeksiyonunu reddeder", ProfileBuilderRejectsInjectionAsync),
     ("wgcf Discord uygulama ve web profili üretir", WgcfProvisionerBuildsDiscordAccessProfileAsync),
+    ("wgcf boş hata çıktısını tanısız bırakmaz", WgcfProvisionerEmptyFailureIsDiagnosticAsync),
     ("SHA-256 doğrulayıcı yalnızca sabit özeti kabul eder", HashVerifierIsStrictAsync),
+    ("Doğrulanmış indirici geçici zaman aşımını tekrar dener", VerifiedDownloaderRetriesTransientTimeoutAsync),
     ("Ayarlar WireSock onayını sürüm bazında saklar", SettingsPersistConsentAsync),
     ("WireSock hazırlığı onaysız kurulumu reddeder", BootstrapRequiresConsentAsync),
     ("WireSock hazırlığı güvenilir kurulumu yeniden kullanır", BootstrapReusesTrustedInstallAsync),
@@ -233,6 +236,35 @@ static async Task WgcfProvisionerBuildsDiscordAccessProfileAsync()
     }
 }
 
+static async Task WgcfProvisionerEmptyFailureIsDiagnosticAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var provisioner = new WgcfProvisioner(
+        paths,
+        new FakeVerifiedDownloader(),
+        new EmptyFailureCommandRunner(exitCode: 9));
+
+    try
+    {
+        var exception = await AssertThrowsAsync<InvalidOperationException>(
+            () => provisioner.EnsureProfileAsync(
+                ["Discord.exe"],
+                CancellationToken.None));
+
+        Assert(exception.Message.Contains(
+            "Cloudflare WARP kaydı çıkış kodu 9",
+            StringComparison.Ordinal));
+        Assert(exception.Message.Contains(
+            "wgcf exit code 9",
+            StringComparison.Ordinal));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task HashVerifierIsStrictAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -245,6 +277,37 @@ static async Task HashVerifierIsStrictAsync()
     {
         Assert(await FileHashVerifier.MatchesSha256Async(path, expected));
         Assert(!await FileHashVerifier.MatchesSha256Async(path, new string('0', 64)));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task VerifiedDownloaderRetriesTransientTimeoutAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var payload = Encoding.UTF8.GetBytes("dogrulanmis-kurucu");
+    var expectedSha256 = Convert.ToHexString(SHA256.HashData(payload));
+    var handler = new FlakyDownloadHandler(failuresBeforeSuccess: 1, payload);
+    using var httpClient = new HttpClient(handler);
+    var downloader = new VerifiedDownloader(
+        httpClient,
+        maxAttempts: 2,
+        retryDelay: TimeSpan.Zero);
+    var destination = Path.Combine(root, "wiresock.msi");
+
+    try
+    {
+        await downloader.DownloadAsync(
+            new Uri("https://downloads.example.test/wiresock.msi"),
+            destination,
+            expectedSha256,
+            CancellationToken.None);
+
+        Assert(handler.RequestCount == 2);
+        Assert(await File.ReadAllTextAsync(destination) == "dogrulanmis-kurucu");
+        Assert(!File.Exists(destination + ".download"));
     }
     finally
     {
@@ -801,9 +864,10 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
         await accessLock.ApplyTunnelScopeAsync(
             includeBrowserAccess: true,
             CancellationToken.None);
+        await accessLock.ClearTunnelScopeAsync(CancellationToken.None);
         await accessLock.RemoveAsync(CancellationToken.None);
 
-        Assert(runner.Commands.Count == 5);
+        Assert(runner.Commands.Count == 6);
         Assert(runner.Commands[0].Contains(
             "System32\\drivers\\etc\\hosts",
             StringComparison.Ordinal));
@@ -868,12 +932,21 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
             "if ($includeBrowserAccess) { return }",
             StringComparison.Ordinal));
         Assert(runner.Commands[4].Contains(
+            "Clear-DiscorderFirewallGroup",
+            StringComparison.Ordinal));
+        Assert(!runner.Commands[4].Contains(
+            "System32\\drivers\\etc\\hosts",
+            StringComparison.Ordinal));
+        Assert(!runner.Commands[4].Contains(
+            "# BEGIN Discorder Discord kilidi",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[5].Contains(
             WindowsFirewallDiscordAccessLock.RuleName,
             StringComparison.Ordinal));
-        Assert(runner.Commands[4].Contains(
+        Assert(runner.Commands[5].Contains(
             "# END Discorder Discord kilidi",
             StringComparison.Ordinal));
-        Assert(runner.Commands[4].Contains(
+        Assert(runner.Commands[5].Contains(
             "Remove-NetFirewallRule",
             StringComparison.Ordinal));
     }
@@ -1041,16 +1114,16 @@ static void AssertThrows<TException>(Action action)
         $"{typeof(TException).Name} beklenen şekilde fırlatılmadı.");
 }
 
-static async Task AssertThrowsAsync<TException>(Func<Task> action)
+static async Task<TException> AssertThrowsAsync<TException>(Func<Task> action)
     where TException : Exception
 {
     try
     {
         await action();
     }
-    catch (TException)
+    catch (TException exception)
     {
-        return;
+        return exception;
     }
 
     throw new InvalidOperationException(
@@ -1164,6 +1237,35 @@ file sealed class FakeWireSockBootstrapper : IWireSockBootstrapper
     }
 }
 
+file sealed class FlakyDownloadHandler(
+    int failuresBeforeSuccess,
+    byte[] payload) : HttpMessageHandler
+{
+    public int RequestCount { get; private set; }
+
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        RequestCount++;
+
+        if (RequestCount <= failuresBeforeSuccess)
+        {
+            return Task.FromException<HttpResponseMessage>(
+                new TaskCanceledException(
+                    "The operation was canceled.",
+                    new TimeoutException(
+                        "A connection could not be established within the configured ConnectTimeout.")));
+        }
+
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(payload)
+        });
+    }
+}
+
 file sealed class FakeVerifiedDownloader : IVerifiedDownloader
 {
     public int DownloadCount { get; private set; }
@@ -1180,6 +1282,23 @@ file sealed class FakeVerifiedDownloader : IVerifiedDownloader
             destination,
             "dogrulanmis-kurucu",
             cancellationToken);
+    }
+}
+
+file sealed class EmptyFailureCommandRunner(int exitCode) : ICommandRunner
+{
+    public Task<CommandResult> RunAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        string workingDirectory,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(new CommandResult(
+            exitCode,
+            string.Empty,
+            string.Empty));
     }
 }
 

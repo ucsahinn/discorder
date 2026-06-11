@@ -1,14 +1,32 @@
 using Discorder.Core.Security;
+using System.Net;
 
 namespace Discorder.Core.Provisioning;
 
 public sealed class VerifiedDownloader : IVerifiedDownloader
 {
-    private readonly HttpClient _httpClient;
+    private const int DefaultMaxAttempts = 3;
+    private static readonly TimeSpan DefaultRetryDelay = TimeSpan.FromSeconds(2);
 
-    public VerifiedDownloader(HttpClient httpClient)
+    private readonly HttpClient _httpClient;
+    private readonly int _maxAttempts;
+    private readonly TimeSpan _retryDelay;
+
+    public VerifiedDownloader(
+        HttpClient httpClient,
+        int maxAttempts = DefaultMaxAttempts,
+        TimeSpan? retryDelay = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        if (maxAttempts < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxAttempts),
+                "En az bir indirme denemesi yapılmalıdır.");
+        }
+
+        _maxAttempts = maxAttempts;
+        _retryDelay = retryDelay ?? DefaultRetryDelay;
     }
 
     public async Task DownloadAsync(
@@ -34,42 +52,133 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
 
         try
         {
-            using var response = await _httpClient.GetAsync(
-                source,
-                HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-            await using (var sourceStream = await response.Content.ReadAsStreamAsync(
-                             cancellationToken))
-            await using (var destinationStream = new FileStream(
-                             temporaryPath,
-                             FileMode.Create,
-                             FileAccess.Write,
-                             FileShare.None,
-                             128 * 1024,
-                             FileOptions.Asynchronous | FileOptions.SequentialScan))
+            for (var attempt = 1; attempt <= _maxAttempts; attempt++)
             {
-                await sourceStream.CopyToAsync(destinationStream, cancellationToken);
+                try
+                {
+                    await DownloadOnceAsync(
+                        source,
+                        temporaryPath,
+                        destination,
+                        expectedSha256,
+                        cancellationToken);
+                    return;
+                }
+                catch (Exception exception) when (
+                    attempt < _maxAttempts
+                    && IsTransientDownloadFailure(exception, cancellationToken))
+                {
+                    TryDelete(temporaryPath);
+                    await Task.Delay(GetRetryDelay(attempt), cancellationToken);
+                }
             }
-
-            if (!await FileHashVerifier.MatchesSha256Async(
-                    temporaryPath,
-                    expectedSha256,
-                    cancellationToken))
-            {
-                throw new InvalidDataException(
-                    $"{source.Host} için SHA-256 doğrulaması başarısız oldu.");
-            }
-
-            File.Move(temporaryPath, destination, overwrite: true);
         }
         finally
         {
-            if (File.Exists(temporaryPath))
+            TryDelete(temporaryPath);
+        }
+    }
+
+    private async Task DownloadOnceAsync(
+        Uri source,
+        string temporaryPath,
+        string destination,
+        string expectedSha256,
+        CancellationToken cancellationToken)
+    {
+        using var response = await _httpClient.GetAsync(
+            source,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new HttpRequestException(
+                $"{source.Host} HTTP {(int)response.StatusCode} ({response.ReasonPhrase}).",
+                null,
+                response.StatusCode);
+        }
+
+        await using (var sourceStream = await response.Content.ReadAsStreamAsync(
+                         cancellationToken))
+        await using (var destinationStream = new FileStream(
+                         temporaryPath,
+                         FileMode.Create,
+                         FileAccess.Write,
+                         FileShare.None,
+                         128 * 1024,
+                         FileOptions.Asynchronous | FileOptions.SequentialScan))
+        {
+            await sourceStream.CopyToAsync(destinationStream, cancellationToken);
+        }
+
+        if (!await FileHashVerifier.MatchesSha256Async(
+                temporaryPath,
+                expectedSha256,
+                cancellationToken))
+        {
+            throw new InvalidDataException(
+                $"{source.Host} için SHA-256 doğrulaması başarısız oldu.");
+        }
+
+        File.Move(temporaryPath, destination, overwrite: true);
+    }
+
+    private static bool IsTransientDownloadFailure(
+        Exception exception,
+        CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        return exception switch
+        {
+            TaskCanceledException => true,
+            TimeoutException => true,
+            HttpRequestException httpException
+                => IsTransientStatusCode(httpException.StatusCode),
+            _ => false
+        };
+    }
+
+    private static bool IsTransientStatusCode(HttpStatusCode? statusCode)
+    {
+        if (statusCode is null
+            or HttpStatusCode.RequestTimeout
+            or HttpStatusCode.TooManyRequests)
+        {
+            return true;
+        }
+
+        return (int)statusCode.Value >= 500;
+    }
+
+    private TimeSpan GetRetryDelay(int failedAttempt)
+    {
+        if (_retryDelay <= TimeSpan.Zero)
+        {
+            return TimeSpan.Zero;
+        }
+
+        return TimeSpan.FromMilliseconds(_retryDelay.TotalMilliseconds * failedAttempt);
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
             {
-                File.Delete(temporaryPath);
+                File.Delete(path);
             }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 }

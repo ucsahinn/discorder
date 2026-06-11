@@ -102,6 +102,10 @@ public sealed class WgcfProvisioner : IProfileProvisioner
         var diagnostic = string.IsNullOrWhiteSpace(result.StandardError)
             ? result.StandardOutput
             : result.StandardError;
+        if (string.IsNullOrWhiteSpace(diagnostic))
+        {
+            diagnostic = $"wgcf exit code {result.ExitCode}.";
+        }
 
         throw new InvalidOperationException(
             $"{operation} çıkış kodu {result.ExitCode} ile başarısız oldu: " +
