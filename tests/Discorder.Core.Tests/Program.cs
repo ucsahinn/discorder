@@ -256,11 +256,13 @@ static async Task SettingsPersistConsentAsync()
         Assert(firstStore.IsBackgroundVideoEnabled());
         Assert(!firstStore.IsRunInBackgroundOnCloseEnabled());
         Assert(!firstStore.IsStartWithWindowsEnabled());
+        Assert(!firstStore.IsWireSockInstalledByDiscorder());
 
         firstStore.SetBrowserAccessEnabled(true);
         firstStore.SetBackgroundVideoEnabled(false);
         firstStore.SetRunInBackgroundOnCloseEnabled(true);
         firstStore.SetStartWithWindowsEnabled(true);
+        firstStore.SetWireSockInstalledByDiscorder(true);
         firstStore.AcceptSetupConsent(WireSockPackage.Version);
 
         var reloadedStore = new AppSettingsStore(paths);
@@ -270,16 +272,19 @@ static async Task SettingsPersistConsentAsync()
         Assert(!reloadedStore.IsBackgroundVideoEnabled());
         Assert(reloadedStore.IsRunInBackgroundOnCloseEnabled());
         Assert(reloadedStore.IsStartWithWindowsEnabled());
+        Assert(reloadedStore.IsWireSockInstalledByDiscorder());
 
         reloadedStore.SetBrowserAccessEnabled(false);
         reloadedStore.SetBackgroundVideoEnabled(true);
         reloadedStore.SetRunInBackgroundOnCloseEnabled(false);
         reloadedStore.SetStartWithWindowsEnabled(false);
+        reloadedStore.SetWireSockInstalledByDiscorder(false);
         var disabledStore = new AppSettingsStore(paths);
         Assert(!disabledStore.IsBrowserAccessEnabled());
         Assert(disabledStore.IsBackgroundVideoEnabled());
         Assert(!disabledStore.IsRunInBackgroundOnCloseEnabled());
         Assert(!disabledStore.IsStartWithWindowsEnabled());
+        Assert(!disabledStore.IsWireSockInstalledByDiscorder());
 
         await File.WriteAllTextAsync(paths.SettingsFile, """
             {
@@ -293,6 +298,7 @@ static async Task SettingsPersistConsentAsync()
         Assert(legacyStore.IsBackgroundVideoEnabled());
         Assert(!legacyStore.IsRunInBackgroundOnCloseEnabled());
         Assert(!legacyStore.IsStartWithWindowsEnabled());
+        Assert(!legacyStore.IsWireSockInstalledByDiscorder());
     }
     finally
     {
@@ -357,6 +363,7 @@ static async Task BootstrapReusesTrustedInstallAsync()
             CancellationToken.None);
 
         Assert(result == locator.Path);
+        Assert(!settings.IsWireSockInstalledByDiscorder());
         Assert(downloader.DownloadCount == 0);
         Assert(verifier.InstallerVerifyCount == 0);
         Assert(verifier.ClientVerifyCount == 1);
@@ -439,6 +446,7 @@ static async Task BootstrapLifecycleAsync()
         Assert(verifier.InstallerVerifyCount == 1);
         Assert(verifier.ClientVerifyCount == 1);
         Assert(launcher.LaunchCount == 1);
+        Assert(settings.IsWireSockInstalledByDiscorder());
         Assert(!File.Exists(Path.Combine(
             paths.InstallerDirectory,
             WireSockPackage.InstallerFileName)));

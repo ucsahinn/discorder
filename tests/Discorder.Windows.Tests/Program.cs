@@ -131,7 +131,8 @@ static void RenderMainWindow()
             new DiscorderCleanupService(
                 new AppPaths(root),
                 new NullDiscordAccessLock()),
-            new FakeStartupLaunchService());
+            new FakeStartupLaunchService(),
+            new FakeWireSockUninstaller());
         window.Show();
         window.UpdateLayout();
 
@@ -336,6 +337,17 @@ file sealed class FakeStartupLaunchService : IStartupLaunchService
     public void SetEnabled(bool enabled)
     {
         Enabled = enabled;
+    }
+}
+
+file sealed class FakeWireSockUninstaller : IWireSockUninstaller
+{
+    public Task UninstallIfDiscorderInstalledAsync(
+        bool installedByDiscorder,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
     }
 }
 

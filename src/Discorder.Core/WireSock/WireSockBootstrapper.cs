@@ -115,6 +115,7 @@ public sealed class WireSockBootstrapper : IWireSockBootstrapper
                 "WireSock kurulumu tamamlandı ancak komut satırı aracı bulunamadı.");
         }
 
+        _settings.SetWireSockInstalledByDiscorder(installed: true);
         TryDeleteInstaller(installerPath);
         return installedExecutable;
     }

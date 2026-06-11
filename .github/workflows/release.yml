@@ -1,0 +1,103 @@
+name: Yayın
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Yayınlanacak tag'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Windows x64 yayını
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Kaynak kodu al
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+
+      - name: .NET kur
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Paket üret
+        shell: pwsh
+        run: ./scripts/build-release.ps1
+
+      - name: Yayın notu ve SHA-256 hazırla
+        id: package
+        shell: pwsh
+        run: |
+          $tag = '${{ github.event.inputs.tag || github.ref_name }}'
+          $version = $tag.TrimStart('v')
+          $archive = Get-ChildItem -LiteralPath artifacts -Filter "Discorder-$version-win-x64.zip" |
+            Select-Object -First 1
+          if ($null -eq $archive) {
+            throw "Yayın arşivi bulunamadı: Discorder-$version-win-x64.zip"
+          }
+
+          $shaPath = Join-Path 'artifacts' "Discorder-$version-win-x64.sha256.txt"
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive.FullName).Hash
+          Set-Content `
+            -LiteralPath $shaPath `
+            -Value "$hash  $($archive.Name)" `
+            -Encoding ASCII
+
+          $notesPath = Join-Path 'artifacts' "release-notes-$tag.md"
+          $notes = @"
+          # Discorder $version
+
+          Discorder $version temiz kaldırma ve premium işletim kontrolleri yayınıdır.
+
+          ## Öne çıkanlar
+
+          - İlk kurulum ve bağlantı adımlarını gösteren süreç çubuğu eklendi.
+          - İşletim Ayarları paneli eklendi: arka planda çalışma, Windows başlangıcı ve arka plan videosu tek yerden yönetilir.
+          - Pencere kapansa bile isteğe bağlı bildirim alanında çalışmaya devam etme desteği eklendi.
+          - Windows oturumu açılınca Discorder'ı otomatik başlatma ayarı eklendi.
+          - Sıfırla/onar akışı ayarları ve WireSock kurulumunu koruyarak profil, wgcf, kurucu önbelleği ve logları yeniler.
+          - Temiz kaldırma akışı Discorder kilidini, başlangıç kaydını, yerel veriyi ve Discorder'ın kurduğu WireSock VPN Client kurulumunu geri alır.
+          - Release paketi adı proje sürümünden otomatik üretilir.
+
+          ## İndirme
+
+          - `$($archive.Name)` dosyasını indirin.
+          - Zip'i çıkarın ve `Discorder.exe` dosyasını çalıştırın.
+          - SHA-256: `$hash`
+
+          ## Doğrulama
+
+          - `scripts/build-release.ps1` geçti.
+          - Core ve Windows render testleri geçti.
+          - Release arşivi self-contained Windows x64 olarak üretildi.
+          "@
+          $notes | Set-Content -LiteralPath $notesPath -Encoding UTF8
+
+          "archive=$($archive.FullName)" >> $env:GITHUB_OUTPUT
+          "sha=$shaPath" >> $env:GITHUB_OUTPUT
+          "notes=$notesPath" >> $env:GITHUB_OUTPUT
+
+      - name: GitHub Release yayınla
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ github.event.inputs.tag || github.ref_name }}'
+          $version = $tag.TrimStart('v')
+          gh release create $tag `
+            '${{ steps.package.outputs.archive }}' `
+            '${{ steps.package.outputs.sha }}' `
+            --title "Discorder $version" `
+            --notes-file '${{ steps.package.outputs.notes }}' `
+            --latest

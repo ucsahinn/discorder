@@ -64,6 +64,14 @@ public sealed class AppSettingsStore
         }
     }
 
+    public bool IsWireSockInstalledByDiscorder()
+    {
+        lock (_gate)
+        {
+            return Load().WireSockInstalledByDiscorder ?? false;
+        }
+    }
+
     public void SetBrowserAccessEnabled(bool enabled)
     {
         lock (_gate)
@@ -114,6 +122,20 @@ public sealed class AppSettingsStore
             var settings = Load() with
             {
                 StartWithWindows = enabled
+            };
+
+            Save(settings);
+        }
+    }
+
+    public void SetWireSockInstalledByDiscorder(bool installed)
+    {
+        lock (_gate)
+        {
+            _paths.EnsureDirectories();
+            var settings = Load() with
+            {
+                WireSockInstalledByDiscorder = installed
             };
 
             Save(settings);
@@ -182,7 +204,8 @@ public sealed class AppSettingsStore
         bool BrowserAccessEnabled,
         bool? BackgroundVideoEnabled,
         bool? RunInBackgroundOnClose,
-        bool? StartWithWindows)
+        bool? StartWithWindows,
+        bool? WireSockInstalledByDiscorder)
     {
         public static StoredSettings Default { get; } = new(
             null,
@@ -190,6 +213,7 @@ public sealed class AppSettingsStore
             BrowserAccessEnabled: false,
             BackgroundVideoEnabled: true,
             RunInBackgroundOnClose: false,
-            StartWithWindows: false);
+            StartWithWindows: false,
+            WireSockInstalledByDiscorder: false);
     }
 }

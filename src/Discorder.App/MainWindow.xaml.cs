@@ -28,6 +28,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly AppSettingsStore _settingsStore;
     private readonly DiscorderCleanupService _cleanupService;
     private readonly IStartupLaunchService _startupLaunchService;
+    private readonly IWireSockUninstaller _wireSockUninstaller;
     private bool _isApplyingSettings;
     private bool _isBackgroundVideoEnabled = true;
     private bool _isRunInBackgroundEnabled;
@@ -44,7 +45,8 @@ public partial class MainWindow : Window, IDisposable
         IWireSockBootstrapper wireSockBootstrapper,
         AppSettingsStore settingsStore,
         DiscorderCleanupService cleanupService,
-        IStartupLaunchService startupLaunchService)
+        IStartupLaunchService startupLaunchService,
+        IWireSockUninstaller wireSockUninstaller)
     {
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
@@ -56,6 +58,8 @@ public partial class MainWindow : Window, IDisposable
             ?? throw new ArgumentNullException(nameof(cleanupService));
         _startupLaunchService = startupLaunchService
             ?? throw new ArgumentNullException(nameof(startupLaunchService));
+        _wireSockUninstaller = wireSockUninstaller
+            ?? throw new ArgumentNullException(nameof(wireSockUninstaller));
 
         InitializeComponent();
         ApplyBrowserAccessSetting(_settingsStore.IsBrowserAccessEnabled());
@@ -443,7 +447,7 @@ public partial class MainWindow : Window, IDisposable
         var confirmation = MessageBox.Show(
             "Discorder bağlantıyı kapatacak, hosts ve Windows Firewall üzerindeki Discorder kilidini geri alacak, " +
             "%LOCALAPPDATA%\\Discorder altındaki profil, ayar, wgcf, kurucu ve log dosyalarını silecek. " +
-            "WireSock VPN Client genel kurulumu kaldırılmaz.\n\nDevam edilsin mi?",
+            "WireSock VPN Client bu uygulama tarafından kurulduysa Windows'tan kaldırılacak.\n\nDevam edilsin mi?",
             "Discorder temiz kaldır",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,
@@ -458,14 +462,24 @@ public partial class MainWindow : Window, IDisposable
         _operationCancellation?.Cancel();
         StopBackgroundVideo();
         StatusMessage.Text = "Temiz kaldırma çalışıyor";
-        StatusDetail.Text = "Tünel kapatılıyor, Discorder kilidi geri alınıyor ve yerel veriler siliniyor.";
+        StatusDetail.Text = "Tünel kapatılıyor, WireSock ve Discorder izleri temizleniyor.";
+        SetMaintenanceProgress(24, "Tünel kapatılıyor");
 
         try
         {
             _startupLaunchService.SetEnabled(false);
+            var removeWireSock = _settingsStore.IsWireSockInstalledByDiscorder();
             _settingsStore.SetStartWithWindowsEnabled(false);
             _settingsStore.SetRunInBackgroundOnCloseEnabled(false);
             await _controller.DisposeAsync();
+            SetMaintenanceProgress(48, removeWireSock
+                ? "WireSock kaldırılıyor"
+                : "WireSock korunuyor");
+            await _wireSockUninstaller.UninstallIfDiscorderInstalledAsync(
+                removeWireSock,
+                CancellationToken.None);
+            _settingsStore.SetWireSockInstalledByDiscorder(installed: false);
+            SetMaintenanceProgress(78, "Yerel veriler siliniyor");
             await _cleanupService.CleanUninstallAsync(CancellationToken.None);
 
             MessageBox.Show(
