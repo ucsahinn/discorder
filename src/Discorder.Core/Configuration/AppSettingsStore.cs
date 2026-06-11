@@ -40,6 +40,14 @@ public sealed class AppSettingsStore
         }
     }
 
+    public bool IsBackgroundVideoEnabled()
+    {
+        lock (_gate)
+        {
+            return Load().BackgroundVideoEnabled ?? true;
+        }
+    }
+
     public void SetBrowserAccessEnabled(bool enabled)
     {
         lock (_gate)
@@ -48,6 +56,20 @@ public sealed class AppSettingsStore
             var settings = Load() with
             {
                 BrowserAccessEnabled = enabled
+            };
+
+            Save(settings);
+        }
+    }
+
+    public void SetBackgroundVideoEnabled(bool enabled)
+    {
+        lock (_gate)
+        {
+            _paths.EnsureDirectories();
+            var settings = Load() with
+            {
+                BackgroundVideoEnabled = enabled
             };
 
             Save(settings);
@@ -113,11 +135,13 @@ public sealed class AppSettingsStore
     private sealed record StoredSettings(
         string? AcceptedWireSockVersion,
         bool AcceptedCloudflareWarpTerms,
-        bool BrowserAccessEnabled)
+        bool BrowserAccessEnabled,
+        bool? BackgroundVideoEnabled)
     {
         public static StoredSettings Default { get; } = new(
             null,
             AcceptedCloudflareWarpTerms: false,
-            BrowserAccessEnabled: false);
+            BrowserAccessEnabled: false,
+            BackgroundVideoEnabled: true);
     }
 }

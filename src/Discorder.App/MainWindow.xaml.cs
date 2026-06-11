@@ -12,12 +12,15 @@ public partial class MainWindow : Window, IDisposable
 {
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/discorder");
+    private static readonly Uri BackgroundVideoUri = new(
+        "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
 
     private readonly DiscordTunnelController _controller;
     private readonly AppPaths _paths;
     private readonly IWireSockBootstrapper _wireSockBootstrapper;
     private readonly AppSettingsStore _settingsStore;
     private bool _isApplyingSettings;
+    private bool _isBackgroundVideoEnabled = true;
     private CancellationTokenSource? _operationCancellation;
     private bool _allowClose;
     private bool _isClosing;
@@ -38,6 +41,7 @@ public partial class MainWindow : Window, IDisposable
 
         InitializeComponent();
         ApplyBrowserAccessSetting(_settingsStore.IsBrowserAccessEnabled());
+        ApplyBackgroundVideoSetting(_settingsStore.IsBackgroundVideoEnabled());
         _controller.StatusChanged += OnStatusChanged;
         ApplySnapshot(_controller.Snapshot);
     }
@@ -185,19 +189,72 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private void BackgroundVideo_Loaded(object sender, RoutedEventArgs e)
+    private void BackgroundVideoToggle_Changed(object sender, RoutedEventArgs e)
     {
-        if (IsBackgroundVideoDisabled())
+        if (_isApplyingSettings)
+        {
+            return;
+        }
+
+        var enabled = BackgroundVideoToggle.IsChecked == true;
+        _settingsStore.SetBackgroundVideoEnabled(enabled);
+        ApplyBackgroundVideoState(enabled);
+    }
+
+    private void ApplyBackgroundVideoSetting(bool enabled)
+    {
+        _isApplyingSettings = true;
+        try
+        {
+            BackgroundVideoToggle.IsChecked = enabled;
+            ApplyBackgroundVideoState(enabled);
+        }
+        finally
+        {
+            _isApplyingSettings = false;
+        }
+    }
+
+    private void ApplyBackgroundVideoState(bool enabled)
+    {
+        _isBackgroundVideoEnabled = enabled;
+        BackgroundVideoStatus.Text = enabled ? "Video açık" : "Video kapalı";
+
+        if (!enabled || IsBackgroundVideoDisabled())
         {
             StopBackgroundVideo();
             return;
         }
 
+        BackgroundVideo.Visibility = Visibility.Visible;
+        BackgroundVideo.Source ??= BackgroundVideoUri;
+
+        if (BackgroundVideo.IsLoaded)
+        {
+            BackgroundVideo.Play();
+        }
+    }
+
+    private void BackgroundVideo_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (!_isBackgroundVideoEnabled || IsBackgroundVideoDisabled())
+        {
+            StopBackgroundVideo();
+            return;
+        }
+
+        BackgroundVideo.Visibility = Visibility.Visible;
+        BackgroundVideo.Source ??= BackgroundVideoUri;
         BackgroundVideo.Play();
     }
 
     private void BackgroundVideo_MediaEnded(object sender, RoutedEventArgs e)
     {
+        if (!_isBackgroundVideoEnabled || IsBackgroundVideoDisabled())
+        {
+            return;
+        }
+
         BackgroundVideo.Position = TimeSpan.Zero;
         BackgroundVideo.Play();
     }
@@ -207,6 +264,7 @@ public partial class MainWindow : Window, IDisposable
         ExceptionRoutedEventArgs e)
     {
         BackgroundVideo.Visibility = Visibility.Collapsed;
+        BackgroundVideoStatus.Text = "Video yüklenemedi";
     }
 
     private static bool IsBackgroundVideoDisabled()
@@ -222,6 +280,7 @@ public partial class MainWindow : Window, IDisposable
         try
         {
             BackgroundVideo.Stop();
+            BackgroundVideo.Visibility = Visibility.Collapsed;
             BackgroundVideo.Source = null;
         }
         catch (InvalidOperationException)

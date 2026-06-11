@@ -136,8 +136,14 @@ static void RenderMainWindow()
         Assert(text.Contains("KAPALI", StringComparison.Ordinal));
         Assert(text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
         Assert(text.Contains("Discord web", StringComparison.Ordinal));
-        var browserSwitch = FindVisualChildren<CheckBox>(window).Single();
+        Assert(text.Contains("Video açık", StringComparison.Ordinal));
+        var switches = FindVisualChildren<CheckBox>(window).ToArray();
+        var browserSwitch = switches.Single(toggle =>
+            toggle.Name == "BrowserAccessToggle");
+        var backgroundVideoSwitch = switches.Single(toggle =>
+            toggle.Name == "BackgroundVideoToggle");
         Assert(browserSwitch.IsChecked == false);
+        Assert(backgroundVideoSwitch.IsChecked == true);
         Assert(text.Contains("SİSTEM DNS", StringComparison.Ordinal));
         Assert(text.Contains("ÇALIŞMA MODU", StringComparison.Ordinal));
         Assert(!text.Contains("Advanced SplitWire", StringComparison.OrdinalIgnoreCase));

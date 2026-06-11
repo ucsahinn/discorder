@@ -14,6 +14,7 @@ Amaç basit: **Bağlan** düğmesine basınca Discord uygulaması çalışsın, 
 - ✅ WireSock ve wgcf ikili dosyaları repoya gömülmez; ilk kullanımda resmi kaynaklardan indirilip doğrulanır.
 - ✅ WireSock kurucusu SHA-256, Authenticode imzası, yayıncı ve sürüm bilgisiyle doğrulanır.
 - ✅ Yerel profil ve tanılama dosyaları `%LOCALAPPDATA%\Discorder` altında tutulur.
+- ✅ Premium arka plan videosu varsayılan olarak açıktır; alt şeritten kapatılıp tekrar açılabilir.
 
 ## 🧭 Kapsam Dışı
 
@@ -57,10 +58,11 @@ Discorder şunları bilinçli olarak yapmaz:
 2. Zip içeriğini istediğiniz klasöre çıkarın.
 3. `Discorder.exe` dosyasını çalıştırın ve Windows UAC onayını verin.
 4. Discord web kullanacaksanız ana ekrandaki **Discord web** seçeneğini açın.
-5. **Bağlan** düğmesine basın.
-6. İlk kurulum penceresinde WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
-7. Windows UAC penceresi gelirse resmi WireSock kurulumuna izin verin.
-8. Durum **AÇIK** olduğunda seçilen kapsam tünellenir.
+5. Arka plan videosunu istemiyorsanız alt şeritteki **Video açık** kontrolünü kapatın.
+6. **Bağlan** düğmesine basın.
+7. İlk kurulum penceresinde WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
+8. Windows UAC penceresi gelirse resmi WireSock kurulumuna izin verin.
+9. Durum **AÇIK** olduğunda seçilen kapsam tünellenir.
 
 ## 🔐 Güvenlik Modeli
 

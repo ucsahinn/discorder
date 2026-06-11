@@ -447,6 +447,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
@@ -468,14 +469,41 @@
                             Click="OpenDiagnostics_Click"
                             ToolTip="Yerel tanılama klasörünü aç" />
 
-                    <TextBlock Grid.Column="2"
+                    <Border Grid.Column="2"
+                            Height="46"
+                            Margin="10,0,0,0"
+                            Padding="14,0"
+                            VerticalAlignment="Center"
+                            Background="#3C132033"
+                            BorderBrush="#668EA7FF"
+                            BorderThickness="1"
+                            CornerRadius="7">
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <TextBlock x:Name="BackgroundVideoStatus"
+                                       MinWidth="70"
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Text="Video açık" />
+                            <CheckBox x:Name="BackgroundVideoToggle"
+                                      Margin="10,0,0,0"
+                                      Style="{StaticResource BrowserSwitchStyle}"
+                                      VerticalAlignment="Center"
+                                      Checked="BackgroundVideoToggle_Changed"
+                                      Unchecked="BackgroundVideoToggle_Changed"
+                                      ToolTip="Arka plan videosunu aç veya kapat" />
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Grid.Column="3"
                                Margin="18,0"
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
                                Text="v2.0.0" />
 
-                    <Button Grid.Column="3"
+                    <Button Grid.Column="4"
                             Height="46"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"

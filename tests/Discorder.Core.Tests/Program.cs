@@ -250,18 +250,23 @@ static async Task SettingsPersistConsentAsync()
         var firstStore = new AppSettingsStore(paths);
         Assert(!firstStore.IsSetupConsentAccepted(WireSockPackage.Version));
         Assert(!firstStore.IsBrowserAccessEnabled());
+        Assert(firstStore.IsBackgroundVideoEnabled());
 
         firstStore.SetBrowserAccessEnabled(true);
+        firstStore.SetBackgroundVideoEnabled(false);
         firstStore.AcceptSetupConsent(WireSockPackage.Version);
 
         var reloadedStore = new AppSettingsStore(paths);
         Assert(reloadedStore.IsSetupConsentAccepted(WireSockPackage.Version));
         Assert(!reloadedStore.IsSetupConsentAccepted("next-version"));
         Assert(reloadedStore.IsBrowserAccessEnabled());
+        Assert(!reloadedStore.IsBackgroundVideoEnabled());
 
         reloadedStore.SetBrowserAccessEnabled(false);
+        reloadedStore.SetBackgroundVideoEnabled(true);
         var disabledStore = new AppSettingsStore(paths);
         Assert(!disabledStore.IsBrowserAccessEnabled());
+        Assert(disabledStore.IsBackgroundVideoEnabled());
 
         await File.WriteAllTextAsync(paths.SettingsFile, """
             {
@@ -272,6 +277,7 @@ static async Task SettingsPersistConsentAsync()
         var legacyStore = new AppSettingsStore(paths);
         Assert(legacyStore.IsSetupConsentAccepted(WireSockPackage.Version));
         Assert(!legacyStore.IsBrowserAccessEnabled());
+        Assert(legacyStore.IsBackgroundVideoEnabled());
     }
     finally
     {
