@@ -36,7 +36,7 @@ public sealed class AppUpdateService
         AppPaths paths,
         IVerifiedDownloader downloader,
         Uri? latestReleaseUri = null,
-        bool requireUpdateAuthenticode = true)
+        bool requireUpdateAuthenticode = false)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
@@ -198,7 +198,8 @@ public sealed class AppUpdateService
             extractionDirectory,
             executableName,
             versionText,
-            expectedSignerThumbprint);
+            expectedSignerThumbprint,
+            expectedSha256);
 
         var applicatorPath = CopyApplicator(
             applicationDirectory,

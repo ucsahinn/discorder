@@ -122,9 +122,9 @@ Discorder geleneksel installer yerine çıkarılmış portable klasörü güncel
 3. Asset durumu `uploaded`, indirme yolu resmi `ucsahinn/discorder` release yolu ve GitHub `sha256:` digest değeri checksum dosyasıyla eşleşmelidir.
 4. Paket `%PROGRAMDATA%\Discorder\updates` altında yöneticiye özel staging klasörüne indirilir.
 5. ZIP içindeki `discorder.update-manifest.json` release sürümüyle, dosya listesiyle, dosya boyutlarıyla ve SHA-256 özetleriyle doğrulanır.
-6. `Discorder.exe`, `Discorder.Updater.exe` ve Discorder'a ait DLL dosyaları mevcut Discorder imza thumbprint'iyle eşleşmelidir.
+6. Kod imzalama etkinse `Discorder.exe`, `Discorder.Updater.exe` ve Discorder'a ait DLL dosyaları mevcut Discorder imza thumbprint'iyle eşleşmelidir; sertifika yoksa GitHub release yolu, asset digest, SHA-256 ve manifest doğrulaması güven sınırı olur.
 7. Güncelleme helper'ı mevcut süreç kapandıktan sonra aynı portable klasöre dosyaları uygular.
 8. Uygulama sırasında eski dosyalar staging altında yedeklenir; hata olursa yedekler geri taşınır.
 9. Başarılı uygulamadan sonra helper aynı klasördeki `Discorder.exe` dosyasını yeniden başlatır.
 
-Release workflow otomatik güncelleme yayını için kod imzalama secret'ını zorunlu tutar. İmzalama yoksa release job'u paket yayımlamaz.
+Release workflow kod imzalama secret'ı varsa Authenticode imzalı paket üretir. Sertifika yoksa paket imzasız yayınlanabilir; bu durumda otomatik güncelleme GitHub release yolu, asset digest, SHA-256 dosyası ve manifest doğrulaması geçmeden uygulanmaz.

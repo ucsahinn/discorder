@@ -47,7 +47,8 @@ internal static class DiscorderUpdater
                 applyPayload,
                 options.ExecutableName,
                 options.ExpectedVersion,
-                options.ExpectedSignerThumbprint);
+                options.ExpectedSignerThumbprint,
+                options.ExpectedSha256);
             var newManifest = UpdatePackageValidator.ValidatePayload(
                 applyPayload,
                 options.ExecutableName,
@@ -128,7 +129,7 @@ internal static class DiscorderUpdater
         UpdateManifest newManifest,
         string executableName,
         string expectedVersion,
-        string expectedSignerThumbprint,
+        string? expectedSignerThumbprint,
         UpdateLog log)
     {
         var targetRoot = Path.GetFullPath(targetDirectory);
@@ -294,7 +295,7 @@ internal sealed record UpdateOptions(
     string PackagePath,
     string ExpectedSha256,
     string ExpectedVersion,
-    string ExpectedSignerThumbprint,
+    string? ExpectedSignerThumbprint,
     string TargetDirectory,
     string ExecutableName,
     string LogPath)
@@ -320,7 +321,7 @@ internal sealed record UpdateOptions(
             Path.GetFullPath(Require(values, "package")),
             Require(values, "expected-sha256"),
             Require(values, "expected-version"),
-            Require(values, "expected-signer-thumbprint"),
+            Optional(values, "expected-signer-thumbprint"),
             Path.GetFullPath(Require(values, "target-directory")),
             Require(values, "executable-name"),
             Path.GetFullPath(Require(values, "log")));
@@ -338,6 +339,16 @@ internal sealed record UpdateOptions(
         }
 
         return value;
+    }
+
+    private static string? Optional(
+        Dictionary<string, string> values,
+        string name)
+    {
+        return values.TryGetValue(name, out var value)
+            && !string.IsNullOrWhiteSpace(value)
+                ? value
+                : null;
     }
 }
 

@@ -133,10 +133,13 @@ public static class UpdatePackageValidator
         string destinationDirectory,
         string executableName,
         string? expectedVersion = null,
-        string? expectedSignerThumbprint = null)
+        string? expectedSignerThumbprint = null,
+        string? expectedSha256 = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationDirectory);
+        VerifyPackageHash(packagePath, expectedSha256);
         ValidateArchive(packagePath, executableName, expectedVersion);
+        VerifyPackageHash(packagePath, expectedSha256);
         Directory.CreateDirectory(destinationDirectory);
         ZipFile.ExtractToDirectory(packagePath, destinationDirectory);
         ValidatePayload(
@@ -144,6 +147,23 @@ public static class UpdatePackageValidator
             executableName,
             expectedVersion,
             expectedSignerThumbprint);
+    }
+
+    public static void VerifyPackageHash(string packagePath, string? expectedSha256)
+    {
+        if (string.IsNullOrWhiteSpace(expectedSha256))
+        {
+            return;
+        }
+
+        if (!string.Equals(
+                ComputeSha256(packagePath),
+                expectedSha256,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                "Güncelleme paketi özeti beklenen değerle eşleşmiyor.");
+        }
     }
 
     public static UpdateManifest ValidatePayload(

@@ -23,7 +23,7 @@ Discorder, Windows kullanıcılarının Discord bağlantısını sade, portable 
 ## Güven Mesajları
 
 - Sistem DNS ayarını kalıcı değiştirmez.
-- Uygulama içi otomatik güncelleme paketlerini hash, manifest ve imza kontrolleriyle doğrular.
+- Uygulama içi otomatik güncelleme paketlerini GitHub release yolu, asset digest, SHA-256 ve manifest kontrolleriyle doğrular.
 - Discord, Cloudflare veya WireSock tarafından üretilen resmi bir ürün olduğunu iddia etmez.
 
 ## Kurulum ve Güncelleme Mesajları

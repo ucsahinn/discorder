@@ -25,7 +25,7 @@
 
 Discorder, Windows'ta Discord bağlantı sorunu yaşayan kullanıcılar için geliştirilmiş portable bir masaüstü uygulamasıdır. Discord uygulamasının bağlantısını tek ekrandan yönetir.
 
-Sistem DNS'ini kalıcı değiştirmez, genel cihaz VPN'i gibi davranmaz ve indirdiği üçüncü taraf bileşenleri hash/imza kontrolleriyle doğrular.
+Sistem DNS'ini kalıcı değiştirmez, genel cihaz VPN'i gibi davranmaz ve indirdiği üçüncü taraf bileşenleri hash, manifest ve kaynak kontrolleriyle doğrular.
 
 Discorder resmi bir Discord, Cloudflare veya WireSock ürünü değildir. Amaç, kullanıcının neyin çalıştığını net gördüğü, kısa ve güven veren bir bağlantı deneyimi sunmaktır.
 
@@ -61,7 +61,7 @@ Bu repo, uygulamanın kaynak kodunu, doğrulama betiklerini, güvenlik sınırla
 - Sistem DNS ayarını kalıcı değiştirmez.
 - WireSock ve wgcf ikili dosyalarını repoya gömmez.
 - WireSock kurucusunu SHA-256, Authenticode imzası, yayıncı ve sürüm bilgisiyle doğrular.
-- Otomatik güncelleme paketini GitHub release asset bilgisi, `.sha256.txt`, manifest ve imza kontrolleriyle eşleştirir.
+- Otomatik güncelleme paketini GitHub release asset bilgisi, `.sha256.txt`, GitHub digest ve manifest kontrolleriyle eşleştirir.
 - Discord dışı uygulamaları bilinçli olarak kapsam dışı bırakır.
 - Gizli profil, hesap ve log dosyalarını repoya veya release arşivine eklemez.
 
@@ -75,7 +75,7 @@ Daha teknik sınırlar için [güvenlik dokümanına](docs/guvenlik.md) ve [SECU
 4. İlk kullanım ekranında WireSock ve WARP koşullarını okuyup onaylayın.
 5. Ana ekranda **Bağlan** düğmesine basın.
 
-Release sayfasındaki ZIP paketini manuel indirdiğinizde yanında verilen SHA-256 dosyasıyla kontrol etmeniz önerilir. Uygulama içi otomatik güncelleme zinciri daha sıkıdır: imzasız veya doğrulanamayan paketleri uygulamaz.
+Release sayfasındaki ZIP paketini manuel indirdiğinizde yanında verilen SHA-256 dosyasıyla kontrol etmeniz önerilir. Uygulama içi otomatik güncelleme zinciri GitHub release yolu, asset digest, SHA-256 dosyası ve manifest eşleşmesi olmadan paketi uygulamaz.
 
 Kullanım adımları, portable klasör önerileri ve ilk kurulum notları için [kullanım rehberini](docs/kullanim.md) okuyun.
 
@@ -86,7 +86,7 @@ Discorder'da güncelleme iki aşamalıdır:
 1. **Güncelle** düğmesi yalnızca yeni sürüm olup olmadığını denetler.
 2. Yeni sürüm bulunursa ayrı ve belirgin **Yükle** düğmesi görünür.
 
-Yükleme, denetlenen sürümle eşleşen paketi kullanır. Paket önce staging alanına indirilir, doğrulanır, mevcut portable klasör yedeklenir ve ardından `Discorder.exe` yeniden başlatılır. İmzasız veya doğrulanamayan paket uygulanmaz. Ayrıntılı akış için [güncelleme dokümanına](docs/guncelleme.md) bakın.
+Yükleme, denetlenen sürümle eşleşen paketi kullanır. Paket önce staging alanına indirilir, doğrulanır, mevcut portable klasör yedeklenir ve ardından `Discorder.exe` yeniden başlatılır. GitHub digest, SHA-256 dosyası veya manifest doğrulaması geçmeyen paket uygulanmaz. Ayrıntılı akış için [güncelleme dokümanına](docs/guncelleme.md) bakın.
 
 ## Doküman Haritası
 
@@ -98,7 +98,7 @@ Yükleme, denetlenen sürümle eşleşen paketi kullanır. Paket önce staging a
 | Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
 | Mimari | [docs/mimari.md](docs/mimari.md) |
 | Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
-| v2.0.12 release notu taslağı | [docs/releases/v2.0.12.md](docs/releases/v2.0.12.md) |
+| v2.0.13 release notu | [docs/releases/v2.0.13.md](docs/releases/v2.0.13.md) |
 
 ## Geliştirme
 
@@ -115,7 +115,7 @@ Release paketi yerel olarak hazırlanacaksa:
 .\scripts\build-release.ps1
 ```
 
-Public otomatik güncelleme için kod imzalama gizli bilgileri gerekir. İmzasız paketler manuel indirme olarak sunulabilir, ancak uygulama içi otomatik güncelleme zincirinde kabul edilmez.
+Public otomatik güncelleme, GitHub release yolu, GitHub asset digest, yayınlanan SHA-256 dosyası ve paket manifesti eşleşmeden paketi kabul etmez. Kod imzalama ileride eklenirse workflow imzalı paket üretir; sertifika yoksa release imzasız ama GitHub yayın yetkisi + hash/manifest doğrulamalı yayınlanır.
 
 ## Destek ve Güvenlik
 

@@ -1305,8 +1305,7 @@ public partial class MainWindow : Window, IDisposable
     {
         if (string.IsNullOrWhiteSpace(update.ApplicatorPath)
             || string.IsNullOrWhiteSpace(update.PackagePath)
-            || string.IsNullOrWhiteSpace(update.ExpectedSha256)
-            || string.IsNullOrWhiteSpace(update.ExpectedSignerThumbprint))
+            || string.IsNullOrWhiteSpace(update.ExpectedSha256))
         {
             throw new InvalidOperationException(
                 "Güncelleme hazırlığı eksik olduğu için uygulanamadı.");
@@ -1329,8 +1328,11 @@ public partial class MainWindow : Window, IDisposable
         startInfo.ArgumentList.Add(update.ExpectedSha256);
         startInfo.ArgumentList.Add("--expected-version");
         startInfo.ArgumentList.Add(AppUpdateService.FormatVersion(update.LatestVersion));
-        startInfo.ArgumentList.Add("--expected-signer-thumbprint");
-        startInfo.ArgumentList.Add(update.ExpectedSignerThumbprint);
+        if (!string.IsNullOrWhiteSpace(update.ExpectedSignerThumbprint))
+        {
+            startInfo.ArgumentList.Add("--expected-signer-thumbprint");
+            startInfo.ArgumentList.Add(update.ExpectedSignerThumbprint);
+        }
         startInfo.ArgumentList.Add("--target-directory");
         startInfo.ArgumentList.Add(AppContext.BaseDirectory);
         startInfo.ArgumentList.Add("--executable-name");

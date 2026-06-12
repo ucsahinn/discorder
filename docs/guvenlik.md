@@ -6,7 +6,7 @@ Discorder'ın güvenlik modeli dar kapsam, doğrulanmış indirme ve kullanıcı
 
 Discorder şu bileşenlere güvenir:
 
-- Windows işletim sistemi ve Authenticode doğrulaması.
+- Windows işletim sistemi, GitHub Releases ve varsa Authenticode doğrulaması.
 - GitHub Releases üzerinden yayınlanan Discorder paketleri.
 - Resmi WireSock VPN Client kurucusu.
 - Cloudflare WARP profil üretimi için kullanılan wgcf akışı.
@@ -22,7 +22,7 @@ WireSock kurucusu resmi kaynaktan alınır ve şu kontrollerden geçer:
 - Beklenen yayıncı adı.
 - Beklenen ürün ve sürüm bilgisi.
 
-Discorder'ın uygulama içi otomatik güncelleme paketleri için hash, manifest ve imza kontrolleri kullanılır. Manuel indirilen GitHub Release ZIP'lerinde kullanıcı ayrıca yayınlanan SHA-256 dosyasını kontrol etmelidir.
+Discorder'ın uygulama içi otomatik güncelleme paketleri için GitHub release yolu, GitHub asset digest, SHA-256 dosyası ve manifest kontrolleri kullanılır. Kod imzalama sertifikası varsa Authenticode kontrolü ayrıca devreye alınabilir. Sertifika yoksa güven sınırı GitHub release yetkisi ve yayınlanan doğrulama verileridir; bu, imzalı yayıncı kimliğiyle aynı güven seviyesini sağlamaz. Manuel indirilen GitHub Release ZIP'lerinde kullanıcı yayınlanan SHA-256 dosyasını kontrol etmelidir.
 
 ## Ne Yapmaz?
 

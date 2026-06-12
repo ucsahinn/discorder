@@ -25,11 +25,14 @@ $archive = Join-Path $root "artifacts\Discorder-$version-$Runtime.zip"
 $shaPath = Join-Path $root "artifacts\Discorder-$version-$Runtime.sha256.txt"
 $signingStatusPath = Join-Path $root 'artifacts\signing-status.txt'
 $updateManifestPath = Join-Path $output 'discorder.update-manifest.json'
+$buildArtifactsPath = Join-Path ([IO.Path]::GetTempPath()) (
+    'discorder-release-' + [guid]::NewGuid().ToString('N'))
 
 Push-Location $root
 
 try {
-    & "$PSScriptRoot\verify.ps1"
+    & "$PSScriptRoot\verify.ps1" `
+        -ArtifactsPath (Join-Path $buildArtifactsPath 'verify')
 
     if (Test-Path -LiteralPath $output) {
         Remove-Item -LiteralPath $output -Recurse -Force
@@ -40,6 +43,8 @@ try {
         --runtime $Runtime `
         --self-contained true `
         --output $output `
+        --artifacts-path (Join-Path $buildArtifactsPath 'publish') `
+        --disable-build-servers `
         -p:DebugType=None `
         -p:DebugSymbols=false
     if ($LASTEXITCODE -ne 0) {
@@ -109,4 +114,7 @@ try {
 }
 finally {
     Pop-Location
+    if (Test-Path -LiteralPath $buildArtifactsPath) {
+        Remove-Item -LiteralPath $buildArtifactsPath -Recurse -Force
+    }
 }

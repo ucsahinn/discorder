@@ -2,7 +2,7 @@
 
 Discorder portable ZIP olarak çalışır. Bu yüzden güncelleme akışı, klasik kurulum dizini yerine kullanıcının çıkardığı mevcut Discorder klasörünü hedef alır.
 
-GitHub Releases üzerinden indirilen ZIP paketi manuel kullanım içindir. Uygulama içi otomatik güncelleme bundan daha sıkı davranır: imzasız veya doğrulanamayan paketi uygulamaz.
+GitHub Releases üzerinden indirilen ZIP paketi manuel kullanım içindir. Uygulama içi otomatik güncelleme, aynı paketi GitHub release yolu, asset digest, SHA-256 dosyası ve manifest eşleşmesiyle doğrular.
 
 ## Kullanıcının Gördüğü Akış
 
@@ -35,7 +35,7 @@ Güncelleme uygulanmadan önce şu kontroller yapılır:
 - GitHub `sha256:` digest bilgisi ve `.sha256.txt` dosyası ZIP ile eşleşir.
 - ZIP içinde `discorder.update-manifest.json` bulunur.
 - Manifest sürümü, denetlenen release sürümüyle eşleşir.
-- Uygulama içi otomatik güncelleme için uygulama dosyaları Authenticode imzalı olmalıdır.
+- Kod imzalama varsa Authenticode imzası ayrıca korunur; sertifika yoksa güncelleme GitHub release yolu, asset digest, SHA-256 ve manifest doğrulamasıyla ilerler.
 
 Bu kontrollerden biri başarısız olursa güncelleme uygulanmaz.
 
@@ -72,7 +72,7 @@ Kullanıcı klasörü elle taşırsa kısayol veya başlangıç kaydını yenide
 
 ## Bilinen Sınırlar
 
-- Uygulama içi otomatik güncelleme için imzalı release paketi gerekir.
-- İmzasız veya doğrulanamayan paketler uygulanmaz.
+- Kod imzalama yoksa paket imzasız yayınlanabilir; bu durumda güven sınırı GitHub yayın yetkisi, release yolu, asset digest, SHA-256 dosyası ve manifest doğrulamasıdır.
+- GitHub digest, SHA-256 dosyası veya manifest doğrulaması geçmeyen paketler uygulanmaz.
 - GitHub erişimi olmayan ağlarda güncelleme denetimi başarısız olabilir; uygulama mevcut sürümle çalışmaya devam eder.
 - Çok yavaş bağlantılarda indirme zaman aşımı yaşanırsa kullanıcı daha sonra tekrar deneyebilir.

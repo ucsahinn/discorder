@@ -26,7 +26,38 @@ jobs:
       - name: Kaynak kodu al
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
-          ref: ${{ github.event.inputs.tag || github.ref_name }}
+          ref: refs/tags/${{ github.event.inputs.tag || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Yayın tag ve sürümünü doğrula
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          $tag = $env:RELEASE_TAG
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
+            throw "Yayın tag'i SemVer formatında olmalı: $tag"
+          }
+
+          git fetch --force origin "refs/tags/$tag:refs/tags/$tag"
+          $tagCommit = (git rev-list -n 1 $tag).Trim()
+          $headCommit = (git rev-parse HEAD).Trim()
+          if ($tagCommit -ne $headCommit) {
+            throw "Checkout edilen commit tag ile eşleşmiyor. tag=$tagCommit head=$headCommit"
+          }
+
+          $tagVersion = $tag.TrimStart('v')
+          $versionedProjects = @(
+            'src/Discorder.App/Discorder.App.csproj',
+            'src/Discorder.Updater/Discorder.Updater.csproj'
+          )
+          foreach ($projectPath in $versionedProjects) {
+            $project = [xml](Get-Content -Raw -LiteralPath $projectPath)
+            $projectVersion = $project.Project.PropertyGroup.Version
+            if ($projectVersion -ne $tagVersion) {
+              throw "Proje sürümü tag ile eşleşmiyor. project=$projectPath version=$projectVersion tag=$tagVersion"
+            }
+          }
 
       - name: .NET kur
         uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2
@@ -41,19 +72,17 @@ jobs:
         run: |
           $signArgs = @()
           $certificatePath = Join-Path $env:RUNNER_TEMP 'discorder-codesign.pfx'
-          if ([string]::IsNullOrWhiteSpace($env:DISCORDER_CODESIGN_PFX_B64)) {
-            throw 'Discorder otomatik güncelleme yayını için DISCORDER_CODESIGN_PFX_B64 secret zorunludur.'
-          }
 
           try {
-            [IO.File]::WriteAllBytes(
-              $certificatePath,
-              [Convert]::FromBase64String($env:DISCORDER_CODESIGN_PFX_B64))
-            $signArgs += @(
-              '-CodeSigningCertificatePath',
-              $certificatePath,
-              '-RequireCodeSigning'
-            )
+            if (-not [string]::IsNullOrWhiteSpace($env:DISCORDER_CODESIGN_PFX_B64)) {
+              [IO.File]::WriteAllBytes(
+                $certificatePath,
+                [Convert]::FromBase64String($env:DISCORDER_CODESIGN_PFX_B64))
+              $signArgs += @(
+                '-CodeSigningCertificatePath',
+                $certificatePath
+              )
+            }
             ./scripts/build-release.ps1 @signArgs
           }
           finally {
@@ -93,7 +122,7 @@ jobs:
             $signingText = 'Kod imzalama: Authenticode imzalı paket.'
           }
           else {
-            throw 'Public otomatik güncelleme yayını imzalı paket gerektirir.'
+            $signingText = 'Kod imzalama: imzasız paket. Güven sınırı GitHub yayın yetkisi, release yolu, asset digest, SHA-256 dosyası ve manifest doğrulamasıdır.'
           }
 
           $releaseDate = Get-Date -Format 'yyyy-MM-dd'
@@ -115,7 +144,7 @@ jobs:
           - Yeni sürüm bulunursa ayrı ve belirgin `Yükle` düğmesi görünür.
           - `Yükle`, denetimde bulunan aynı sürümü indirir ve doğrular.
           - Güncelleme paketi `discorder.update-manifest.json` ile eşleştirilir.
-          - Otomatik güncelleme yayını Authenticode imzalı paket gerektirir.
+          - Otomatik güncelleme paketi GitHub release yolu, asset digest, SHA-256 dosyası ve manifest ile doğrulanır.
           - Portable güncelleme mevcut çıkarılmış Discorder klasörünü hedefler.
           - Güncelleme helper'ı mevcut uygulama kapandıktan sonra dosyaları yedekleyerek değiştirir; hata olursa önceki dosyaları geri taşır.
           - UI metinleri kısa, sakin ve kullanıcı odaklı hale getirildi.
@@ -146,7 +175,8 @@ jobs:
           ## Güvenlik ve güven sınırları
 
           - Manuel ZIP indirmesinde SHA-256 dosyasını kontrol edin.
-          - Uygulama içi otomatik güncelleme imzasız veya doğrulanamayan paketi uygulamaz.
+          - Uygulama içi otomatik güncelleme GitHub asset digest, SHA-256 dosyası veya manifest doğrulaması geçmeyen paketi uygulamaz.
+          - Sertifika yoksa güven sınırı GitHub yayın yetkisidir; bu, imzalı yayıncı kimliğiyle aynı güven seviyesi değildir.
           - Discorder sistem DNS ayarını kalıcı değiştirmez.
           - Discorder resmi Discord, Cloudflare veya WireSock ürünü değildir.
 

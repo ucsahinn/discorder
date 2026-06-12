@@ -1,12 +1,24 @@
 [CmdletBinding()]
-param()
+param(
+    [string]$ArtifactsPath
+)
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+$createdArtifactsPath = $false
+if ([string]::IsNullOrWhiteSpace($ArtifactsPath)) {
+    $ArtifactsPath = Join-Path ([IO.Path]::GetTempPath()) (
+        'discorder-verify-' + [guid]::NewGuid().ToString('N'))
+    $createdArtifactsPath = $true
+}
+
 Push-Location $root
 
 try {
-    dotnet build Discorder.sln --configuration Release
+    dotnet build Discorder.sln `
+        --configuration Release `
+        --artifacts-path $ArtifactsPath `
+        --disable-build-servers
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet build hata kodu $LASTEXITCODE ile basarisiz oldu"
     }
@@ -14,7 +26,8 @@ try {
     dotnet run `
         --project tests\Discorder.Core.Tests\Discorder.Core.Tests.csproj `
         --configuration Release `
-        --no-build
+        --artifacts-path $ArtifactsPath `
+        --disable-build-servers
     if ($LASTEXITCODE -ne 0) {
         throw "cekirdek testleri hata kodu $LASTEXITCODE ile basarisiz oldu"
     }
@@ -22,7 +35,8 @@ try {
     dotnet run `
         --project tests\Discorder.Windows.Tests\Discorder.Windows.Tests.csproj `
         --configuration Release `
-        --no-build
+        --artifacts-path $ArtifactsPath `
+        --disable-build-servers
     if ($LASTEXITCODE -ne 0) {
         throw "Windows guvenlik testleri hata kodu $LASTEXITCODE ile basarisiz oldu"
     }
@@ -95,4 +109,7 @@ try {
 }
 finally {
     Pop-Location
+    if ($createdArtifactsPath -and (Test-Path -LiteralPath $ArtifactsPath)) {
+        Remove-Item -LiteralPath $ArtifactsPath -Recurse -Force
+    }
 }
