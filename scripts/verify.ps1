@@ -23,20 +23,20 @@ try {
         throw "dotnet build hata kodu $LASTEXITCODE ile basarisiz oldu"
     }
 
-    dotnet run `
-        --project tests\Discorder.Core.Tests\Discorder.Core.Tests.csproj `
-        --configuration Release `
-        --artifacts-path $ArtifactsPath `
-        --disable-build-servers
+    $coreTests = Join-Path $ArtifactsPath 'bin\Discorder.Core.Tests\release\Discorder.Core.Tests.dll'
+    if (-not (Test-Path -LiteralPath $coreTests)) {
+        throw "Core test cikisi bulunamadi: $coreTests"
+    }
+    dotnet $coreTests
     if ($LASTEXITCODE -ne 0) {
         throw "cekirdek testleri hata kodu $LASTEXITCODE ile basarisiz oldu"
     }
 
-    dotnet run `
-        --project tests\Discorder.Windows.Tests\Discorder.Windows.Tests.csproj `
-        --configuration Release `
-        --artifacts-path $ArtifactsPath `
-        --disable-build-servers
+    $windowsTests = Join-Path $ArtifactsPath 'bin\Discorder.Windows.Tests\release\Discorder.Windows.Tests.dll'
+    if (-not (Test-Path -LiteralPath $windowsTests)) {
+        throw "Windows test cikisi bulunamadi: $windowsTests"
+    }
+    dotnet $windowsTests
     if ($LASTEXITCODE -ne 0) {
         throw "Windows guvenlik testleri hata kodu $LASTEXITCODE ile basarisiz oldu"
     }

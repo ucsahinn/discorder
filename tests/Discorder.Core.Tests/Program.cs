@@ -378,17 +378,17 @@ static async Task AppUpdateCheckFindsReleaseWithoutDownloadAsync()
     try
     {
         var latestUri = new Uri("https://updates.example.test/releases/latest");
-        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
-        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.sha256.txt");
         var packageBytes = CreateUpdatePackage();
         var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
         var handler = new MapHttpMessageHandler();
         handler.AddJson(
             latestUri,
-            CreateReleaseJson("2.0.13", zipUri, checksumUri, expectedSha256, packageBytes.Length));
+            CreateReleaseJson("2.0.14", zipUri, checksumUri, expectedSha256, packageBytes.Length));
         handler.AddText(
             checksumUri,
-            $"{expectedSha256}  Discorder-2.0.13-win-x64.zip");
+            $"{expectedSha256}  Discorder-2.0.14-win-x64.zip");
         using var httpClient = new HttpClient(handler);
         var downloader = new CapturingVerifiedDownloader(packageBytes);
         var service = new AppUpdateService(
@@ -402,7 +402,7 @@ static async Task AppUpdateCheckFindsReleaseWithoutDownloadAsync()
             CancellationToken.None);
 
         Assert(check.Status == AppUpdateCheckStatus.UpdateAvailable);
-        Assert(check.LatestVersion == new Version(2, 0, 13, 0));
+        Assert(check.LatestVersion == new Version(2, 0, 14, 0));
         Assert(check.PackageUri == zipUri);
         Assert(check.ExpectedSha256 == expectedSha256);
         Assert(downloader.DownloadCount == 0);
@@ -419,8 +419,8 @@ static async Task AppUpdateCheckRetriesTransientMetadataFailureAsync()
     try
     {
         var latestUri = new Uri("https://updates.example.test/releases/latest");
-        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
-        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.sha256.txt");
         var packageBytes = CreateUpdatePackage();
         var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
         var handler = new MapHttpMessageHandler();
@@ -439,7 +439,7 @@ static async Task AppUpdateCheckRetriesTransientMetadataFailureAsync()
                 {
                     Content = new StringContent(
                         CreateReleaseJson(
-                            "2.0.13",
+                            "2.0.14",
                             zipUri,
                             checksumUri,
                             expectedSha256,
@@ -450,7 +450,7 @@ static async Task AppUpdateCheckRetriesTransientMetadataFailureAsync()
             });
         handler.AddText(
             checksumUri,
-            $"{expectedSha256}  Discorder-2.0.13-win-x64.zip");
+            $"{expectedSha256}  Discorder-2.0.14-win-x64.zip");
         using var httpClient = new HttpClient(handler);
         var downloader = new CapturingVerifiedDownloader(packageBytes);
         var service = new AppUpdateService(
@@ -480,8 +480,8 @@ static async Task AppUpdateCheckRetriesTransientMetadataBodyFailureAsync()
     try
     {
         var latestUri = new Uri("https://updates.example.test/releases/latest");
-        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
-        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.sha256.txt");
         var packageBytes = CreateUpdatePackage();
         var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
         var handler = new MapHttpMessageHandler();
@@ -503,7 +503,7 @@ static async Task AppUpdateCheckRetriesTransientMetadataBodyFailureAsync()
                 {
                     Content = new StringContent(
                         CreateReleaseJson(
-                            "2.0.13",
+                            "2.0.14",
                             zipUri,
                             checksumUri,
                             expectedSha256,
@@ -514,7 +514,7 @@ static async Task AppUpdateCheckRetriesTransientMetadataBodyFailureAsync()
             });
         handler.AddText(
             checksumUri,
-            $"{expectedSha256}  Discorder-2.0.13-win-x64.zip");
+            $"{expectedSha256}  Discorder-2.0.14-win-x64.zip");
         using var httpClient = new HttpClient(handler);
         var downloader = new CapturingVerifiedDownloader(packageBytes);
         var service = new AppUpdateService(
@@ -544,14 +544,14 @@ static async Task AppUpdateCheckRetriesTransientChecksumFailureAsync()
     try
     {
         var latestUri = new Uri("https://updates.example.test/releases/latest");
-        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
-        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.sha256.txt");
         var packageBytes = CreateUpdatePackage();
         var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
         var handler = new MapHttpMessageHandler();
         handler.AddJson(
             latestUri,
-            CreateReleaseJson("2.0.13", zipUri, checksumUri, expectedSha256, packageBytes.Length));
+            CreateReleaseJson("2.0.14", zipUri, checksumUri, expectedSha256, packageBytes.Length));
         var checksumAttempts = 0;
         handler.AddResponse(
             checksumUri,
@@ -566,7 +566,7 @@ static async Task AppUpdateCheckRetriesTransientChecksumFailureAsync()
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(
-                        $"{expectedSha256}  Discorder-2.0.13-win-x64.zip",
+                        $"{expectedSha256}  Discorder-2.0.14-win-x64.zip",
                         Encoding.UTF8,
                         "text/plain")
                 };
@@ -600,17 +600,17 @@ static async Task AppUpdatePreparesVerifiedReleaseAsync()
     try
     {
         var latestUri = new Uri("https://updates.example.test/releases/latest");
-        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
-        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.sha256.txt");
         var packageBytes = CreateUpdatePackage();
         var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
         var handler = new MapHttpMessageHandler();
         handler.AddJson(
             latestUri,
-            CreateReleaseJson("2.0.13", zipUri, checksumUri, expectedSha256, packageBytes.Length));
+            CreateReleaseJson("2.0.14", zipUri, checksumUri, expectedSha256, packageBytes.Length));
         handler.AddText(
             checksumUri,
-            $"{expectedSha256}  Discorder-2.0.13-win-x64.zip");
+            $"{expectedSha256}  Discorder-2.0.14-win-x64.zip");
         using var httpClient = new HttpClient(handler);
         var downloader = new CapturingVerifiedDownloader(packageBytes);
         var service = new AppUpdateService(
@@ -653,22 +653,22 @@ static async Task AppUpdateRejectsDigestMismatchAsync()
     try
     {
         var latestUri = new Uri("https://updates.example.test/releases/latest");
-        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
-        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.sha256.txt");
         var packageBytes = CreateUpdatePackage();
         var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
         var handler = new MapHttpMessageHandler();
         handler.AddJson(
             latestUri,
             CreateReleaseJson(
-                "2.0.13",
+                "2.0.14",
                 zipUri,
                 checksumUri,
                 new string('A', 64),
                 packageBytes.Length));
         handler.AddText(
             checksumUri,
-            $"{expectedSha256}  Discorder-2.0.13-win-x64.zip");
+            $"{expectedSha256}  Discorder-2.0.14-win-x64.zip");
         using var httpClient = new HttpClient(handler);
         var service = new AppUpdateService(
             httpClient,
@@ -694,17 +694,17 @@ static async Task AppUpdateDefaultsToGitHubVerifiedPackageAsync()
     try
     {
         var latestUri = new Uri("https://updates.example.test/releases/latest");
-        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
-        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.sha256.txt");
         var packageBytes = CreateUpdatePackage();
         var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
         var handler = new MapHttpMessageHandler();
         handler.AddJson(
             latestUri,
-            CreateReleaseJson("2.0.13", zipUri, checksumUri, expectedSha256, packageBytes.Length));
+            CreateReleaseJson("2.0.14", zipUri, checksumUri, expectedSha256, packageBytes.Length));
         handler.AddText(
             checksumUri,
-            $"{expectedSha256}  Discorder-2.0.13-win-x64.zip");
+            $"{expectedSha256}  Discorder-2.0.14-win-x64.zip");
         using var httpClient = new HttpClient(handler);
         var downloader = new CapturingVerifiedDownloader(packageBytes);
         var service = new AppUpdateService(
@@ -738,17 +738,17 @@ static async Task AppUpdateRejectsManifestVersionMismatchAsync()
     try
     {
         var latestUri = new Uri("https://updates.example.test/releases/latest");
-        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
-        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
-        var packageBytes = CreateUpdatePackage(version: "2.0.14");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.sha256.txt");
+        var packageBytes = CreateUpdatePackage(version: "2.0.15");
         var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
         var handler = new MapHttpMessageHandler();
         handler.AddJson(
             latestUri,
-            CreateReleaseJson("2.0.13", zipUri, checksumUri, expectedSha256, packageBytes.Length));
+            CreateReleaseJson("2.0.14", zipUri, checksumUri, expectedSha256, packageBytes.Length));
         handler.AddText(
             checksumUri,
-            $"{expectedSha256}  Discorder-2.0.13-win-x64.zip");
+            $"{expectedSha256}  Discorder-2.0.14-win-x64.zip");
         using var httpClient = new HttpClient(handler);
         var service = new AppUpdateService(
             httpClient,
@@ -777,14 +777,14 @@ static async Task AppUpdateRejectsOversizedChecksumAsync()
     try
     {
         var latestUri = new Uri("https://updates.example.test/releases/latest");
-        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
-        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.sha256.txt");
         var packageBytes = CreateUpdatePackage();
         var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
         var handler = new MapHttpMessageHandler();
         handler.AddJson(
             latestUri,
-            CreateReleaseJson("2.0.13", zipUri, checksumUri, expectedSha256, packageBytes.Length));
+            CreateReleaseJson("2.0.14", zipUri, checksumUri, expectedSha256, packageBytes.Length));
         handler.AddText(
             checksumUri,
             new string('A', 8193));
@@ -841,7 +841,7 @@ static Task AppUpdateRejectsArchiveEntryOutsideManifestAsync()
             UpdatePackageValidator.ValidateArchive(
                 path,
                 "Discorder.exe",
-                expectedVersion: "2.0.13"));
+                expectedVersion: "2.0.14"));
         return Task.CompletedTask;
     }
     finally
@@ -855,7 +855,7 @@ static Task AppUpdateExtractRejectsPackageHashMismatchAsync()
     var root = CreateTemporaryDirectory();
     try
     {
-        var packagePath = Path.Combine(root, "Discorder-2.0.13-win-x64.zip");
+        var packagePath = Path.Combine(root, "Discorder-2.0.14-win-x64.zip");
         File.WriteAllBytes(packagePath, CreateUpdatePackage());
         var destination = Path.Combine(root, "payload");
 
@@ -864,7 +864,7 @@ static Task AppUpdateExtractRejectsPackageHashMismatchAsync()
                 packagePath,
                 destination,
                 "Discorder.exe",
-                "2.0.13",
+                "2.0.14",
                 expectedSha256: new string('0', 64)));
 
         return Task.CompletedTask;
@@ -883,7 +883,7 @@ static Task AppUpdateStagingRejectsUnsafeVersionDirectoryAsync()
         AssertThrows<ArgumentException>(
             () => ProtectedUpdateStaging.CreateVersionDirectory(
                 Path.Combine(root, "updates"),
-                "..\\2.0.13",
+                "..\\2.0.14",
                 restrictAccess: false));
 
         return Task.CompletedTask;
@@ -1775,7 +1775,7 @@ static string CreateTemporaryDirectory()
 }
 
 static byte[] CreateUpdatePackage(
-    string version = "2.0.13",
+    string version = "2.0.14",
     string? extraEntryName = null)
 {
     using var buffer = new MemoryStream();
