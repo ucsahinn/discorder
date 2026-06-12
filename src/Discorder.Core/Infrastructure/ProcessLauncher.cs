@@ -101,7 +101,14 @@ public sealed class ProcessLauncher : IProcessLauncher
 
             try
             {
-                _process.CloseMainWindow();
+                var gracefulStopRequested = _process.CloseMainWindow();
+                if (!gracefulStopRequested)
+                {
+                    _process.Kill(entireProcessTree: true);
+                    await _process.WaitForExitAsync(cancellationToken);
+                    return;
+                }
+
                 using var timeoutSource = new CancellationTokenSource(timeout);
                 using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken,

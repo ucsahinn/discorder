@@ -13,11 +13,20 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
         "Discorder tünel kapsamı - tarayıcı Discord engeli";
     private const string DiscordDomains =
         "'discord.com'," +
+        "'ptb.discord.com'," +
+        "'canary.discord.com'," +
+        "'status.discord.com'," +
+        "'support.discord.com'," +
         "'discordapp.com'," +
         "'discordapp.net'," +
         "'discord.gg'," +
+        "'discord.gift'," +
+        "'discord.media'," +
+        "'discordstatus.com'," +
         "'discordcdn.com'," +
         "'cdn.discordapp.com'," +
+        "'dl.discordapp.net'," +
+        "'updates.discord.com'," +
         "'gateway.discord.gg'," +
         "'media.discordapp.net'," +
         "'images-ext-1.discordapp.net'," +
@@ -197,10 +206,22 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "}",
             "function Get-DiscorderBrowserPrograms {",
             "    $programFilesX86 = ${env:ProgramFiles(x86)}",
+            "    $browserNames = @(",
+            "        'brave.exe',",
+            "        'chrome.exe',",
+            "        'chromium.exe',",
+            "        'firefox.exe',",
+            "        'msedge.exe',",
+            "        'opera.exe',",
+            "        'vivaldi.exe'",
+            "    )",
             "    $candidates = @(",
             "        (Join-DiscorderPath $env:ProgramFiles 'Google\\Chrome\\Application\\chrome.exe'),",
             "        (Join-DiscorderPath $programFilesX86 'Google\\Chrome\\Application\\chrome.exe'),",
             "        (Join-DiscorderPath $env:LOCALAPPDATA 'Google\\Chrome\\Application\\chrome.exe'),",
+            "        (Join-DiscorderPath $env:ProgramFiles 'Chromium\\Application\\chromium.exe'),",
+            "        (Join-DiscorderPath $programFilesX86 'Chromium\\Application\\chromium.exe'),",
+            "        (Join-DiscorderPath $env:LOCALAPPDATA 'Chromium\\Application\\chromium.exe'),",
             "        (Join-DiscorderPath $env:ProgramFiles 'Microsoft\\Edge\\Application\\msedge.exe'),",
             "        (Join-DiscorderPath $programFilesX86 'Microsoft\\Edge\\Application\\msedge.exe'),",
             "        (Join-DiscorderPath $env:ProgramFiles 'BraveSoftware\\Brave-Browser\\Application\\brave.exe'),",
@@ -216,7 +237,34 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "        (Join-DiscorderPath $env:ProgramFiles 'Vivaldi\\Application\\vivaldi.exe'),",
             "        (Join-DiscorderPath $programFilesX86 'Vivaldi\\Application\\vivaldi.exe')",
             "    )",
-            "    return @($candidates | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_) } | Sort-Object -Unique)",
+            "    $registryCandidates = foreach ($name in $browserNames) {",
+            "        foreach ($root in @(",
+            "            'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths',",
+            "            'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths',",
+            "            'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\App Paths'",
+            "        )) {",
+            "            $key = Join-Path $root $name",
+            "            try {",
+            "                $item = Get-Item -LiteralPath $key -ErrorAction Stop",
+            "                $item.GetValue('')",
+            "            } catch {",
+            "            }",
+            "        }",
+            "    }",
+            "    $commandCandidates = foreach ($name in $browserNames) {",
+            "        try {",
+            "            (Get-Command $name -ErrorAction Stop).Source",
+            "        } catch {",
+            "        }",
+            "    }",
+            "    $processCandidates = foreach ($name in $browserNames) {",
+            "        $processName = [IO.Path]::GetFileNameWithoutExtension($name)",
+            "        Get-Process -Name $processName -ErrorAction SilentlyContinue | ForEach-Object {",
+            "            try { $_.Path } catch { }",
+            "        }",
+            "    }",
+            "    $allCandidates = @($candidates) + @($registryCandidates) + @($commandCandidates) + @($processCandidates)",
+            "    return @($allCandidates | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_) } | Sort-Object -Unique)",
             "}",
             "Clear-DiscorderTunnelScope",
             "if ($includeBrowserAccess) { return }",

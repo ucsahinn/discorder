@@ -70,13 +70,13 @@ public partial class App : System.Windows.Application, IDisposable
         var handler = new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-            ConnectTimeout = TimeSpan.FromSeconds(45),
+            ConnectTimeout = TimeSpan.FromSeconds(20),
             AutomaticDecompression = System.Net.DecompressionMethods.All
         };
 
         _httpClient = new HttpClient(handler)
         {
-            Timeout = TimeSpan.FromMinutes(5)
+            Timeout = TimeSpan.FromMinutes(10)
         };
         _httpClient.DefaultRequestHeaders.UserAgent.Add(
             new ProductInfoHeaderValue("Discorder", "2.0.14"));

@@ -28,6 +28,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("wgcf boş hata çıktısını tanısız bırakmaz", WgcfProvisionerEmptyFailureIsDiagnosticAsync),
     ("SHA-256 doğrulayıcı yalnızca sabit özeti kabul eder", HashVerifierIsStrictAsync),
     ("Doğrulanmış indirici geçici zaman aşımını tekrar dener", VerifiedDownloaderRetriesTransientTimeoutAsync),
+    ("Doğrulanmış indirici geçici DNS hatasını tekrar dener", VerifiedDownloaderRetriesTransientDnsFailureAsync),
     ("Otomatik güncelleme güncel sürümde indirme yapmaz", AppUpdateSkipsCurrentReleaseAsync),
     ("Otomatik güncelleme yeni sürümü indirmeden bildirir", AppUpdateCheckFindsReleaseWithoutDownloadAsync),
     ("Otomatik güncelleme geçici release hatasını tekrar dener", AppUpdateCheckRetriesTransientMetadataFailureAsync),
@@ -321,6 +322,37 @@ static async Task VerifiedDownloaderRetriesTransientTimeoutAsync()
     {
         await downloader.DownloadAsync(
             new Uri("https://downloads.example.test/wiresock.msi"),
+            destination,
+            expectedSha256,
+            CancellationToken.None);
+
+        Assert(handler.RequestCount == 2);
+        Assert(await File.ReadAllTextAsync(destination) == "dogrulanmis-kurucu");
+        Assert(!File.Exists(destination + ".download"));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task VerifiedDownloaderRetriesTransientDnsFailureAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var payload = Encoding.UTF8.GetBytes("dogrulanmis-kurucu");
+    var expectedSha256 = Convert.ToHexString(SHA256.HashData(payload));
+    var handler = new FlakyDnsDownloadHandler(payload);
+    using var httpClient = new HttpClient(handler);
+    var downloader = new VerifiedDownloader(
+        httpClient,
+        maxAttempts: 2,
+        retryDelay: TimeSpan.Zero);
+    var destination = Path.Combine(root, "wiresock.msi");
+
+    try
+    {
+        await downloader.DownloadAsync(
+            new Uri("https://github.com/example/wiresock.msi"),
             destination,
             expectedSha256,
             CancellationToken.None);
@@ -1571,6 +1603,12 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
             "'gateway.discord.gg'",
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
+            "'ptb.discord.com'",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "'updates.discord.com'",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
             "-RemoteAddress $addressList",
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
@@ -1602,6 +1640,21 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
             StringComparison.Ordinal));
         Assert(runner.Commands[2].Contains(
             "Get-DiscorderBrowserPrograms",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[2].Contains(
+            "Get-Process -Name $processName",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[2].Contains(
+            "CurrentVersion\\App Paths",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[2].Contains(
+            "Get-Command $name",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[2].Contains(
+            "chromium.exe",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[2].Contains(
+            "$allCandidates",
             StringComparison.Ordinal));
         Assert(runner.Commands[2].Contains(
             "-Program $program",
@@ -2036,6 +2089,32 @@ file sealed class FlakyDownloadHandler(
                     "The operation was canceled.",
                     new TimeoutException(
                         "A connection could not be established within the configured ConnectTimeout.")));
+        }
+
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(payload)
+        });
+    }
+}
+
+file sealed class FlakyDnsDownloadHandler(byte[] payload) : HttpMessageHandler
+{
+    public int RequestCount { get; private set; }
+
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        RequestCount++;
+
+        if (RequestCount == 1)
+        {
+            return Task.FromException<HttpResponseMessage>(
+                new HttpRequestException(
+                    "No such host is known. (github.com:443)",
+                    new SocketException((int)SocketError.HostNotFound)));
         }
 
         return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
