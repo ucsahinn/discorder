@@ -54,7 +54,7 @@ Repo görselleri ve dokümanları şu verileri içermemelidir:
 - Redakte edilmemiş log.
 - Gizli IP, müşteri verisi veya hesap bilgisi.
 
-Bu nedenle README'deki ana ekran görselinde canlı DNS değerleri maskelenmiştir.
+Bu nedenle README görsellerinde yalnızca ürün arayüzü ve genel DNS sağlayıcı örnekleri gösterilir; yerel yol, hesap, token, log veya kişisel veri yer almaz.
 
 ## Güvenlik Açığı Bildirme
 
