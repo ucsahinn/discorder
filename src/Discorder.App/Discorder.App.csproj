@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <ApplicationIcon>Assets\discorder.ico</ApplicationIcon>
+    <ApplicationIcon>Assets\discorder-v2.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>Discorder</AssemblyName>
     <RootNamespace>Discorder.App</RootNamespace>
@@ -18,8 +18,8 @@
     <AssemblyCompany>ucsahinn</AssemblyCompany>
     <AssemblyProduct>Discorder</AssemblyProduct>
     <Copyright>Copyright (c) 2026 ucsahinn</Copyright>
-    <Version>2.0.10</Version>
-    <FileVersion>2.0.10.0</FileVersion>
+    <Version>2.0.11</Version>
+    <FileVersion>2.0.11.0</FileVersion>
     <RepositoryUrl>https://github.com/ucsahinn/discorder</RepositoryUrl>
     <PublishTrimmed>false</PublishTrimmed>
     <PublishSingleFile>false</PublishSingleFile>
@@ -28,7 +28,7 @@
     <ProjectReference Include="..\Discorder.Core\Discorder.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="Assets\discorder.ico" />
-    <Resource Include="Assets\discorder-logo.png" />
+    <Resource Include="Assets\discorder-mark.png" />
+    <Resource Include="Assets\discorder-v2.ico" />
   </ItemGroup>
 </Project>

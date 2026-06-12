@@ -518,8 +518,8 @@ public partial class MainWindow : Window, IDisposable
             _diagnostics.Info(
                 "ui.startup",
                 enabled
-                    ? "Windows başlangıcı açıldı."
-                    : "Windows başlangıcı kapatıldı.");
+                    ? "Başlangıçta çalışma açıldı."
+                    : "Başlangıçta çalışma kapatıldı.");
             ApplyStartupSetting(enabled);
         }
         catch (Exception exception)
@@ -529,7 +529,7 @@ public partial class MainWindow : Window, IDisposable
             ApplyStartupSetting(currentState);
 
             MessageBox.Show(
-                "Windows başlangıç ayarı kaydedilemedi.\n\n" + exception.Message,
+                "Başlangıçta çalışma ayarı kaydedilemedi.\n\n" + exception.Message,
                 "Discorder",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -943,9 +943,9 @@ public partial class MainWindow : Window, IDisposable
         try
         {
             _paths.EnsureDirectories();
-            _diagnostics.Info("ui.diagnostics", "Tanılama paketi istendi.");
+            _diagnostics.Info("ui.diagnostics", "Tanılama istendi.");
             _diagnostics.WriteHealth(
-                "tanılama paketi istendi",
+                "tanılama istendi",
                 new Dictionary<string, string?>
                 {
                     ["browserAccess"] = _controller.IncludeBrowserAccess.ToString(),
@@ -955,12 +955,12 @@ public partial class MainWindow : Window, IDisposable
             var bundleDirectory = !string.IsNullOrWhiteSpace(bundlePath)
                 ? Path.GetDirectoryName(bundlePath)
                 : _paths.DiagnosticBundleDirectory;
-            DiagnosticsStatus.Text = "Son paket hazır. Paket klasörü açıldı.";
+            DiagnosticsStatus.Text = "Son tanılama hazır. Klasör açıldı.";
 
             if (!string.IsNullOrWhiteSpace(bundlePath))
             {
                 MessageBox.Show(
-                    "Tanılama paketi hazırlandı.\n\n" + bundlePath,
+                    "Tanılama hazırlandı.\n\n" + bundlePath,
                     "Discorder tanılama",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -974,13 +974,13 @@ public partial class MainWindow : Window, IDisposable
         }
         catch (Exception exception)
         {
-            DiagnosticsStatus.Text = "Tanılama paketi hazırlanamadı. Ayrıntı loglara yazıldı.";
+            DiagnosticsStatus.Text = "Tanılama hazırlanamadı. Ayrıntı loglara yazıldı.";
             _diagnostics.Failure(
                 "ui.diagnostics",
-                "Tanılama paketi hazırlanamadı.",
+                "Tanılama hazırlanamadı.",
                 exception);
             MessageBox.Show(
-                "Tanılama paketi hazırlanamadı.\n\n" + exception.Message,
+                "Tanılama hazırlanamadı.\n\n" + exception.Message,
                 "Discorder tanılama",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);

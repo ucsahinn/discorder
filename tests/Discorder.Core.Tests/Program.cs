@@ -327,8 +327,8 @@ static async Task AppUpdateSkipsCurrentReleaseAsync()
         var handler = new MapHttpMessageHandler();
         handler.AddJson(latestUri, """
             {
-              "tag_name": "v2.0.10",
-              "html_url": "https://github.com/ucsahinn/discorder/releases/tag/v2.0.10",
+              "tag_name": "v2.0.11",
+              "html_url": "https://github.com/ucsahinn/discorder/releases/tag/v2.0.11",
               "assets": []
             }
             """);
@@ -341,7 +341,7 @@ static async Task AppUpdateSkipsCurrentReleaseAsync()
             latestUri);
 
         var update = await service.PrepareLatestUpdateAsync(
-            new Version(2, 0, 10, 0),
+            new Version(2, 0, 11, 0),
             root,
             "Discorder.exe",
             CancellationToken.None);
@@ -361,22 +361,22 @@ static async Task AppUpdatePreparesVerifiedReleaseAsync()
     try
     {
         var latestUri = new Uri("https://updates.example.test/releases/latest");
-        var zipUri = new Uri("https://updates.example.test/releases/download/v2.0.11/Discorder-2.0.11-win-x64.zip");
-        var checksumUri = new Uri("https://updates.example.test/releases/download/v2.0.11/Discorder-2.0.11-win-x64.sha256.txt");
+        var zipUri = new Uri("https://updates.example.test/releases/download/v2.0.12/Discorder-2.0.12-win-x64.zip");
+        var checksumUri = new Uri("https://updates.example.test/releases/download/v2.0.12/Discorder-2.0.12-win-x64.sha256.txt");
         var packageBytes = CreateUpdatePackage();
         var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
         var handler = new MapHttpMessageHandler();
         handler.AddJson(latestUri, $$"""
             {
-              "tag_name": "v2.0.11",
-              "html_url": "https://github.com/ucsahinn/discorder/releases/tag/v2.0.11",
+              "tag_name": "v2.0.12",
+              "html_url": "https://github.com/ucsahinn/discorder/releases/tag/v2.0.12",
               "assets": [
                 {
-                  "name": "Discorder-2.0.11-win-x64.zip",
+                  "name": "Discorder-2.0.12-win-x64.zip",
                   "browser_download_url": "{{zipUri.AbsoluteUri}}"
                 },
                 {
-                  "name": "Discorder-2.0.11-win-x64.sha256.txt",
+                  "name": "Discorder-2.0.12-win-x64.sha256.txt",
                   "browser_download_url": "{{checksumUri.AbsoluteUri}}"
                 }
               ]
@@ -384,7 +384,7 @@ static async Task AppUpdatePreparesVerifiedReleaseAsync()
             """);
         handler.AddText(
             checksumUri,
-            $"{expectedSha256}  Discorder-2.0.11-win-x64.zip");
+            $"{expectedSha256}  Discorder-2.0.12-win-x64.zip");
         using var httpClient = new HttpClient(handler);
         var downloader = new CapturingVerifiedDownloader(packageBytes);
         var service = new AppUpdateService(
@@ -394,7 +394,7 @@ static async Task AppUpdatePreparesVerifiedReleaseAsync()
             latestUri);
 
         var update = await service.PrepareLatestUpdateAsync(
-            new Version(2, 0, 10, 0),
+            new Version(2, 0, 11, 0),
             root,
             "Discorder.exe",
             CancellationToken.None);

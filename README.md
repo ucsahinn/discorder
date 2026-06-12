@@ -20,7 +20,7 @@ Amaç basit: **Bağlan** düğmesine basınca Discord uygulaması çalışsın, 
 - ✅ **Onar** işlemi ayarları, WireSock kurulumunu ve tanılama kayıtlarını koruyup profil, wgcf ve kurucu önbelleğini yeniden üretilecek hale getirir.
 - ✅ **Tanılama** JSONL olay akışı, sağlık raporu, okunabilir özet ve aktif WireSock loglarını kilitlenmeden tek zip içinde hazırlar.
 - ✅ İsteğe bağlı arka plan modu pencere kapansa bile Discorder'ı bildirim alanında çalıştırır.
-- ✅ İsteğe bağlı Windows başlangıcı ayarı Discorder'ı oturum açılışında başlatır.
+- ✅ İsteğe bağlı başlangıç ayarı Discorder'ı oturum açılışında başlatır.
 - ✅ **Temiz kaldır** işlemi Discorder kilidini, başlangıç kaydını, yerel veriyi ve Discorder'ın kurduğu WireSock VPN Client kurulumunu geri alır.
 
 ## 🧭 Kapsam Dışı
@@ -61,7 +61,7 @@ Discorder şunları bilinçli olarak yapmaz:
 
 ## 🚀 Kullanım
 
-1. Yayın arşivinden `Discorder-2.0.10-win-x64.zip` dosyasını indirin.
+1. Yayın arşivinden `Discorder-2.0.11-win-x64.zip` dosyasını indirin.
 2. Zip içeriğini istediğiniz klasöre çıkarın.
 3. `Discorder.exe` dosyasını çalıştırın ve Windows UAC onayını verin.
 4. Discord web kullanacaksanız ana ekrandaki **Web modu** seçeneğini açın.

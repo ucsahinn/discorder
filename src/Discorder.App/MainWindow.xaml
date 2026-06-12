@@ -106,7 +106,7 @@
                            Width="42"
                            Height="42"
                            Margin="0,0,14,0"
-                           Source="Assets/discorder-logo.png"
+                           Source="Assets/discorder-mark.png"
                            Stretch="Uniform" />
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
@@ -397,9 +397,15 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock FontSize="18"
-                                               FontWeight="SemiBold"
-                                               Text="Web modu" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Margin="0,0,8,0"
+                                                   FontFamily="Segoe UI Emoji"
+                                                   FontSize="17"
+                                                   Text="🌐" />
+                                        <TextBlock FontSize="18"
+                                                   FontWeight="SemiBold"
+                                                   Text="Web modu" />
+                                    </StackPanel>
                                     <TextBlock x:Name="BrowserAccessStatus"
                                                Margin="0,6,18,0"
                                                TextWrapping="Wrap"
@@ -463,9 +469,15 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <TextBlock FontSize="15"
-                                               FontWeight="SemiBold"
-                                               Text="Arka plan" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Margin="0,0,7,0"
+                                                   FontFamily="Segoe UI Emoji"
+                                                   FontSize="14"
+                                                   Text="🌙" />
+                                        <TextBlock FontSize="15"
+                                                   FontWeight="SemiBold"
+                                                   Text="Arka plan" />
+                                    </StackPanel>
                                     <TextBlock Grid.Row="1"
                                                x:Name="RunInBackgroundStatus"
                                                Margin="0,5,0,10"
@@ -494,9 +506,15 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <TextBlock FontSize="15"
-                                               FontWeight="SemiBold"
-                                               Text="Başlangıçta çalış" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Margin="0,0,7,0"
+                                                   FontFamily="Segoe UI Emoji"
+                                                   FontSize="14"
+                                                   Text="🚀" />
+                                        <TextBlock FontSize="15"
+                                                   FontWeight="SemiBold"
+                                                   Text="Başlangıçta çalış" />
+                                    </StackPanel>
                                     <TextBlock Grid.Row="1"
                                                x:Name="StartupStatus"
                                                Margin="0,5,0,10"
@@ -525,9 +543,15 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <TextBlock FontSize="15"
-                                               FontWeight="SemiBold"
-                                               Text="Tanılama" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Margin="0,0,7,0"
+                                                   FontFamily="Segoe UI Emoji"
+                                                   FontSize="14"
+                                                   Text="🧾" />
+                                        <TextBlock FontSize="15"
+                                                   FontWeight="SemiBold"
+                                                   Text="Tanılama" />
+                                    </StackPanel>
                                     <TextBlock Grid.Row="1"
                                                x:Name="DiagnosticsStatus"
                                                Margin="0,5,0,10"
@@ -649,7 +673,7 @@
                             Height="46"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
-                            Content="WireSock"
+                            Content="🔌 WireSock"
                             Click="OpenWireSock_Click"
                             ToolTip="WireSock VPN Client resmi sayfası" />
 
@@ -657,7 +681,7 @@
                             Height="46"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
-                            Content="Tanılama"
+                            Content="🧾 Tanılama"
                             Click="OpenDiagnostics_Click"
                             ToolTip="Tanılama dosyalarını hazırla ve klasörü aç" />
 
@@ -667,7 +691,7 @@
                             Height="46"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
-                            Content="Onar"
+                            Content="🛠 Onar"
                             Click="Repair_Click"
                             ToolTip="Profil, wgcf ve kurucu önbelleğini yeniden üretilecek hale getir; logları koru" />
 
@@ -677,7 +701,7 @@
                             Height="46"
                             VerticalAlignment="Center"
                             Style="{StaticResource DangerCommandButtonStyle}"
-                            Content="Temiz kaldır"
+                            Content="⛔ Temiz kaldır"
                             Click="CleanUninstall_Click"
                             ToolTip="Discorder kilitlerini geri al, yerel Discorder verisini sil ve uygulamayı kapat" />
 
@@ -686,7 +710,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.0.10" />
+                               Text="v2.0.11" />
 
                     <Button Grid.Column="5"
                             x:Name="AutoUpdateButton"

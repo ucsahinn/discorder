@@ -171,9 +171,9 @@ static void RenderMainWindow()
             .Select(button => button.Content?.ToString())
             .Where(content => !string.IsNullOrWhiteSpace(content))
             .ToArray();
-        Assert(buttons.Contains("Onar"));
-        Assert(buttons.Contains("Temiz kaldır"));
-        Assert(buttons.Contains("Tanılama"));
+        Assert(buttons.Contains("🛠 Onar"));
+        Assert(buttons.Contains("⛔ Temiz kaldır"));
+        Assert(buttons.Contains("🧾 Tanılama"));
         var switches = FindVisualChildren<CheckBox>(window).ToArray();
         var browserSwitch = switches.Single(toggle =>
             toggle.Name == "BrowserAccessToggle");
