@@ -284,6 +284,7 @@
                                     HorizontalAlignment="Center">
                             <TextBlock x:Name="StatusMessage"
                                        MaxWidth="520"
+                                       MaxHeight="58"
                                        HorizontalAlignment="Center"
                                        TextAlignment="Center"
                                        TextWrapping="Wrap"
@@ -293,10 +294,12 @@
                                        Text="Bağlantı kapalı" />
                             <TextBlock x:Name="StatusDetail"
                                        MaxWidth="520"
+                                       MaxHeight="42"
                                        Margin="0,8,0,0"
                                        HorizontalAlignment="Center"
                                        TextAlignment="Center"
                                        TextWrapping="Wrap"
+                                       TextTrimming="CharacterEllipsis"
                                        FontSize="13"
                                        Foreground="{StaticResource SecondaryTextBrush}"
                                        Text="Hazır" />
@@ -611,11 +614,15 @@
                                            Margin="0,6,0,0"
                                            FontSize="16"
                                            FontWeight="SemiBold"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
                                            Text="Okunuyor" />
                                 <TextBlock x:Name="DnsDetail"
                                            Margin="0,4,0,0"
                                            FontSize="11"
                                            Foreground="{StaticResource SecondaryTextBrush}"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
                                            Text="Makinenin aldığı DNS" />
                             </StackPanel>
 
@@ -731,7 +738,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.0.17" />
+                               Text="v2.0.18" />
 
                     <Button Grid.Column="5"
                             x:Name="AutoUpdateButton"

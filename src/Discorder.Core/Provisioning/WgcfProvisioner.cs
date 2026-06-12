@@ -6,7 +6,11 @@ namespace Discorder.Core.Provisioning;
 
 public sealed class WgcfProvisioner : IProfileProvisioner
 {
+    private const long ProgressByteInterval = 1024 * 1024;
+    private const double ProgressPercentInterval = 5;
+
     public const string Version = "2.2.31";
+    public const long WindowsX64MaxBytes = 32L * 1024 * 1024;
     public const string WindowsX64Sha256 =
         "38cad8ab9cf44f8ec25c8a4e99179b1ee3510dd207e654c6aa1f6786e16d404c";
 
@@ -30,19 +34,41 @@ public sealed class WgcfProvisioner : IProfileProvisioner
 
     public async Task<string> EnsureProfileAsync(
         IReadOnlyList<string> allowedApplications,
+        IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(allowedApplications);
         _paths.EnsureDirectories();
 
+        progress?.Report("Cloudflare WARP aracı hazırlanıyor");
+        double? lastProgressPercent = null;
+        long lastProgressBytes = -ProgressByteInterval;
+        var downloadProgress = new DirectProgress<DownloadProgress>(
+            download =>
+            {
+                if (ShouldReportDownloadProgress(
+                    download,
+                    ref lastProgressPercent,
+                    ref lastProgressBytes))
+                {
+                    progress?.Report(FormatDownloadProgress(
+                        "Cloudflare WARP aracı",
+                        download));
+                }
+            });
+
         await _downloader.DownloadAsync(
             WindowsX64Download,
             _paths.WgcfExecutable,
             WindowsX64Sha256,
-            cancellationToken);
+            cancellationToken,
+            maxBytes: WindowsX64MaxBytes,
+            progress: downloadProgress);
+        progress?.Report("Cloudflare WARP aracı hazır");
 
         if (!File.Exists(_paths.WgcfAccount))
         {
+            progress?.Report("Cloudflare WARP hesabı hazırlanıyor");
             var registerResult = await _commandRunner.RunAsync(
                 _paths.WgcfExecutable,
                 ["register", "--accept-tos"],
@@ -61,6 +87,7 @@ public sealed class WgcfProvisioner : IProfileProvisioner
 
         if (!File.Exists(_paths.WgcfBaseProfile))
         {
+            progress?.Report("Cloudflare WARP profili hazırlanıyor");
             var generateResult = await _commandRunner.RunAsync(
                 _paths.WgcfExecutable,
                 ["generate"],
@@ -89,6 +116,7 @@ public sealed class WgcfProvisioner : IProfileProvisioner
             discordProfile,
             cancellationToken);
 
+        progress?.Report("Discord bağlantı profili hazır");
         return _paths.DiscordProfile;
     }
 
@@ -110,5 +138,103 @@ public sealed class WgcfProvisioner : IProfileProvisioner
         throw new InvalidOperationException(
             $"{operation} çıkış kodu {result.ExitCode} ile başarısız oldu: " +
             diagnostic.Trim().ReplaceLineEndings(" "));
+    }
+
+    private static bool ShouldReportDownloadProgress(
+        DownloadProgress progress,
+        ref double? lastPercent,
+        ref long lastBytes)
+    {
+        if (!string.IsNullOrWhiteSpace(progress.Message))
+        {
+            return true;
+        }
+
+        if (progress.BytesReceived <= 0)
+        {
+            lastBytes = 0;
+            lastPercent = progress.Percent;
+            return true;
+        }
+
+        if (progress.Percent >= 100)
+        {
+            lastBytes = progress.BytesReceived;
+            lastPercent = progress.Percent;
+            return true;
+        }
+
+        if (progress.Percent is { } percent)
+        {
+            if (lastPercent is null
+                || percent - lastPercent.Value >= ProgressPercentInterval)
+            {
+                lastPercent = percent;
+                lastBytes = progress.BytesReceived;
+                return true;
+            }
+
+            return false;
+        }
+
+        if (progress.BytesReceived - lastBytes >= ProgressByteInterval)
+        {
+            lastBytes = progress.BytesReceived;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string FormatDownloadProgress(
+        string label,
+        DownloadProgress progress)
+    {
+        var attempt = progress.Attempt is not null && progress.MaxAttempts is not null
+            ? $" ({progress.Attempt}/{progress.MaxAttempts})"
+            : string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(progress.Message))
+        {
+            return $"{label}: {progress.Message}{attempt}";
+        }
+
+        if (progress.TotalBytes is > 0)
+        {
+            return $"{label} indiriliyor: {FormatBytes(progress.BytesReceived)} / {FormatBytes(progress.TotalBytes.Value)}";
+        }
+
+        return $"{label} indiriliyor: {FormatBytes(progress.BytesReceived)}";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB"];
+        var value = (double)Math.Max(0, bytes);
+        var unitIndex = 0;
+        while (value >= 1024 && unitIndex < units.Length - 1)
+        {
+            value /= 1024;
+            unitIndex++;
+        }
+
+        return unitIndex == 0
+            ? $"{value:0} {units[unitIndex]}"
+            : $"{value:0.0} {units[unitIndex]}";
+    }
+
+    private sealed class DirectProgress<T> : IProgress<T>
+    {
+        private readonly Action<T> _handler;
+
+        public DirectProgress(Action<T> handler)
+        {
+            _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+        }
+
+        public void Report(T value)
+        {
+            _handler(value);
+        }
     }
 }

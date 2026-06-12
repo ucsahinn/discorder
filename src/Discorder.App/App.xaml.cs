@@ -79,9 +79,9 @@ public partial class App : System.Windows.Application, IDisposable
             Timeout = TimeSpan.FromMinutes(10)
         };
         _httpClient.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("Discorder", "2.0.17"));
+            new ProductInfoHeaderValue("Discorder", "2.0.18"));
 
-        var downloader = new VerifiedDownloader(_httpClient);
+        var downloader = new VerifiedDownloader(_httpClient, maxAttempts: 5);
         var wireSockLocator = new WireSockLocator();
         var settingsStore = new AppSettingsStore(_paths);
         var wireSockBootstrapper = new WireSockBootstrapper(

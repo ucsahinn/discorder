@@ -180,6 +180,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 IncludeBrowserAccess);
             var profilePath = await _provisioner.EnsureProfileAsync(
                 allowedApplications,
+                progress,
                 cancellationToken);
             _diagnostics.Info(
                 "controller.profile",
@@ -487,6 +488,11 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
     private static string CreateUserFacingConnectError(Exception exception)
     {
+        if (exception is TimeoutException)
+        {
+            return "Gerekli dosya indirilemedi. Bağlantı zaman aşımına uğradı; internet erişimini kontrol edip tekrar bağlanın.";
+        }
+
         if (exception is TaskCanceledException
             && exception.InnerException is TimeoutException)
         {

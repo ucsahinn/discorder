@@ -398,6 +398,7 @@ file sealed class FakeProfileProvisioner(string profilePath) : IProfileProvision
 {
     public Task<string> EnsureProfileAsync(
         IReadOnlyList<string> allowedApplications,
+        IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
         return Task.FromResult(profilePath);

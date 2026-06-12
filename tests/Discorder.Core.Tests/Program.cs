@@ -63,6 +63,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
     ("Denetleyici GitHub DNS hatasını Türkçe açıklar", ControllerNetworkFailureIsUserFriendlyAsync),
     ("Denetleyici indirme zaman aşımını Türkçe açıklar", ControllerDownloadTimeoutIsUserFriendlyAsync),
+    ("Denetleyici duran indirme zaman aşımını Türkçe açıklar", ControllerDirectDownloadTimeoutIsUserFriendlyAsync),
     ("Denetleyici bağlantı koruması hatasını Türkçe açıklar", ControllerAccessLockFailureIsUserFriendlyAsync),
     ("Windows Firewall koruması Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
     ("Onarım ayarları ve logları koruyup üretilen veriyi yeniler", CleanupServiceRepairsGeneratedStateAsync),
@@ -226,12 +227,14 @@ static async Task WgcfProvisionerBuildsDiscordAccessProfileAsync()
         paths,
         downloader,
         commandRunner);
+    var progressMessages = new List<string>();
 
     try
     {
         var discordDirectory = Path.Combine(root, "Discord");
         var profilePath = await provisioner.EnsureProfileAsync(
             ["Discord.exe", "chrome.exe", "msedge.exe", discordDirectory],
+            new ImmediateProgress<string>(progressMessages.Add),
             CancellationToken.None);
 
         var profile = await File.ReadAllTextAsync(profilePath);
@@ -250,9 +253,20 @@ static async Task WgcfProvisionerBuildsDiscordAccessProfileAsync()
         Assert(commandRunner.Commands.SequenceEqual(
             ["register --accept-tos", "generate"],
             StringComparer.Ordinal));
+        Assert(progressMessages.Any(message => message.Contains(
+            "Cloudflare WARP aracı",
+            StringComparison.OrdinalIgnoreCase)));
+        Assert(progressMessages.Any(message => message.Contains(
+            "20 B / 20 B",
+            StringComparison.OrdinalIgnoreCase)));
+        Assert(progressMessages.Any(message => message.Contains(
+            "Discord bağlantı profili hazır",
+            StringComparison.OrdinalIgnoreCase)));
+        Assert(downloader.LastMaxBytes == WgcfProvisioner.WindowsX64MaxBytes);
 
         await provisioner.EnsureProfileAsync(
             ["Discord.exe"],
+            null,
             CancellationToken.None);
         Assert(commandRunner.Commands.Count == 2);
     }
@@ -276,6 +290,7 @@ static async Task WgcfProvisionerEmptyFailureIsDiagnosticAsync()
         var exception = await AssertThrowsAsync<InvalidOperationException>(
             () => provisioner.EnsureProfileAsync(
                 ["Discord.exe"],
+                null,
                 CancellationToken.None));
 
         Assert(exception.Message.Contains(
@@ -1754,6 +1769,46 @@ static async Task ControllerDownloadTimeoutIsUserFriendlyAsync()
     }
 }
 
+static async Task ControllerDirectDownloadTimeoutIsUserFriendlyAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var accessLock = new FakeDiscordAccessLock();
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(
+            Path.Combine(
+                root,
+                "WireSock VPN Client",
+                "bin",
+                WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(
+            Path.Combine(root, "discord.conf"),
+            new TimeoutException(
+                "İndirme sırasında veri akışı zaman aşımına uğradı.")),
+        new FakeProcessLauncher(new FakeManagedProcess()),
+        TimeSpan.Zero,
+        accessLock);
+
+    try
+    {
+        await controller.ConnectAsync();
+        Assert(controller.Snapshot.State == TunnelState.Error);
+        Assert(controller.Snapshot.Message.Contains(
+            "zaman aşımına",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!controller.Snapshot.Message.Contains(
+            "veri akışı",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(accessLock.EnableCount == 1);
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task ControllerAccessLockFailureIsUserFriendlyAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -2743,6 +2798,7 @@ file sealed class FakeProfileProvisioner(
 
     public Task<string> EnsureProfileAsync(
         IReadOnlyList<string> allowedApplications,
+        IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
         LastAllowedApplications = allowedApplications.ToArray();

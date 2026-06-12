@@ -481,21 +481,23 @@ public partial class MainWindow : Window, IDisposable
             TunnelState.Disconnecting => (62, "Bağlantı kapatılıyor", 4),
             TunnelState.Error => (100, "Müdahale gerekiyor", 4),
             TunnelState.Preparing when message.Contains(
-                    "bağlantısı",
+                    "Cloudflare",
+                    StringComparison.OrdinalIgnoreCase)
+                || message.Contains("WARP", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("wgcf", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("profil", StringComparison.OrdinalIgnoreCase)
+                => (68, "Profil hazırlanıyor", 3),
+            TunnelState.Preparing when message.Contains(
+                    "Discord bağlantısı",
                     StringComparison.OrdinalIgnoreCase)
                 => (22, "Discord bağlantısı hazırlanıyor", 1),
             TunnelState.Preparing when message.Contains(
                     "WireSock",
                     StringComparison.OrdinalIgnoreCase)
                 || message.Contains("kurul", StringComparison.OrdinalIgnoreCase)
-                || message.Contains("indir", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("kurucu", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("doğrulan", StringComparison.OrdinalIgnoreCase)
                 => (48, "WireSock doğrulanıyor", 2),
-            TunnelState.Preparing when message.Contains(
-                    "profil",
-                    StringComparison.OrdinalIgnoreCase)
-                || message.Contains("wgcf", StringComparison.OrdinalIgnoreCase)
-                => (68, "Profil hazırlanıyor", 3),
             TunnelState.Preparing => (38, "Hazırlık çalışıyor", 2),
             _ => (8, "Discorder Bağlı Değil", 0)
         };
