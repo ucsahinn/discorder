@@ -1,11 +1,11 @@
 using System.Globalization;
-using System.IO.Compression;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Discorder.Core.Configuration;
 using Discorder.Core.Provisioning;
+using Discorder.Core.Security;
 
 namespace Discorder.Core.Updates;
 
@@ -14,6 +14,11 @@ public sealed class AppUpdateService
     public static readonly Uri DefaultLatestReleaseUri = new(
         "https://api.github.com/repos/ucsahinn/discorder/releases/latest");
 
+    private const string RepositoryOwner = "ucsahinn";
+    private const string RepositoryName = "discorder";
+    private const string GitHubHost = "github.com";
+    private const string UpdaterExecutableName = "Discorder.Updater.exe";
+
     private static readonly JsonSerializerOptions JsonOptions = new(
         JsonSerializerDefaults.Web);
 
@@ -21,33 +26,27 @@ public sealed class AppUpdateService
     private readonly AppPaths _paths;
     private readonly IVerifiedDownloader _downloader;
     private readonly Uri _latestReleaseUri;
+    private readonly bool _requireUpdateAuthenticode;
 
     public AppUpdateService(
         HttpClient httpClient,
         AppPaths paths,
         IVerifiedDownloader downloader,
-        Uri? latestReleaseUri = null)
+        Uri? latestReleaseUri = null,
+        bool requireUpdateAuthenticode = true)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _downloader = downloader ?? throw new ArgumentNullException(nameof(downloader));
         _latestReleaseUri = latestReleaseUri ?? DefaultLatestReleaseUri;
+        _requireUpdateAuthenticode = requireUpdateAuthenticode;
     }
 
-    public async Task<AppUpdatePreparation> PrepareLatestUpdateAsync(
+    public async Task<AppUpdateCheckResult> CheckLatestUpdateAsync(
         Version currentVersion,
-        string applicationDirectory,
-        string executableName,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(currentVersion);
-        ArgumentException.ThrowIfNullOrWhiteSpace(applicationDirectory);
-        ArgumentException.ThrowIfNullOrWhiteSpace(executableName);
-
-        if (!Directory.Exists(applicationDirectory))
-        {
-            throw new DirectoryNotFoundException(applicationDirectory);
-        }
 
         var release = await FetchLatestReleaseAsync(cancellationToken);
         var latestVersion = ParseReleaseVersion(release.TagName);
@@ -57,7 +56,7 @@ public sealed class AppUpdateService
 
         if (normalizedLatestVersion <= normalizedCurrentVersion)
         {
-            return AppUpdatePreparation.UpToDate(
+            return AppUpdateCheckResult.UpToDate(
                 normalizedCurrentVersion,
                 normalizedLatestVersion,
                 releaseUrl);
@@ -68,54 +67,166 @@ public sealed class AppUpdateService
         var checksumFileName = $"Discorder-{versionText}-win-x64.sha256.txt";
         var packageAsset = FindAsset(release, packageFileName);
         var checksumAsset = FindAsset(release, checksumFileName);
+
+        ValidateAsset(packageAsset, packageFileName, release.TagName, isPackage: true);
+        ValidateAsset(checksumAsset, checksumFileName, release.TagName, isPackage: false);
+
         var packageUri = CreateAssetUri(packageAsset, packageFileName);
         var checksumUri = CreateAssetUri(checksumAsset, checksumFileName);
+        var packageDigestSha256 = ParseSha256Digest(packageAsset, packageFileName);
         var expectedSha256 = await ReadExpectedSha256Async(
             checksumUri,
             checksumFileName,
             cancellationToken);
 
-        var updateDirectory = Path.Combine(
-            _paths.DataDirectory,
-            "updates",
-            versionText);
-        Directory.CreateDirectory(updateDirectory);
+        if (!string.Equals(
+                expectedSha256,
+                packageDigestSha256,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                "GitHub asset özeti ile SHA-256 dosyası eşleşmiyor.");
+        }
+
+        return AppUpdateCheckResult.UpdateAvailable(
+            normalizedCurrentVersion,
+            normalizedLatestVersion,
+            releaseUrl,
+            packageFileName,
+            packageUri,
+            checksumFileName,
+            checksumUri,
+            expectedSha256,
+            packageDigestSha256,
+            packageAsset.Size!.Value);
+    }
+
+    public async Task<AppUpdatePreparation> PrepareCheckedUpdateAsync(
+        AppUpdateCheckResult check,
+        string applicationDirectory,
+        string executableName,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(check);
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationDirectory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(executableName);
+
+        if (check.Status == AppUpdateCheckStatus.UpToDate)
+        {
+            return AppUpdatePreparation.UpToDate(
+                check.CurrentVersion,
+                check.LatestVersion,
+                check.ReleaseUrl);
+        }
+
+        if (!Directory.Exists(applicationDirectory))
+        {
+            throw new DirectoryNotFoundException(applicationDirectory);
+        }
+
+        var packageFileName = Require(check.PackageFileName, nameof(check.PackageFileName));
+        var packageUri = check.PackageUri
+            ?? throw new InvalidOperationException("Güncelleme indirme adresi yok.");
+        var expectedSha256 = Require(check.ExpectedSha256, nameof(check.ExpectedSha256));
+        var packageDigestSha256 = Require(
+            check.PackageDigestSha256,
+            nameof(check.PackageDigestSha256));
+        if (!string.Equals(
+                expectedSha256,
+                packageDigestSha256,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                "Denetlenen güncelleme özeti tutarlı değil.");
+        }
+
+        if (check.PackageSizeBytes is null or <= 0)
+        {
+            throw new InvalidDataException(
+                "Denetlenen güncelleme boyutu okunamadı.");
+        }
+
+        var versionText = FormatVersion(check.LatestVersion);
+        var expectedSignerThumbprint = _requireUpdateAuthenticode
+            ? AuthenticodeSignatureVerifier.GetRequiredSignerThumbprint(
+                Path.Combine(applicationDirectory, executableName))
+            : null;
+        var updateDirectory = ProtectedUpdateStaging.CreateVersionDirectory(
+            _paths.UpdateStagingDirectory,
+            versionText,
+            _paths.ProtectUpdateStaging);
 
         var packagePath = Path.Combine(updateDirectory, packageFileName);
         await _downloader.DownloadAsync(
             packageUri,
             packagePath,
             expectedSha256,
-            cancellationToken);
+            cancellationToken,
+            check.PackageSizeBytes.Value);
+
+        var downloadedPackage = new FileInfo(packagePath);
+        if (!downloadedPackage.Exists || downloadedPackage.Length != check.PackageSizeBytes.Value)
+        {
+            throw new InvalidDataException(
+                "Güncelleme paketi beklenen boyutta değil.");
+        }
+
+        if (!string.Equals(
+                UpdatePackageValidator.ComputeSha256(packagePath),
+                expectedSha256,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                "Güncelleme paketi indirme sonrasında doğrulanamadı.");
+        }
+
+        UpdatePackageValidator.ValidateArchive(
+            packagePath,
+            executableName,
+            versionText);
 
         var extractionDirectory = Path.Combine(
             updateDirectory,
             "payload-" + DateTimeOffset.UtcNow.ToString(
                 "yyyyMMddHHmmss",
                 CultureInfo.InvariantCulture) + "-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(extractionDirectory);
-        ZipFile.ExtractToDirectory(packagePath, extractionDirectory);
-
-        var extractedExecutable = Path.Combine(extractionDirectory, executableName);
-        if (!File.Exists(extractedExecutable))
-        {
-            throw new InvalidDataException(
-                $"{packageFileName} does not contain {executableName}.");
-        }
-
-        var scriptPath = await WriteUpdateScriptAsync(
-            updateDirectory,
+        UpdatePackageValidator.ExtractToDirectory(
+            packagePath,
+            extractionDirectory,
+            executableName,
             versionText,
-            cancellationToken);
+            expectedSignerThumbprint);
+
+        var applicatorPath = CopyApplicator(
+            applicationDirectory,
+            updateDirectory);
 
         return AppUpdatePreparation.Prepared(
-            normalizedCurrentVersion,
-            normalizedLatestVersion,
-            releaseUrl,
+            check.CurrentVersion,
+            check.LatestVersion,
+            check.ReleaseUrl,
             packagePath,
             extractionDirectory,
             expectedSha256,
-            scriptPath);
+            expectedSignerThumbprint,
+            applicatorPath);
+    }
+
+    public async Task<AppUpdatePreparation> PrepareLatestUpdateAsync(
+        Version currentVersion,
+        string applicationDirectory,
+        string executableName,
+        CancellationToken cancellationToken)
+    {
+        var check = await CheckLatestUpdateAsync(
+            currentVersion,
+            cancellationToken);
+
+        return await PrepareCheckedUpdateAsync(
+            check,
+            applicationDirectory,
+            executableName,
+            cancellationToken);
     }
 
     public static string FormatVersion(Version version)
@@ -140,6 +251,7 @@ public sealed class AppUpdateService
         using var request = new HttpRequestMessage(HttpMethod.Get, _latestReleaseUri);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(
             "application/vnd.github+json"));
+        request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
 
         using var response = await _httpClient.SendAsync(
             request,
@@ -164,7 +276,7 @@ public sealed class AppUpdateService
         if (release is null || string.IsNullOrWhiteSpace(release.TagName))
         {
             throw new InvalidDataException(
-                "GitHub release metadata could not be read.");
+                "GitHub release bilgisi okunamadı.");
         }
 
         return release;
@@ -174,7 +286,7 @@ public sealed class AppUpdateService
     {
         if (string.IsNullOrWhiteSpace(tagName))
         {
-            throw new InvalidDataException("GitHub release tag is empty.");
+            throw new InvalidDataException("GitHub release etiketi boş.");
         }
 
         var versionText = tagName.Trim();
@@ -186,7 +298,7 @@ public sealed class AppUpdateService
         if (!Version.TryParse(versionText, out var version))
         {
             throw new InvalidDataException(
-                $"GitHub release tag is not a valid version: {tagName}");
+                $"GitHub release etiketi geçerli sürüm değil: {tagName}");
         }
 
         return version;
@@ -205,18 +317,83 @@ public sealed class AppUpdateService
         GitHubRelease release,
         string assetName)
     {
-        var asset = release.Assets?.FirstOrDefault(item => string.Equals(
-            item.Name,
-            assetName,
-            StringComparison.OrdinalIgnoreCase));
+        var assets = release.Assets?
+            .Where(item => string.Equals(
+                item.Name,
+                assetName,
+                StringComparison.OrdinalIgnoreCase))
+            .ToArray() ?? [];
 
-        if (asset is null)
+        return assets.Length switch
+        {
+            1 => assets[0],
+            0 => throw new InvalidDataException(
+                $"GitHub release {assetName} dosyasını içermiyor."),
+            _ => throw new InvalidDataException(
+                $"GitHub release {assetName} dosyasını birden fazla içeriyor.")
+        };
+    }
+
+    private static void ValidateAsset(
+        GitHubReleaseAsset asset,
+        string assetName,
+        string? releaseTag,
+        bool isPackage)
+    {
+        if (!string.Equals(
+                asset.State,
+                "uploaded",
+                StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidDataException(
-                $"GitHub release does not contain asset {assetName}.");
+                $"{assetName} GitHub tarafında hazır değil.");
         }
 
-        return asset;
+        if (asset.Size is null or <= 0)
+        {
+            throw new InvalidDataException(
+                $"{assetName} boyutu okunamadı.");
+        }
+
+        var maxSize = isPackage
+            ? UpdatePackageValidator.MaxPackageBytes
+            : 1024L * 1024L;
+        if (asset.Size > maxSize)
+        {
+            throw new InvalidDataException(
+                $"{assetName} beklenenden büyük.");
+        }
+
+        if (isPackage)
+        {
+            _ = ParseSha256Digest(asset, assetName);
+        }
+
+        var uri = CreateAssetUri(asset, assetName);
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(uri.Host, GitHubHost, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                $"{assetName} GitHub indirme adresi güvenli değil.");
+        }
+
+        var expectedPath = string.Join(
+            '/',
+            RepositoryOwner,
+            RepositoryName,
+            "releases",
+            "download",
+            releaseTag,
+            assetName);
+        var actualPath = Uri.UnescapeDataString(uri.AbsolutePath).TrimStart('/');
+        if (!string.Equals(
+                actualPath,
+                expectedPath,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"{assetName} beklenen release yolundan indirilmiyor.");
+        }
     }
 
     private static Uri CreateAssetUri(
@@ -229,7 +406,7 @@ public sealed class AppUpdateService
                 out var uri))
         {
             throw new InvalidDataException(
-                $"{assetName} download URL is invalid.");
+                $"{assetName} indirme adresi geçerli değil.");
         }
 
         return uri;
@@ -253,8 +430,18 @@ public sealed class AppUpdateService
                 response.StatusCode);
         }
 
-        var checksumText = await response.Content.ReadAsStringAsync(
+        if (response.Content.Headers.ContentLength is > 8192)
+        {
+            throw new InvalidDataException(
+                $"{checksumFileName} beklenenden büyük.");
+        }
+
+        var checksumText = await ReadLimitedTextAsync(
+            response.Content,
+            checksumFileName,
+            maxBytes: 8192,
             cancellationToken);
+
         foreach (var token in checksumText.Split(
                      [' ', '\t', '\r', '\n'],
                      StringSplitOptions.RemoveEmptyEntries))
@@ -266,81 +453,109 @@ public sealed class AppUpdateService
         }
 
         throw new InvalidDataException(
-            $"{checksumFileName} does not contain a valid SHA-256.");
+            $"{checksumFileName} geçerli SHA-256 içermiyor.");
     }
 
-    private static async Task<string> WriteUpdateScriptAsync(
-        string updateDirectory,
-        string versionText,
+    private static async Task<string> ReadLimitedTextAsync(
+        HttpContent content,
+        string sourceName,
+        int maxBytes,
         CancellationToken cancellationToken)
     {
-        var scriptPath = Path.Combine(
+        await using var stream = await content.ReadAsStreamAsync(cancellationToken);
+        using var buffer = new MemoryStream();
+        var chunk = new byte[1024];
+        var totalBytes = 0;
+        while (true)
+        {
+            var bytesRead = await stream.ReadAsync(chunk, cancellationToken);
+            if (bytesRead == 0)
+            {
+                return Encoding.UTF8.GetString(buffer.ToArray());
+            }
+
+            totalBytes += bytesRead;
+            if (totalBytes > maxBytes)
+            {
+                throw new InvalidDataException(
+                    $"{sourceName} beklenenden büyük.");
+            }
+
+            buffer.Write(chunk, 0, bytesRead);
+        }
+    }
+
+    private static string ParseSha256Digest(
+        GitHubReleaseAsset asset,
+        string assetName)
+    {
+        const string prefix = "sha256:";
+        if (string.IsNullOrWhiteSpace(asset.Digest)
+            || !asset.Digest.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                $"{assetName} GitHub SHA-256 digest bilgisi içermiyor.");
+        }
+
+        var digest = asset.Digest[prefix.Length..];
+        if (digest.Length != 64 || !digest.All(Uri.IsHexDigit))
+        {
+            throw new InvalidDataException(
+                $"{assetName} GitHub SHA-256 digest bilgisi geçerli değil.");
+        }
+
+        return digest.ToUpperInvariant();
+    }
+
+    private static string CopyApplicator(
+        string applicationDirectory,
+        string updateDirectory)
+    {
+        var sourceDirectory = Path.GetFullPath(applicationDirectory);
+        var applicatorDirectory = Path.Combine(
             updateDirectory,
-            $"apply-update-{versionText}-{Guid.NewGuid():N}.ps1");
-        var script = """
-param(
-    [Parameter(Mandatory=$true)][int]$ProcessId,
-    [Parameter(Mandatory=$true)][string]$SourceDirectory,
-    [Parameter(Mandatory=$true)][string]$TargetDirectory,
-    [Parameter(Mandatory=$true)][string]$ExecutableName,
-    [Parameter(Mandatory=$true)][string]$LogPath
-)
+            "applicator-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(applicatorDirectory);
 
-$ErrorActionPreference = 'Stop'
+        var updaterFiles = Directory
+            .EnumerateFiles(sourceDirectory, "Discorder.Updater*", SearchOption.TopDirectoryOnly)
+            .Concat(Directory.EnumerateFiles(
+                sourceDirectory,
+                "Discorder.Core.dll",
+                SearchOption.TopDirectoryOnly))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
-function Write-DiscorderUpdateLog {
-    param([string]$Message)
-    $line = ('{0:O} {1}' -f [DateTimeOffset]::Now, $Message)
-    Add-Content -LiteralPath $LogPath -Value $line -Encoding UTF8
-}
+        foreach (var source in updaterFiles)
+        {
+            File.Copy(
+                source,
+                Path.Combine(applicatorDirectory, Path.GetFileName(source)),
+                overwrite: true);
+        }
 
-try {
-    Write-DiscorderUpdateLog 'Waiting for Discorder to exit.'
-    try {
-        Wait-Process -Id $ProcessId -Timeout 90 -ErrorAction SilentlyContinue
-    } catch {
-        Write-DiscorderUpdateLog ('Wait-Process returned: ' + $_.Exception.Message)
+        var applicatorPath = Path.Combine(
+            applicatorDirectory,
+            UpdaterExecutableName);
+        if (!File.Exists(applicatorPath))
+        {
+            throw new FileNotFoundException(
+                "Güncelleme yardımcısı bulunamadı.",
+                applicatorPath);
+        }
+
+        return applicatorPath;
     }
 
-    if (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue) {
-        throw 'Discorder process did not exit before the update timeout.'
-    }
+    private static string Require(string? value, string name)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException(
+                $"Güncelleme bilgisi eksik: {name}");
+        }
 
-    if (-not (Test-Path -LiteralPath $SourceDirectory -PathType Container)) {
-        throw ('Update source not found: ' + $SourceDirectory)
-    }
-
-    if (-not (Test-Path -LiteralPath $TargetDirectory -PathType Container)) {
-        throw ('Update target not found: ' + $TargetDirectory)
-    }
-
-    Write-DiscorderUpdateLog 'Copying update payload.'
-    Get-ChildItem -LiteralPath $SourceDirectory -Force | ForEach-Object {
-        Copy-Item -LiteralPath $_.FullName -Destination $TargetDirectory -Recurse -Force
-    }
-
-    $executablePath = Join-Path -Path $TargetDirectory -ChildPath $ExecutableName
-    if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
-        throw ('Updated executable not found: ' + $executablePath)
-    }
-
-    Write-DiscorderUpdateLog 'Starting updated Discorder.'
-    Start-Process -FilePath $executablePath -WorkingDirectory $TargetDirectory
-    Write-DiscorderUpdateLog 'Update applied successfully.'
-    exit 0
-} catch {
-    Write-DiscorderUpdateLog ('Update failed: ' + $_.Exception.Message)
-    exit 1
-}
-""";
-
-        await File.WriteAllTextAsync(
-            scriptPath,
-            script,
-            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
-            cancellationToken);
-
-        return scriptPath;
+        return value;
     }
 
     private sealed record GitHubRelease(
@@ -350,5 +565,8 @@ try {
 
     private sealed record GitHubReleaseAsset(
         [property: JsonPropertyName("name")] string? Name,
-        [property: JsonPropertyName("browser_download_url")] string? BrowserDownloadUrl);
+        [property: JsonPropertyName("browser_download_url")] string? BrowserDownloadUrl,
+        [property: JsonPropertyName("state")] string? State,
+        [property: JsonPropertyName("size")] long? Size,
+        [property: JsonPropertyName("digest")] string? Digest);
 }

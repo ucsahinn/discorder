@@ -6,13 +6,19 @@ public sealed class AppPaths
     {
         var root = localAppData ?? Environment.GetFolderPath(
             Environment.SpecialFolder.LocalApplicationData);
+        var sharedRoot = localAppData ?? Environment.GetFolderPath(
+            Environment.SpecialFolder.CommonApplicationData);
 
-        if (string.IsNullOrWhiteSpace(root))
+        if (string.IsNullOrWhiteSpace(root)
+            || string.IsNullOrWhiteSpace(sharedRoot))
         {
             throw new InvalidOperationException("Yerel uygulama veri klasörü kullanılamıyor.");
         }
 
         DataDirectory = Path.Combine(root, "Discorder");
+        SharedDataDirectory = Path.Combine(sharedRoot, "Discorder");
+        UpdateStagingDirectory = Path.Combine(SharedDataDirectory, "updates");
+        ProtectUpdateStaging = localAppData is null;
         ToolsDirectory = Path.Combine(DataDirectory, "tools");
         InstallerDirectory = Path.Combine(DataDirectory, "installers");
         ProfileDirectory = Path.Combine(DataDirectory, "profiles");
@@ -32,6 +38,12 @@ public sealed class AppPaths
     }
 
     public string DataDirectory { get; }
+
+    public string SharedDataDirectory { get; }
+
+    public string UpdateStagingDirectory { get; }
+
+    public bool ProtectUpdateStaging { get; }
 
     public string ToolsDirectory { get; }
 

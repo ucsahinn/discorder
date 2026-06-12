@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.IO.Compression;
 using Discorder.Core.Configuration;
 using Discorder.Core.Connection;
@@ -20,7 +21,7 @@ using Discorder.Core.WireSock;
 var tests = new (string Name, Func<Task> Run)[]
 {
     ("Discord kapsamı varsayılan olarak tarayıcıları kapalı tutar", DiscordScopeDefaultsToAppOnlyAsync),
-    ("Discord web modu uygulama ve desteklenen tarayıcıları içerir", DiscordScopeIncludesBrowsersWhenEnabledAsync),
+    ("Tarayıcı modu uygulama ve desteklenen tarayıcıları içerir", DiscordScopeIncludesBrowsersWhenEnabledAsync),
     ("Profil üretici geniş AllowedApps değerlerini değiştirir", ProfileBuilderIsStrictAsync),
     ("Profil üretici yapılandırma enjeksiyonunu reddeder", ProfileBuilderRejectsInjectionAsync),
     ("wgcf Discord uygulama ve web profili üretir", WgcfProvisionerBuildsDiscordAccessProfileAsync),
@@ -28,7 +29,14 @@ var tests = new (string Name, Func<Task> Run)[]
     ("SHA-256 doğrulayıcı yalnızca sabit özeti kabul eder", HashVerifierIsStrictAsync),
     ("Doğrulanmış indirici geçici zaman aşımını tekrar dener", VerifiedDownloaderRetriesTransientTimeoutAsync),
     ("Otomatik güncelleme güncel sürümde indirme yapmaz", AppUpdateSkipsCurrentReleaseAsync),
+    ("Otomatik güncelleme yeni sürümü indirmeden bildirir", AppUpdateCheckFindsReleaseWithoutDownloadAsync),
     ("Otomatik güncelleme yeni GitHub paketini hazırlar", AppUpdatePreparesVerifiedReleaseAsync),
+    ("Otomatik güncelleme GitHub digest uyuşmazlığını reddeder", AppUpdateRejectsDigestMismatchAsync),
+    ("Otomatik güncelleme manifest sürüm uyuşmazlığını reddeder", AppUpdateRejectsManifestVersionMismatchAsync),
+    ("Otomatik güncelleme büyük checksum dosyasını reddeder", AppUpdateRejectsOversizedChecksumAsync),
+    ("Otomatik güncelleme güvensiz zip yolunu reddeder", AppUpdateRejectsUnsafeArchiveEntryAsync),
+    ("Otomatik güncelleme manifest dışı zip dosyasını reddeder", AppUpdateRejectsArchiveEntryOutsideManifestAsync),
+    ("Otomatik güncelleme tüm PE dosyalarını imza doğrulamasına alır", AppUpdateRequiresSignaturesForAllPortableBinariesAsync),
     ("Ayarlar WireSock onayını sürüm bazında saklar", SettingsPersistConsentAsync),
     ("WireSock hazırlığı onaysız kurulumu reddeder", BootstrapRequiresConsentAsync),
     ("WireSock hazırlığı güvenilir kurulumu yeniden kullanır", BootstrapReusesTrustedInstallAsync),
@@ -40,10 +48,10 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
     ("Denetleyici GitHub DNS hatasını Türkçe açıklar", ControllerNetworkFailureIsUserFriendlyAsync),
     ("Denetleyici indirme zaman aşımını Türkçe açıklar", ControllerDownloadTimeoutIsUserFriendlyAsync),
-    ("Denetleyici hosts kilidi hatasını Türkçe açıklar", ControllerAccessLockFailureIsUserFriendlyAsync),
-    ("Windows Firewall kilidi Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
+    ("Denetleyici bağlantı koruması hatasını Türkçe açıklar", ControllerAccessLockFailureIsUserFriendlyAsync),
+    ("Windows Firewall koruması Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
     ("Onarım ayarları ve logları koruyup üretilen veriyi yeniler", CleanupServiceRepairsGeneratedStateAsync),
-    ("Temiz kaldırma Discorder verisini ve kilidini siler", CleanupServiceRemovesDiscorderStateAsync),
+    ("Uygulamayı kaldırma Discorder verisini ve korumayı siler", CleanupServiceRemovesDiscorderStateAsync),
     ("Tanılama logları devops paketi üretir", DiagnosticsWritesDevOpsBundleAsync)
 };
 
@@ -327,8 +335,8 @@ static async Task AppUpdateSkipsCurrentReleaseAsync()
         var handler = new MapHttpMessageHandler();
         handler.AddJson(latestUri, """
             {
-              "tag_name": "v2.0.11",
-              "html_url": "https://github.com/ucsahinn/discorder/releases/tag/v2.0.11",
+              "tag_name": "v2.0.12",
+              "html_url": "https://github.com/ucsahinn/discorder/releases/tag/v2.0.12",
               "assets": []
             }
             """);
@@ -338,15 +346,58 @@ static async Task AppUpdateSkipsCurrentReleaseAsync()
             httpClient,
             new AppPaths(root),
             downloader,
-            latestUri);
+            latestUri,
+            requireUpdateAuthenticode: false);
 
         var update = await service.PrepareLatestUpdateAsync(
-            new Version(2, 0, 11, 0),
+            new Version(2, 0, 12, 0),
             root,
             "Discorder.exe",
             CancellationToken.None);
 
         Assert(update.Status == AppUpdatePreparationStatus.UpToDate);
+        Assert(downloader.DownloadCount == 0);
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task AppUpdateCheckFindsReleaseWithoutDownloadAsync()
+{
+    var root = CreateTemporaryDirectory();
+    try
+    {
+        var latestUri = new Uri("https://updates.example.test/releases/latest");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var packageBytes = CreateUpdatePackage();
+        var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
+        var handler = new MapHttpMessageHandler();
+        handler.AddJson(
+            latestUri,
+            CreateReleaseJson("2.0.13", zipUri, checksumUri, expectedSha256, packageBytes.Length));
+        handler.AddText(
+            checksumUri,
+            $"{expectedSha256}  Discorder-2.0.13-win-x64.zip");
+        using var httpClient = new HttpClient(handler);
+        var downloader = new CapturingVerifiedDownloader(packageBytes);
+        var service = new AppUpdateService(
+            httpClient,
+            new AppPaths(root),
+            downloader,
+            latestUri,
+            requireUpdateAuthenticode: false);
+
+        var check = await service.CheckLatestUpdateAsync(
+            new Version(2, 0, 12, 0),
+            CancellationToken.None);
+
+        Assert(check.Status == AppUpdateCheckStatus.UpdateAvailable);
+        Assert(check.LatestVersion == new Version(2, 0, 13, 0));
+        Assert(check.PackageUri == zipUri);
+        Assert(check.ExpectedSha256 == expectedSha256);
         Assert(downloader.DownloadCount == 0);
     }
     finally
@@ -361,40 +412,29 @@ static async Task AppUpdatePreparesVerifiedReleaseAsync()
     try
     {
         var latestUri = new Uri("https://updates.example.test/releases/latest");
-        var zipUri = new Uri("https://updates.example.test/releases/download/v2.0.12/Discorder-2.0.12-win-x64.zip");
-        var checksumUri = new Uri("https://updates.example.test/releases/download/v2.0.12/Discorder-2.0.12-win-x64.sha256.txt");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
         var packageBytes = CreateUpdatePackage();
         var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
         var handler = new MapHttpMessageHandler();
-        handler.AddJson(latestUri, $$"""
-            {
-              "tag_name": "v2.0.12",
-              "html_url": "https://github.com/ucsahinn/discorder/releases/tag/v2.0.12",
-              "assets": [
-                {
-                  "name": "Discorder-2.0.12-win-x64.zip",
-                  "browser_download_url": "{{zipUri.AbsoluteUri}}"
-                },
-                {
-                  "name": "Discorder-2.0.12-win-x64.sha256.txt",
-                  "browser_download_url": "{{checksumUri.AbsoluteUri}}"
-                }
-              ]
-            }
-            """);
+        handler.AddJson(
+            latestUri,
+            CreateReleaseJson("2.0.13", zipUri, checksumUri, expectedSha256, packageBytes.Length));
         handler.AddText(
             checksumUri,
-            $"{expectedSha256}  Discorder-2.0.12-win-x64.zip");
+            $"{expectedSha256}  Discorder-2.0.13-win-x64.zip");
         using var httpClient = new HttpClient(handler);
         var downloader = new CapturingVerifiedDownloader(packageBytes);
         var service = new AppUpdateService(
             httpClient,
             new AppPaths(root),
             downloader,
-            latestUri);
+            latestUri,
+            requireUpdateAuthenticode: false);
+        await WriteUpdaterHelperAsync(root);
 
         var update = await service.PrepareLatestUpdateAsync(
-            new Version(2, 0, 11, 0),
+            new Version(2, 0, 12, 0),
             root,
             "Discorder.exe",
             CancellationToken.None);
@@ -403,17 +443,189 @@ static async Task AppUpdatePreparesVerifiedReleaseAsync()
         Assert(downloader.DownloadCount == 1);
         Assert(downloader.LastSource == zipUri);
         Assert(downloader.LastExpectedSha256 == expectedSha256);
+        Assert(downloader.LastMaxBytes == packageBytes.Length);
         Assert(File.Exists(update.PackagePath));
         Assert(File.Exists(Path.Combine(update.PayloadDirectory!, "Discorder.exe")));
-        Assert(File.Exists(update.ScriptPath));
-        Assert((await File.ReadAllTextAsync(update.ScriptPath!)).Contains(
-            "Copy-Item",
-            StringComparison.Ordinal));
+        Assert(File.Exists(Path.Combine(
+            update.PayloadDirectory!,
+            UpdatePackageValidator.ManifestFileName)));
+        Assert(File.Exists(update.ApplicatorPath));
+        Assert(Path.GetFileName(update.ApplicatorPath!) == "Discorder.Updater.exe");
     }
     finally
     {
         Directory.Delete(root, recursive: true);
     }
+}
+
+static async Task AppUpdateRejectsDigestMismatchAsync()
+{
+    var root = CreateTemporaryDirectory();
+    try
+    {
+        var latestUri = new Uri("https://updates.example.test/releases/latest");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var packageBytes = CreateUpdatePackage();
+        var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
+        var handler = new MapHttpMessageHandler();
+        handler.AddJson(
+            latestUri,
+            CreateReleaseJson(
+                "2.0.13",
+                zipUri,
+                checksumUri,
+                new string('A', 64),
+                packageBytes.Length));
+        handler.AddText(
+            checksumUri,
+            $"{expectedSha256}  Discorder-2.0.13-win-x64.zip");
+        using var httpClient = new HttpClient(handler);
+        var service = new AppUpdateService(
+            httpClient,
+            new AppPaths(root),
+            new CapturingVerifiedDownloader(packageBytes),
+            latestUri,
+            requireUpdateAuthenticode: false);
+
+        await AssertThrowsAsync<InvalidDataException>(
+            () => service.CheckLatestUpdateAsync(
+                new Version(2, 0, 12, 0),
+                CancellationToken.None));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task AppUpdateRejectsManifestVersionMismatchAsync()
+{
+    var root = CreateTemporaryDirectory();
+    try
+    {
+        var latestUri = new Uri("https://updates.example.test/releases/latest");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var packageBytes = CreateUpdatePackage(version: "2.0.14");
+        var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
+        var handler = new MapHttpMessageHandler();
+        handler.AddJson(
+            latestUri,
+            CreateReleaseJson("2.0.13", zipUri, checksumUri, expectedSha256, packageBytes.Length));
+        handler.AddText(
+            checksumUri,
+            $"{expectedSha256}  Discorder-2.0.13-win-x64.zip");
+        using var httpClient = new HttpClient(handler);
+        var service = new AppUpdateService(
+            httpClient,
+            new AppPaths(root),
+            new CapturingVerifiedDownloader(packageBytes),
+            latestUri,
+            requireUpdateAuthenticode: false);
+        await WriteUpdaterHelperAsync(root);
+
+        await AssertThrowsAsync<InvalidDataException>(
+            () => service.PrepareLatestUpdateAsync(
+                new Version(2, 0, 12, 0),
+                root,
+                "Discorder.exe",
+                CancellationToken.None));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task AppUpdateRejectsOversizedChecksumAsync()
+{
+    var root = CreateTemporaryDirectory();
+    try
+    {
+        var latestUri = new Uri("https://updates.example.test/releases/latest");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var packageBytes = CreateUpdatePackage();
+        var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
+        var handler = new MapHttpMessageHandler();
+        handler.AddJson(
+            latestUri,
+            CreateReleaseJson("2.0.13", zipUri, checksumUri, expectedSha256, packageBytes.Length));
+        handler.AddText(
+            checksumUri,
+            new string('A', 8193));
+        using var httpClient = new HttpClient(handler);
+        var service = new AppUpdateService(
+            httpClient,
+            new AppPaths(root),
+            new CapturingVerifiedDownloader(packageBytes),
+            latestUri,
+            requireUpdateAuthenticode: false);
+
+        await AssertThrowsAsync<InvalidDataException>(
+            () => service.CheckLatestUpdateAsync(
+                new Version(2, 0, 12, 0),
+                CancellationToken.None));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static Task AppUpdateRejectsUnsafeArchiveEntryAsync()
+{
+    var root = CreateTemporaryDirectory();
+    try
+    {
+        var path = Path.Combine(root, "unsafe.zip");
+        using (var archive = ZipFile.Open(path, ZipArchiveMode.Create))
+        {
+            archive.CreateEntry("Discorder.exe");
+            archive.CreateEntry("../outside.txt");
+        }
+
+        AssertThrows<InvalidDataException>(() =>
+            UpdatePackageValidator.ValidateArchive(path, "Discorder.exe"));
+        return Task.CompletedTask;
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static Task AppUpdateRejectsArchiveEntryOutsideManifestAsync()
+{
+    var root = CreateTemporaryDirectory();
+    try
+    {
+        var path = Path.Combine(root, "extra.zip");
+        File.WriteAllBytes(path, CreateUpdatePackage(extraEntryName: "unexpected.txt"));
+
+        AssertThrows<InvalidDataException>(() =>
+            UpdatePackageValidator.ValidateArchive(
+                path,
+                "Discorder.exe",
+                expectedVersion: "2.0.13"));
+        return Task.CompletedTask;
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static Task AppUpdateRequiresSignaturesForAllPortableBinariesAsync()
+{
+    Assert(AuthenticodeSignatureVerifier.ShouldVerify("Discorder.exe"));
+    Assert(AuthenticodeSignatureVerifier.ShouldVerify("Discorder.Updater.dll"));
+    Assert(AuthenticodeSignatureVerifier.ShouldVerify("third-party/native-helper.exe"));
+    Assert(AuthenticodeSignatureVerifier.ShouldVerify("third-party/native-helper.dll"));
+    Assert(!AuthenticodeSignatureVerifier.ShouldVerify("discorder.update-manifest.json"));
+    Assert(!AuthenticodeSignatureVerifier.ShouldVerify("README.md"));
+    return Task.CompletedTask;
 }
 
 static async Task SettingsPersistConsentAsync()
@@ -693,7 +905,7 @@ static async Task ControllerLifecycleAsync()
     {
         await controller.EnsureDisconnectedLockAsync();
         Assert(accessLock.EnableCount == 1);
-        Assert(controller.Snapshot.Message.Contains("kilitli", StringComparison.Ordinal));
+        Assert(controller.Snapshot.Message.Contains("Bağlı Değil", StringComparison.Ordinal));
 
         await controller.ConnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Connected);
@@ -930,7 +1142,7 @@ static async Task ControllerAccessLockFailureIsUserFriendlyAsync()
         await controller.ConnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Error);
         Assert(controller.Snapshot.Message.Contains(
-            "Discord kilidi güncellenemedi",
+            "Discord bağlantı koruması güncellenemedi",
             StringComparison.OrdinalIgnoreCase));
         Assert(controller.Snapshot.Message.Contains(
             "yönetici",
@@ -1191,18 +1403,90 @@ static string CreateTemporaryDirectory()
     return path;
 }
 
-static byte[] CreateUpdatePackage()
+static byte[] CreateUpdatePackage(
+    string version = "2.0.13",
+    string? extraEntryName = null)
 {
     using var buffer = new MemoryStream();
+    var executableBytes = Encoding.UTF8.GetBytes("discorder-update");
+    var executableHash = Convert.ToHexString(SHA256.HashData(executableBytes));
+    var manifest = new UpdateManifest(
+        version,
+        [
+            new UpdateManifestFile(
+                "Discorder.exe",
+                executableBytes.Length,
+                executableHash)
+        ]);
+    var manifestBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(
+        manifest,
+        TestJsonOptions.Manifest));
+
     using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
     {
         var executable = archive.CreateEntry("Discorder.exe");
-        using var stream = executable.Open();
-        var bytes = Encoding.UTF8.GetBytes("discorder-update");
-        stream.Write(bytes);
+        using (var stream = executable.Open())
+        {
+            stream.Write(executableBytes);
+        }
+
+        var manifestEntry = archive.CreateEntry(
+            UpdatePackageValidator.ManifestFileName);
+        using (var manifestStream = manifestEntry.Open())
+        {
+            manifestStream.Write(manifestBytes);
+        }
+
+        if (!string.IsNullOrWhiteSpace(extraEntryName))
+        {
+            var extraEntry = archive.CreateEntry(extraEntryName);
+            using var extraStream = extraEntry.Open();
+            extraStream.Write(Encoding.UTF8.GetBytes("unexpected"));
+        }
     }
 
     return buffer.ToArray();
+}
+
+static string CreateReleaseJson(
+    string version,
+    Uri packageUri,
+    Uri checksumUri,
+    string packageSha256,
+    long packageSize)
+{
+    return $$"""
+        {
+          "tag_name": "v{{version}}",
+          "html_url": "https://github.com/ucsahinn/discorder/releases/tag/v{{version}}",
+          "assets": [
+            {
+              "name": "Discorder-{{version}}-win-x64.zip",
+              "browser_download_url": "{{packageUri.AbsoluteUri}}",
+              "state": "uploaded",
+              "size": {{packageSize}},
+              "digest": "sha256:{{packageSha256}}"
+            },
+            {
+              "name": "Discorder-{{version}}-win-x64.sha256.txt",
+              "browser_download_url": "{{checksumUri.AbsoluteUri}}",
+              "state": "uploaded",
+              "size": 96,
+              "digest": null
+            }
+          ]
+        }
+        """;
+}
+
+static async Task WriteUpdaterHelperAsync(string root)
+{
+    await File.WriteAllTextAsync(
+        Path.Combine(root, "Discorder.Updater.exe"),
+        "updater");
+    await File.WriteAllTextAsync(
+        Path.Combine(root, "Discorder.Core.dll"),
+        "core");
 }
 
 static void Assert(bool condition)
@@ -1243,6 +1527,15 @@ static async Task<TException> AssertThrowsAsync<TException>(Func<Task> action)
 
     throw new InvalidOperationException(
         $"{typeof(TException).Name} beklenen şekilde fırlatılmadı.");
+}
+
+file static class TestJsonOptions
+{
+    public static readonly JsonSerializerOptions Manifest = new(
+        JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true
+    };
 }
 
 file sealed class FakeDiscordAccessLock(Exception? disableException = null) : IDiscordAccessLock
@@ -1425,16 +1718,20 @@ file sealed class CapturingVerifiedDownloader(byte[] payload) : IVerifiedDownloa
 
     public string? LastExpectedSha256 { get; private set; }
 
+    public long? LastMaxBytes { get; private set; }
+
     public async Task DownloadAsync(
         Uri source,
         string destination,
         string expectedSha256,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long? maxBytes = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         DownloadCount++;
         LastSource = source;
         LastExpectedSha256 = expectedSha256;
+        LastMaxBytes = maxBytes;
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
         await File.WriteAllBytesAsync(destination, payload, cancellationToken);
     }
@@ -1448,7 +1745,8 @@ file sealed class FakeVerifiedDownloader : IVerifiedDownloader
         Uri source,
         string destination,
         string expectedSha256,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long? maxBytes = null)
     {
         DownloadCount++;
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);

@@ -43,6 +43,7 @@ public partial class MainWindow : Window, IDisposable
     private bool _isRunInBackgroundEnabled;
     private bool _isToggleOperationRunning;
     private bool _isUpdateOperationRunning;
+    private AppUpdateCheckResult? _pendingUpdate;
     private bool _backgroundVideoRemoteFallbackTried;
     private Forms.NotifyIcon? _trayIcon;
     private bool _hasShownTrayNotice;
@@ -164,7 +165,7 @@ public partial class MainWindow : Window, IDisposable
     {
         ToggleButton.IsEnabled = !_isToggleOperationRunning && !snapshot.IsBusy;
         RepairButton.IsEnabled = !snapshot.IsBusy;
-        AutoUpdateButton.IsEnabled = !_isUpdateOperationRunning && !snapshot.IsBusy;
+        ApplyUpdateControls(snapshot.IsBusy);
         StatusMessage.Text = snapshot.Message;
         StatusDetail.Text = GetDetail(snapshot.State);
         ApplyBrowserAccessView(
@@ -346,14 +347,14 @@ public partial class MainWindow : Window, IDisposable
         var message = snapshot.Message;
         return snapshot.State switch
         {
-            TunnelState.Connected => (100, "Tünel açık", 4),
-            TunnelState.Connecting => (82, "Tünel başlatılıyor", 4),
+            TunnelState.Connected => (100, "Bağlandı", 4),
+            TunnelState.Connecting => (82, "Bağlantı açılıyor", 4),
             TunnelState.Disconnecting => (62, "Bağlantı kapatılıyor", 4),
             TunnelState.Error => (100, "Müdahale gerekiyor", 4),
             TunnelState.Preparing when message.Contains(
-                    "kilidi",
+                    "bağlantısı",
                     StringComparison.OrdinalIgnoreCase)
-                => (22, "Discord kilidi kaldırılıyor", 1),
+                => (22, "Discord bağlantısı hazırlanıyor", 1),
             TunnelState.Preparing when message.Contains(
                     "WireSock",
                     StringComparison.OrdinalIgnoreCase)
@@ -367,7 +368,7 @@ public partial class MainWindow : Window, IDisposable
                 || message.Contains("wgcf", StringComparison.OrdinalIgnoreCase)
                 => (68, "Profil hazırlanıyor", 3),
             TunnelState.Preparing => (38, "Hazırlık çalışıyor", 2),
-            _ => (8, "Hazır, Discord kilidi aktif", 0)
+            _ => (8, "Discorder Bağlı Değil", 0)
         };
     }
 
@@ -390,13 +391,13 @@ public partial class MainWindow : Window, IDisposable
         return state switch
         {
             TunnelState.Connected => _controller.IncludeBrowserAccess
-                ? "Web modunda Discord uygulaması ve desteklenen tarayıcılar kapsamda."
-                : "Uygulama modunda yalnızca Discord uygulaması kapsamda.",
-            TunnelState.Preparing => "Kurulum, dijital imza ve tünel profili doğrulanıyor.",
+                ? "Tarayıcı modunda Discord uygulaması ve desteklenen tarayıcılar kapsamda."
+                : "Çalışma modunda yalnızca Discord uygulaması kapsamda.",
+            TunnelState.Preparing => "Kurulum, dijital imza ve bağlantı profili doğrulanıyor.",
             TunnelState.Connecting => "WireSock VPN Client süreci başlatılıyor.",
-            TunnelState.Disconnecting => "Tünel süreci güvenli biçimde sonlandırılıyor.",
+            TunnelState.Disconnecting => "Bağlantı güvenli biçimde sonlandırılıyor.",
             TunnelState.Error => "Tanılama klasörünü açarak ayrıntıları inceleyin.",
-            _ => "Discorder kapalıyken Discord VPN kilidi aktif kalır."
+            _ => "Discorder bağlı değilken Discord düz bağlantıya çıkmaz."
         };
     }
 
@@ -445,11 +446,11 @@ public partial class MainWindow : Window, IDisposable
             BrowserAccessToggle.IsEnabled = !locked;
             BrowserAccessStatus.Text = enabled
                 ? locked
-                    ? "Web modu bu oturumda açık. Uygulama moduna geçmek için önce bağlantıyı kes."
-                    : "Web modu açık. Discord uygulaması ve desteklenen tarayıcılar tünellenir."
+                    ? "Tarayıcı modu bu oturumda açık. Değiştirmek için önce bağlantıyı kes."
+                    : "Tarayıcı modu açık. Discord web erişimi de bağlantıya dahil."
                 : locked
-                    ? "Bu oturumda kilitli. Web modunu değiştirmek için önce bağlantıyı kes."
-                    : "Kapalıyken yalnızca Discord uygulaması tünellenir.";
+                    ? "Bu oturumda değişmez. Değiştirmek için önce bağlantıyı kes."
+                    : "Kapalıyken yalnızca Discord uygulaması bağlantıya dahil.";
         }
         finally
         {
@@ -485,8 +486,8 @@ public partial class MainWindow : Window, IDisposable
                 ? "Pencere kapanınca bildirim alanında kalır."
                 : "Pencere kapanınca bildirim alanında kalmaz.";
             CloseBehaviorSummary.Text = enabled
-                ? "Arka planda kalır"
-                : "Discord kilitlenir";
+                ? "Arka planda çalışır"
+                : "Bağlı değil";
 
             if (enabled)
             {
@@ -518,8 +519,8 @@ public partial class MainWindow : Window, IDisposable
             _diagnostics.Info(
                 "ui.startup",
                 enabled
-                    ? "Başlangıçta çalışma açıldı."
-                    : "Başlangıçta çalışma kapatıldı.");
+                    ? "Windows açılışında çalıştırma açıldı."
+                    : "Windows açılışında çalıştırma kapatıldı.");
             ApplyStartupSetting(enabled);
         }
         catch (Exception exception)
@@ -529,7 +530,7 @@ public partial class MainWindow : Window, IDisposable
             ApplyStartupSetting(currentState);
 
             MessageBox.Show(
-                "Başlangıçta çalışma ayarı kaydedilemedi.\n\n" + exception.Message,
+                "Windows açılışında çalıştırma ayarı kaydedilemedi.\n\n" + exception.Message,
                 "Discorder",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -547,8 +548,8 @@ public partial class MainWindow : Window, IDisposable
         {
             StartupToggle.IsChecked = enabled;
             StartupStatus.Text = enabled
-                ? "Açıkken Windows oturumunda başlar."
-                : "Kapalıyken Windows oturumunda başlamaz.";
+                ? "Windows açılışında çalışır."
+                : "Windows açılışında çalıştır";
         }
         finally
         {
@@ -588,10 +589,9 @@ public partial class MainWindow : Window, IDisposable
     private async void CleanUninstall_Click(object sender, RoutedEventArgs e)
     {
         var confirmation = MessageBox.Show(
-            "Discorder bağlantıyı kapatacak, hosts ve Windows Firewall üzerindeki Discorder kilidini geri alacak, " +
-            "%LOCALAPPDATA%\\Discorder altındaki profil, ayar, wgcf, kurucu, tanılama paketi ve log dosyalarını silecek. " +
-            "WireSock VPN Client Discorder tarafından kurulduysa Windows'tan kaldırılacak.\n\nDevam edilsin mi?",
-            "Discorder temiz kaldır",
+            "Discorder bağlantıyı kapatacak, yerel ayarları ve uygulama verilerini kaldıracak. " +
+            "WireSock Discorder tarafından kurulduysa Windows'tan kaldırılacak.\n\nDevam edilsin mi?",
+            "Discorder uygulamayı kaldır",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,
             MessageBoxResult.No);
@@ -604,9 +604,9 @@ public partial class MainWindow : Window, IDisposable
         IsEnabled = false;
         _operationCancellation?.Cancel();
         StopBackgroundVideo();
-        StatusMessage.Text = "Temiz kaldırma çalışıyor";
-        StatusDetail.Text = "Tünel kapatılıyor, WireSock ve Discorder izleri temizleniyor.";
-        SetMaintenanceProgress(24, "Tünel kapatılıyor");
+        StatusMessage.Text = "Kaldırma çalışıyor";
+        StatusDetail.Text = "Bağlantı kapatılıyor, yerel Discorder verileri kaldırılıyor.";
+        SetMaintenanceProgress(24, "Bağlantı kapatılıyor");
         _diagnostics.Warning("ui.cleanUninstall", "Kullanıcı temiz kaldırmayı başlattı.");
 
         try
@@ -624,11 +624,11 @@ public partial class MainWindow : Window, IDisposable
                 removeWireSock,
                 CancellationToken.None);
             _settingsStore.SetWireSockInstalledByDiscorder(installed: false);
-            SetMaintenanceProgress(78, "Yerel veriler siliniyor");
+            SetMaintenanceProgress(78, "Yerel veriler kaldırılıyor");
             await _cleanupService.CleanUninstallAsync(CancellationToken.None);
 
             MessageBox.Show(
-                "Discorder temiz kaldırıldı. Uygulama kapanacak.",
+                "Discorder kaldırıldı. Uygulama kapanacak.",
                 "Discorder",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -639,11 +639,11 @@ public partial class MainWindow : Window, IDisposable
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             IsEnabled = true;
-            StatusMessage.Text = "Temiz kaldırma tamamlanamadı";
+            StatusMessage.Text = "Kaldırma tamamlanamadı";
             StatusDetail.Text = exception.Message;
 
             MessageBox.Show(
-                "Temiz kaldırma tamamlanamadı.\n\n" + exception.Message,
+                "Uygulama kaldırılamadı.\n\n" + exception.Message,
                 "Discorder",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -672,11 +672,11 @@ public partial class MainWindow : Window, IDisposable
 
         ToggleButton.IsEnabled = false;
         RepairButton.IsEnabled = false;
-        AutoUpdateButton.IsEnabled = false;
+        SetUpdateControlsEnabled(false);
         BrowserAccessToggle.IsEnabled = false;
         _operationCancellation?.Cancel();
         StatusMessage.Text = "Onarım çalışıyor";
-        StatusDetail.Text = "Tünel kapatılıyor, Discord kilidi kuruluyor ve profil dosyaları yenileniyor.";
+        StatusDetail.Text = "Bağlantı kapatılıyor, koruma geri alınıyor ve profil dosyaları yenileniyor.";
         SetMaintenanceProgress(36, "Onarım hazırlanıyor");
         _diagnostics.Info("ui.repair", "Kullanıcı onarımı başlattı.");
 
@@ -712,8 +712,7 @@ public partial class MainWindow : Window, IDisposable
         {
             ToggleButton.IsEnabled = !_controller.Snapshot.IsBusy;
             RepairButton.IsEnabled = !_controller.Snapshot.IsBusy;
-            AutoUpdateButton.IsEnabled =
-                !_isUpdateOperationRunning && !_controller.Snapshot.IsBusy;
+            ApplyUpdateControls(_controller.Snapshot.IsBusy);
             BrowserAccessToggle.IsEnabled = !_controller.Snapshot.IsBusy
                 && !_controller.Snapshot.IsConnected;
         }
@@ -1010,51 +1009,135 @@ public partial class MainWindow : Window, IDisposable
         }
 
         _isUpdateOperationRunning = true;
-        AutoUpdateButton.IsEnabled = false;
+        SetUpdateControlsEnabled(false);
         ToggleButton.IsEnabled = false;
         RepairButton.IsEnabled = false;
 
         try
         {
-            _diagnostics.Info("ui.update", "Otomatik güncelleme istendi.");
-            DiagnosticsStatus.Text = "Güncelleme kontrol ediliyor...";
-
-            if (_controller.Snapshot.IsConnected)
-            {
-                DiagnosticsStatus.Text = "Bağlantı kapatılıyor, sonra güncelleme hazırlanacak.";
-                await _controller.DisconnectAsync(CancellationToken.None);
-            }
-
+            _diagnostics.Info("ui.update.check", "Güncelleme denetimi istendi.");
+            DiagnosticsStatus.Text = "Güncelleme denetleniyor…";
             using var timeoutSource = new CancellationTokenSource(
-                TimeSpan.FromMinutes(10));
-            var executableName = Path.GetFileName(Environment.ProcessPath);
-            if (string.IsNullOrWhiteSpace(executableName))
-            {
-                executableName = "Discorder.exe";
-            }
-
-            var update = await _updateService.PrepareLatestUpdateAsync(
+                TimeSpan.FromMinutes(2));
+            var update = await _updateService.CheckLatestUpdateAsync(
                 GetCurrentVersion(),
-                AppContext.BaseDirectory,
-                executableName,
                 timeoutSource.Token);
 
-            if (update.Status == AppUpdatePreparationStatus.UpToDate)
+            if (update.Status == AppUpdateCheckStatus.UpToDate)
             {
-                DiagnosticsStatus.Text = "Discorder zaten güncel.";
+                _pendingUpdate = null;
+                DiagnosticsStatus.Text = "Discorder güncel.";
                 MessageBox.Show(
-                    $"Discorder zaten güncel.\n\nKurulu sürüm: v{AppUpdateService.FormatVersion(update.CurrentVersion)}",
+                    $"Discorder güncel.\n\nKurulu sürüm: v{AppUpdateService.FormatVersion(update.CurrentVersion)}",
                     "Discorder güncelleme",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
             }
 
+            _pendingUpdate = update;
             DiagnosticsStatus.Text =
-                $"v{AppUpdateService.FormatVersion(update.LatestVersion)} indirildi. Güncelleme uygulanıyor...";
+                $"v{AppUpdateService.FormatVersion(update.LatestVersion)} bulundu. Yükle bu klasöre kurar.";
+            _diagnostics.Info(
+                "ui.update.available",
+                "Güncelleme bulundu.",
+                new Dictionary<string, string?>
+                {
+                    ["latestVersion"] = AppUpdateService.FormatVersion(update.LatestVersion),
+                    ["expectedSha256"] = update.ExpectedSha256
+                });
+        }
+        catch (OperationCanceledException)
+        {
+            DiagnosticsStatus.Text = "Güncelleme denetimi iptal edildi.";
+        }
+        catch (Exception exception)
+        {
+            _pendingUpdate = null;
+            DiagnosticsStatus.Text = "Güncelleme denetlenemedi. Mevcut sürüm kullanılabilir.";
+            _diagnostics.Failure(
+                "ui.update",
+                "Güncelleme denetimi tamamlanamadı.",
+                exception);
+            MessageBox.Show(
+                "Güncelleme denetlenemedi.\n\n" + exception.Message,
+                "Discorder güncelleme",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            _isUpdateOperationRunning = false;
+
+            if (!_allowClose)
+            {
+                ApplySnapshot(_controller.Snapshot);
+            }
+        }
+    }
+
+    private async void InstallUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isUpdateOperationRunning)
+        {
+            return;
+        }
+
+        if (_pendingUpdate is null
+            || _pendingUpdate.Status != AppUpdateCheckStatus.UpdateAvailable)
+        {
+            DiagnosticsStatus.Text = "Önce güncellemeyi denetleyin.";
+            return;
+        }
+
+        if (_controller.Snapshot.IsBusy)
+        {
+            MessageBox.Show(
+                "Devam eden işlem bitince güncellemeyi yükleyin.",
+                "Discorder güncelleme",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        _isUpdateOperationRunning = true;
+        SetUpdateControlsEnabled(false);
+        ToggleButton.IsEnabled = false;
+        RepairButton.IsEnabled = false;
+
+        try
+        {
+            _diagnostics.Info("ui.update.install", "Güncelleme yükleme istendi.");
+
+            if (_controller.Snapshot.IsConnected)
+            {
+                DiagnosticsStatus.Text = "Bağlantı kapatılıyor. Ardından güncelleme yüklenecek.";
+                await _controller.DisconnectAsync(CancellationToken.None);
+            }
+
+            using var timeoutSource = new CancellationTokenSource(
+                TimeSpan.FromMinutes(10));
+            var executableName = GetExecutableName();
+            DiagnosticsStatus.Text =
+                $"v{AppUpdateService.FormatVersion(_pendingUpdate.LatestVersion)} indiriliyor ve doğrulanıyor…";
+            var update = await _updateService.PrepareCheckedUpdateAsync(
+                _pendingUpdate,
+                AppContext.BaseDirectory,
+                executableName,
+                timeoutSource.Token);
+
+            if (update.Status == AppUpdatePreparationStatus.UpToDate)
+            {
+                _pendingUpdate = null;
+                DiagnosticsStatus.Text = "Discorder güncel.";
+                return;
+            }
+
+            DiagnosticsStatus.Text =
+                "Güncelleme hazır. Discorder kapanıp yeni sürümle açılacak.";
             _diagnostics.Info(
                 "ui.update.prepared",
-                "Otomatik güncelleme paketi hazırlandı.",
+                "Güncelleme paketi hazırlandı.",
                 new Dictionary<string, string?>
                 {
                     ["latestVersion"] = AppUpdateService.FormatVersion(update.LatestVersion),
@@ -1069,17 +1152,17 @@ public partial class MainWindow : Window, IDisposable
         }
         catch (OperationCanceledException)
         {
-            DiagnosticsStatus.Text = "Güncelleme iptal edildi.";
+            DiagnosticsStatus.Text = "Güncelleme yükleme iptal edildi.";
         }
         catch (Exception exception)
         {
-            DiagnosticsStatus.Text = "Güncelleme tamamlanamadı. Ayrıntı loglara yazıldı.";
+            DiagnosticsStatus.Text = "Güncelleme yüklenemedi. Mevcut sürüm kullanılabilir.";
             _diagnostics.Failure(
-                "ui.update",
-                "Otomatik güncelleme tamamlanamadı.",
+                "ui.update.install",
+                "Güncelleme yükleme tamamlanamadı.",
                 exception);
             MessageBox.Show(
-                "Güncelleme tamamlanamadı.\n\n" + exception.Message,
+                "Güncelleme yüklenemedi.\n\nMevcut sürüm kullanılabilir. Ayrıntılar tanılama loglarına yazıldı.\n\n" + exception.Message,
                 "Discorder güncelleme",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -1099,8 +1182,10 @@ public partial class MainWindow : Window, IDisposable
         AppUpdatePreparation update,
         string executableName)
     {
-        if (string.IsNullOrWhiteSpace(update.ScriptPath)
-            || string.IsNullOrWhiteSpace(update.PayloadDirectory))
+        if (string.IsNullOrWhiteSpace(update.ApplicatorPath)
+            || string.IsNullOrWhiteSpace(update.PackagePath)
+            || string.IsNullOrWhiteSpace(update.ExpectedSha256)
+            || string.IsNullOrWhiteSpace(update.ExpectedSignerThumbprint))
         {
             throw new InvalidOperationException(
                 "Güncelleme hazırlığı eksik olduğu için uygulanamadı.");
@@ -1108,26 +1193,28 @@ public partial class MainWindow : Window, IDisposable
 
         var startInfo = new ProcessStartInfo
         {
-            FileName = "powershell.exe",
+            FileName = update.ApplicatorPath,
+            WorkingDirectory = Path.GetDirectoryName(update.ApplicatorPath),
             UseShellExecute = false,
             CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden
         };
-        startInfo.ArgumentList.Add("-NoProfile");
-        startInfo.ArgumentList.Add("-ExecutionPolicy");
-        startInfo.ArgumentList.Add("Bypass");
-        startInfo.ArgumentList.Add("-File");
-        startInfo.ArgumentList.Add(update.ScriptPath);
-        startInfo.ArgumentList.Add("-ProcessId");
+        startInfo.ArgumentList.Add("--process-id");
         startInfo.ArgumentList.Add(Environment.ProcessId.ToString(
             CultureInfo.InvariantCulture));
-        startInfo.ArgumentList.Add("-SourceDirectory");
-        startInfo.ArgumentList.Add(update.PayloadDirectory);
-        startInfo.ArgumentList.Add("-TargetDirectory");
+        startInfo.ArgumentList.Add("--package");
+        startInfo.ArgumentList.Add(update.PackagePath);
+        startInfo.ArgumentList.Add("--expected-sha256");
+        startInfo.ArgumentList.Add(update.ExpectedSha256);
+        startInfo.ArgumentList.Add("--expected-version");
+        startInfo.ArgumentList.Add(AppUpdateService.FormatVersion(update.LatestVersion));
+        startInfo.ArgumentList.Add("--expected-signer-thumbprint");
+        startInfo.ArgumentList.Add(update.ExpectedSignerThumbprint);
+        startInfo.ArgumentList.Add("--target-directory");
         startInfo.ArgumentList.Add(AppContext.BaseDirectory);
-        startInfo.ArgumentList.Add("-ExecutableName");
+        startInfo.ArgumentList.Add("--executable-name");
         startInfo.ArgumentList.Add(executableName);
-        startInfo.ArgumentList.Add("-LogPath");
+        startInfo.ArgumentList.Add("--log");
         startInfo.ArgumentList.Add(Path.Combine(_paths.LogDirectory, "update.log"));
 
         if (Process.Start(startInfo) is null)
@@ -1141,6 +1228,29 @@ public partial class MainWindow : Window, IDisposable
     {
         return typeof(MainWindow).Assembly.GetName().Version
             ?? new Version(0, 0, 0, 0);
+    }
+
+    private static string GetExecutableName()
+    {
+        var executableName = Path.GetFileName(Environment.ProcessPath);
+        return string.IsNullOrWhiteSpace(executableName)
+            ? "Discorder.exe"
+            : executableName;
+    }
+
+    private void ApplyUpdateControls(bool isBusy)
+    {
+        SetUpdateControlsEnabled(!_isUpdateOperationRunning && !isBusy);
+        InstallUpdateButton.Visibility = _pendingUpdate?.Status == AppUpdateCheckStatus.UpdateAvailable
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void SetUpdateControlsEnabled(bool enabled)
+    {
+        AutoUpdateButton.IsEnabled = enabled;
+        InstallUpdateButton.IsEnabled = enabled
+            && _pendingUpdate?.Status == AppUpdateCheckStatus.UpdateAvailable;
     }
 
     private static void OpenUri(Uri uri)

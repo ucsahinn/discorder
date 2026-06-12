@@ -19,15 +19,17 @@ jobs:
     name: Windows x64 yayını
     runs-on: windows-2025
     timeout-minutes: 20
+    environment:
+      name: release
 
     steps:
       - name: Kaynak kodu al
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           ref: ${{ github.event.inputs.tag || github.ref_name }}
 
       - name: .NET kur
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2
         with:
           global-json-file: global.json
 
@@ -38,8 +40,12 @@ jobs:
           DISCORDER_CODESIGN_PFX_PASSWORD: ${{ secrets.DISCORDER_CODESIGN_PFX_PASSWORD }}
         run: |
           $signArgs = @()
-          if (-not [string]::IsNullOrWhiteSpace($env:DISCORDER_CODESIGN_PFX_B64)) {
-            $certificatePath = Join-Path $env:RUNNER_TEMP 'discorder-codesign.pfx'
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'discorder-codesign.pfx'
+          if ([string]::IsNullOrWhiteSpace($env:DISCORDER_CODESIGN_PFX_B64)) {
+            throw 'Discorder auto-update yayını için DISCORDER_CODESIGN_PFX_B64 secret zorunludur.'
+          }
+
+          try {
             [IO.File]::WriteAllBytes(
               $certificatePath,
               [Convert]::FromBase64String($env:DISCORDER_CODESIGN_PFX_B64))
@@ -48,22 +54,21 @@ jobs:
               $certificatePath,
               '-RequireCodeSigning'
             )
-
-            if (-not [string]::IsNullOrWhiteSpace($env:DISCORDER_CODESIGN_PFX_PASSWORD)) {
-              $signArgs += @(
-                '-CodeSigningCertificatePassword',
-                $env:DISCORDER_CODESIGN_PFX_PASSWORD
-              )
+            ./scripts/build-release.ps1 @signArgs
+          }
+          finally {
+            if (Test-Path -LiteralPath $certificatePath) {
+              Remove-Item -LiteralPath $certificatePath -Force
             }
           }
-
-          ./scripts/build-release.ps1 @signArgs
 
       - name: Yayın notu ve SHA-256 hazırla
         id: package
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
-          $tag = '${{ github.event.inputs.tag || github.ref_name }}'
+          $tag = $env:RELEASE_TAG
           $version = $tag.TrimStart('v')
           $archive = Get-ChildItem -LiteralPath artifacts -Filter "Discorder-$version-win-x64.zip" |
             Select-Object -First 1
@@ -95,33 +100,24 @@ jobs:
           $notes = @"
           # Discorder $version
 
-          Discorder $version web kapsamı, tanılama paketi ve premium arayüz bugfix yayınıdır.
+          Discorder $version, güncelleme deneyimi ve Türkçe arayüz metinleri için güvenli düzeltme yayınıdır.
 
           ## Öne çıkanlar
 
-          - Arayüz 1320x780 sabit premium sahneye alındı; arka plan videosu kullanıcı ayarı olmadan sürekli görünür.
-          - Arka plan videosu release zip içine `Assets/background.mp4` olarak eklenir; uygulama önce yerel videoyu oynatır, yalnızca gerekirse uzak kaynağa düşer.
-          - Windows hosts kilidi PowerShell `Set-Content` yerine doğrulanmış .NET dosya yazımıyla güncellenir; bazı Windows 10 makinelerde görülen hosts yazım hatası giderildi.
-          - WireSock/GitHub indirme timeout hataları kullanıcıya Türkçe ve eyleme dönük mesajla gösterilir.
-          - Güç halkası panel içinde optik olarak yeniden ölçülendirildi; parlak fosfor görünür kalırken üst-alt kesilme hissi giderildi.
-          - Sağ alt kaynak bağlantısı metin yerine ikonlu GitHub butonuna çevrildi.
-          - Kapalı durum kırmızı fosfor, bağlı durum yeşil fosfor olacak şekilde bağlantı butonu, rozet ve süreç çubuğu netleştirildi.
-          - Web modu sözleşmesi netleştirildi: kapalıyken yalnızca Discord uygulaması tünellenir; açıkken Discord uygulaması ve desteklenen tarayıcılar birlikte tünellenir.
-          - Web modu kapalı bağlı oturumlarda desteklenen tarayıcıların Discord'a düz internetten çıkmasını azaltan geçici `Discorder.TunnelScope.Browsers` Windows Firewall kapsamı eklendi.
-          - Bağlan, bağlantıyı kes ve üst üste aç/kapat geçişlerinde geçici kapsam kuralları temizlenip yeniden uygulanır.
-          - Tanılama paketi aktif log dosyaları yazılırken de staging kopyası üzerinden zip üretir; paket hazır olunca doğrudan tanılama paketi klasörü açılır.
-          - GitHub/DNS indirme hataları kullanıcıya Türkçe ve eyleme dönük metinle gösterilir; ayrıntılı stack trace tanılama loglarında kalır.
-          - İşletim Merkezi paneli: arka planda çalışma, Windows başlangıcı ve tanılama durumu tek yerden görülür.
-          - Pencere kapansa bile isteğe bağlı bildirim alanında çalışmaya devam etme desteği eklendi.
-          - Windows oturumu açılınca Discorder'ı otomatik başlatma ayarı eklendi.
-          - Onar akışı ayarları, WireSock kurulumunu ve tanılama loglarını koruyarak profil, wgcf ve kurucu önbelleğini yeniler.
-          - Temiz kaldırma akışı Discorder kilidini, başlangıç kaydını, yerel veriyi, marker izini ve Discorder'ın kurduğu WireSock VPN Client kurulumunu geri alır.
-          - Release paketi adı proje sürümünden otomatik üretilir.
+          - Güncelleme düğmesi artık önce yalnızca yeni sürümü denetler.
+          - Yeni sürüm bulunursa ayrı ve belirgin `Yükle` düğmesi görünür.
+          - `Yükle`, denetimde bulunan aynı sürümü indirir, SHA-256 ile doğrular ve portable Discorder klasörüne uygular.
+          - Güncelleme paketi içeriği `discorder.update-manifest.json` ile doğrulanır.
+          - Otomatik güncelleme yayını Authenticode imzalı paket gerektirir.
+          - Güncelleme helper'ı mevcut uygulama kapandıktan sonra dosyaları yedekleyerek değiştirir; hata olursa önceki dosyaları geri taşır.
+          - Önemli düğmelere kısa ve anlaşılır Türkçe tooltip eklendi.
+          - Arayüz metinleri daha kısa, sakin ve kullanıcı odaklı hale getirildi.
 
           ## İndirme
 
           - $($archive.Name) dosyasını indirin.
           - Zip'i çıkarın ve Discorder.exe dosyasını çalıştırın.
+          - Güncelleme akışı aynı çıkarılmış Discorder klasörünü günceller ve Discorder.exe dosyasını yeniden başlatır.
           - SHA-256: $hash
           - $signingText
 
@@ -142,29 +138,40 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_ARCHIVE: ${{ steps.package.outputs.archive }}
+          RELEASE_SHA: ${{ steps.package.outputs.sha }}
+          RELEASE_NOTES: ${{ steps.package.outputs.notes }}
         run: |
-          $tag = '${{ github.event.inputs.tag || github.ref_name }}'
+          $tag = $env:RELEASE_TAG
           $version = $tag.TrimStart('v')
-          $repo = '${{ github.repository }}'
+          $repo = $env:RELEASE_REPOSITORY
           gh release view $tag --repo $repo *> $null
           if ($LASTEXITCODE -eq 0) {
+            $existingAssetNames = gh release view $tag --repo $repo --json assets --jq '.assets[].name'
+            $archiveName = [IO.Path]::GetFileName($env:RELEASE_ARCHIVE)
+            $shaName = [IO.Path]::GetFileName($env:RELEASE_SHA)
+            if ($existingAssetNames -contains $archiveName -or $existingAssetNames -contains $shaName) {
+              throw "Release $tag zaten bu asset adlarını içeriyor. Güvenli yayın için clobber kullanılmıyor."
+            }
+
             gh release upload $tag `
-              '${{ steps.package.outputs.archive }}' `
-              '${{ steps.package.outputs.sha }}' `
-              --repo $repo `
-              --clobber
+              $env:RELEASE_ARCHIVE `
+              $env:RELEASE_SHA `
+              --repo $repo
             gh release edit $tag `
               --repo $repo `
               --title "Discorder $version" `
-              --notes-file '${{ steps.package.outputs.notes }}' `
+              --notes-file $env:RELEASE_NOTES `
               --latest
           }
           else {
             gh release create $tag `
-              '${{ steps.package.outputs.archive }}' `
-              '${{ steps.package.outputs.sha }}' `
+              $env:RELEASE_ARCHIVE `
+              $env:RELEASE_SHA `
               --repo $repo `
               --title "Discorder $version" `
-              --notes-file '${{ steps.package.outputs.notes }}' `
+              --notes-file $env:RELEASE_NOTES `
               --latest
           }

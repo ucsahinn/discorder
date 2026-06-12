@@ -81,40 +81,78 @@ if ($files.Count -eq 0) {
     throw "Imzalanacak exe/dll bulunamadi: $PublishDirectory"
 }
 
-$passwordArgument = @()
-if (-not [string]::IsNullOrWhiteSpace($CertificatePassword)) {
-    $passwordArgument = @('/p', $CertificatePassword)
-}
+$existingThumbprints = @(
+    Get-ChildItem -LiteralPath 'Cert:\CurrentUser\My' -ErrorAction SilentlyContinue |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_.Thumbprint) } |
+        ForEach-Object { $_.Thumbprint }
+)
+$certificateThumbprint = $null
+$removeImportedCertificate = $false
 
-foreach ($file in $files) {
-    $arguments = @(
-        'sign',
-        '/fd',
-        'SHA256',
-        '/tr',
-        $TimestampUrl,
-        '/td',
-        'SHA256',
-        '/f',
-        $CertificatePath
-    ) + $passwordArgument + @(
-        '/d',
-        'Discorder',
-        $file.FullName
-    )
+try {
+    $importParameters = @{
+        FilePath = $CertificatePath
+        CertStoreLocation = 'Cert:\CurrentUser\My'
+        ErrorAction = 'Stop'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($CertificatePassword)) {
+        $importParameters.Password = ConvertTo-SecureString `
+            -String $CertificatePassword `
+            -AsPlainText `
+            -Force
+    }
 
-    & $signTool @arguments
+    $importedCertificates = @(Import-PfxCertificate @importParameters)
+    $certificate = $importedCertificates |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_.Thumbprint) } |
+        Sort-Object NotAfter -Descending |
+        Select-Object -First 1
+    if ($null -eq $certificate) {
+        throw 'Kod imzalama sertifikasi CurrentUser store icine alinamadi.'
+    }
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "Kod imzalama basarisiz oldu: $($file.FullName)"
+    $certificateThumbprint = $certificate.Thumbprint
+    $removeImportedCertificate = $existingThumbprints -notcontains $certificateThumbprint
+
+    foreach ($file in $files) {
+        $arguments = @(
+            'sign',
+            '/fd',
+            'SHA256',
+            '/tr',
+            $TimestampUrl,
+            '/td',
+            'SHA256',
+            '/s',
+            'My',
+            '/sha1',
+            $certificateThumbprint,
+            '/d',
+            'Discorder',
+            $file.FullName
+        )
+
+        & $signTool @arguments
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "Kod imzalama basarisiz oldu: $($file.FullName)"
+        }
+    }
+
+    $mainExecutable = Join-Path $PublishDirectory 'Discorder.exe'
+    if (Test-Path -LiteralPath $mainExecutable) {
+        $signature = Get-AuthenticodeSignature -LiteralPath $mainExecutable
+        if ($signature.Status -ne 'Valid') {
+            throw "Discorder.exe imza dogrulamasi basarisiz: $($signature.Status)"
+        }
     }
 }
-
-$mainExecutable = Join-Path $PublishDirectory 'Discorder.exe'
-if (Test-Path -LiteralPath $mainExecutable) {
-    $signature = Get-AuthenticodeSignature -LiteralPath $mainExecutable
-    if ($signature.Status -ne 'Valid') {
-        throw "Discorder.exe imza dogrulamasi basarisiz: $($signature.Status)"
+finally {
+    if ($removeImportedCertificate -and -not [string]::IsNullOrWhiteSpace($certificateThumbprint)) {
+        $certificateStorePath = "Cert:\CurrentUser\My\$certificateThumbprint"
+        if (Test-Path -LiteralPath $certificateStorePath) {
+            Remove-Item -LiteralPath $certificateStorePath -Force
+        }
     }
 }
 

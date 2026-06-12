@@ -116,7 +116,7 @@
                         <TextBlock Margin="0,3,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Uygulama modu hazır. Web modu isteğe bağlı." />
+                                   Text="Çalışma modu hazır. Tarayıcı modu isteğe bağlı." />
                     </StackPanel>
 
                     <Border Grid.Column="2"
@@ -174,13 +174,13 @@
                         <StackPanel Grid.Row="0">
                             <TextBlock FontSize="13"
                                        Foreground="{StaticResource MutedTextBrush}"
-                                       Text="ÖZEL TÜNEL" />
+                                       Text="ÖZEL BAĞLANTI" />
                             <TextBlock Margin="0,8,0,0"
                                        FontSize="36"
                                        FontWeight="SemiBold"
                                        LineHeight="41"
                                        TextWrapping="Wrap"
-                                       Text="Discord tünelini yönet" />
+                                       Text="Discord bağlantısını yönet" />
                         </StackPanel>
 
                         <Button Grid.Row="1"
@@ -195,8 +195,8 @@
                                 Cursor="Hand"
                                 Click="ToggleButton_Click"
                                 AutomationProperties.AutomationId="TunnelToggleButton"
-                                AutomationProperties.Name="Discord tünelini aç veya kapat"
-                                ToolTip="Discord tünelini aç veya kapat">
+                                AutomationProperties.Name="Discord bağlantısını aç veya kapat"
+                                ToolTip="Discord bağlantısını aç veya kapat">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Grid Width="{TemplateBinding Width}"
@@ -326,7 +326,7 @@
                                     <TextBlock x:Name="StageProgressLabel"
                                                FontSize="12"
                                                FontWeight="SemiBold"
-                                               Text="Hazır, Discord kilidi aktif" />
+                                               Text="Discorder Bağlı Değil" />
                                     <TextBlock Grid.Column="1"
                                                x:Name="StageProgressPercent"
                                                FontSize="12"
@@ -345,7 +345,7 @@
                                     <TextBlock x:Name="StageStepLock"
                                                FontSize="11"
                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="Kilit" />
+                                      Text="Bağlantı" />
                                     <TextBlock x:Name="StageStepSetup"
                                                FontSize="11"
                                                Foreground="{StaticResource SecondaryTextBrush}"
@@ -389,7 +389,7 @@
                         <StackPanel>
                             <TextBlock FontSize="13"
                                        Foreground="{StaticResource MutedTextBrush}"
-                                       Text="MOD SEÇİMİ" />
+                                       Text="Çalışma modu" />
                             <Grid Margin="0,16,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -404,7 +404,7 @@
                                                    Text="🌐" />
                                         <TextBlock FontSize="18"
                                                    FontWeight="SemiBold"
-                                                   Text="Web modu" />
+                                                   Text="Tarayıcı modu" />
                                     </StackPanel>
                                     <TextBlock x:Name="BrowserAccessStatus"
                                                Margin="0,6,18,0"
@@ -412,7 +412,7 @@
                                                FontSize="12"
                                                LineHeight="18"
                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="Açıkken Discord web erişimi de tünellenir." />
+                                               Text="Discord web erişimini tarayıcıda da kullan." />
                                 </StackPanel>
 
                                 <CheckBox Grid.Column="1"
@@ -421,7 +421,8 @@
                                           VerticalAlignment="Top"
                                           Checked="BrowserAccessToggle_Changed"
                                           Unchecked="BrowserAccessToggle_Changed"
-                                          ToolTip="Web modu açıkken Discord uygulaması ve desteklenen tarayıcılar tünellenir" />
+                                          ToolTip="Discord web'i tarayıcıda da kullan"
+                                          AutomationProperties.Name="Tarayıcı modunu aç veya kapat" />
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -476,7 +477,7 @@
                                                    Text="🌙" />
                                         <TextBlock FontSize="15"
                                                    FontWeight="SemiBold"
-                                                   Text="Arka plan" />
+                                                   Text="Arka planda çalış" />
                                     </StackPanel>
                                     <TextBlock Grid.Row="1"
                                                x:Name="RunInBackgroundStatus"
@@ -492,7 +493,8 @@
                                               HorizontalAlignment="Left"
                                               Checked="RunInBackgroundToggle_Changed"
                                               Unchecked="RunInBackgroundToggle_Changed"
-                                              ToolTip="Pencere kapanınca Discorder'ı bildirim alanında çalıştır" />
+                                              ToolTip="Pencere kapanınca çalışmaya devam et"
+                                              AutomationProperties.Name="Arka planda çalışmayı aç veya kapat" />
                                 </Grid>
 
                                 <Rectangle Grid.Column="1"
@@ -506,15 +508,22 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <StackPanel Orientation="Horizontal">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
                                         <TextBlock Margin="0,0,7,0"
                                                    FontFamily="Segoe UI Emoji"
                                                    FontSize="14"
                                                    Text="🚀" />
-                                        <TextBlock FontSize="15"
+                                        <TextBlock Grid.Column="1"
+                                                   FontSize="15"
                                                    FontWeight="SemiBold"
-                                                   Text="Başlangıçta çalış" />
-                                    </StackPanel>
+                                                   TextWrapping="Wrap"
+                                                   LineHeight="18"
+                                                   Text="Windows açılışında çalıştır" />
+                                    </Grid>
                                     <TextBlock Grid.Row="1"
                                                x:Name="StartupStatus"
                                                Margin="0,5,0,10"
@@ -522,14 +531,15 @@
                                                FontSize="12"
                                                LineHeight="17"
                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="Kapalıyken Windows oturumunda başlamaz." />
+                                               Text="Windows açılışında çalıştır" />
                                     <CheckBox Grid.Row="2"
                                               x:Name="StartupToggle"
                                               Style="{StaticResource BrowserSwitchStyle}"
                                               HorizontalAlignment="Left"
                                               Checked="StartupToggle_Changed"
                                               Unchecked="StartupToggle_Changed"
-                                              ToolTip="Discorder'ı Windows oturumu açılınca başlat" />
+                                              ToolTip="Discorder'ı Windows açılışında başlat"
+                                              AutomationProperties.Name="Windows açılışında çalıştırmayı aç veya kapat" />
                                 </Grid>
 
                                 <Rectangle Grid.Column="3"
@@ -559,7 +569,7 @@
                                                FontSize="12"
                                                LineHeight="17"
                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="Loglar hazır, tek tıkla paketlenir." />
+                                               Text="Bağlantı sorunlarını incelemek için rapor hazırla" />
                                     <Border Grid.Row="2"
                                             HorizontalAlignment="Left"
                                             Padding="12,6"
@@ -617,7 +627,7 @@
                             <StackPanel Grid.Column="2" Margin="20,0">
                                 <TextBlock FontSize="11"
                                            Foreground="{StaticResource MutedTextBrush}"
-                                           Text="TÜNEL" />
+                                               Text="BAĞLANTI" />
                                 <TextBlock Margin="0,6,0,0"
                                            FontSize="16"
                                            FontWeight="SemiBold"
@@ -636,7 +646,7 @@
                                            Margin="0,6,0,0"
                                            FontSize="16"
                                            FontWeight="SemiBold"
-                                           Text="Discord kilitlenir" />
+                                           Text="Bağlı değil" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -666,6 +676,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <Button Grid.Column="0"
@@ -683,7 +694,7 @@
                             Style="{StaticResource CommandButtonStyle}"
                             Content="🧾 Tanılama"
                             Click="OpenDiagnostics_Click"
-                            ToolTip="Tanılama dosyalarını hazırla ve klasörü aç" />
+                            ToolTip="Bağlantı raporu hazırla" />
 
                     <Button Grid.Column="2"
                             x:Name="RepairButton"
@@ -693,7 +704,7 @@
                             Style="{StaticResource CommandButtonStyle}"
                             Content="🛠 Onar"
                             Click="Repair_Click"
-                            ToolTip="Profil, wgcf ve kurucu önbelleğini yeniden üretilecek hale getir; logları koru" />
+                            ToolTip="Bağlantı dosyalarını güvenle yenile" />
 
                     <Button Grid.Column="3"
                             x:Name="CleanUninstallButton"
@@ -701,42 +712,43 @@
                             Height="46"
                             VerticalAlignment="Center"
                             Style="{StaticResource DangerCommandButtonStyle}"
-                            Content="⛔ Temiz kaldır"
+                            Content="⛔ Uygulamayı kaldır"
                             Click="CleanUninstall_Click"
-                            ToolTip="Discorder kilitlerini geri al, yerel Discorder verisini sil ve uygulamayı kapat" />
+                            ToolTip="Discorder'ı ve yerel ayarlarını kaldır" />
 
                     <TextBlock Grid.Column="4"
                                Margin="18,0"
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.0.11" />
+                               Text="v2.0.12" />
 
                     <Button Grid.Column="5"
                             x:Name="AutoUpdateButton"
                             Margin="0,0,8,0"
-                            Width="56"
+                            Width="114"
                             Height="46"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
                             Click="AutoUpdate_Click"
-                            ToolTip="Güncellemeyi denetle ve uygula"
-                            AutomationProperties.Name="Otomatik güncelle">
-                        <Viewbox Width="23"
-                                 Height="23"
-                                 Stretch="Uniform">
-                            <Canvas Width="24" Height="24">
-                                <Path Stroke="{StaticResource PrimaryTextBrush}"
-                                      StrokeThickness="2"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round"
-                                      StrokeLineJoin="Round"
-                                      Data="M21,2 L21,8 L15,8 M20.49,15 A9,9 0 0 1 5.64,18.36 L3,16 M3,22 L3,16 L9,16 M3.51,9 A9,9 0 0 1 18.36,5.64 L21,8" />
-                            </Canvas>
-                        </Viewbox>
-                    </Button>
+                            Content="⟳ Güncelle"
+                            ToolTip="Yeni sürüm var mı denetle"
+                            AutomationProperties.Name="Güncellemeyi denetle" />
 
                     <Button Grid.Column="6"
+                            x:Name="InstallUpdateButton"
+                            Margin="0,0,8,0"
+                            Width="92"
+                            Height="46"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource InstallUpdateButtonStyle}"
+                            Content="Yükle"
+                            Click="InstallUpdate_Click"
+                            Visibility="Collapsed"
+                            ToolTip="Bulunan sürümü bu klasöre yükle"
+                            AutomationProperties.Name="Bulunan güncellemeyi yükle" />
+
+                    <Button Grid.Column="7"
                             Width="68"
                             Height="46"
                             VerticalAlignment="Center"

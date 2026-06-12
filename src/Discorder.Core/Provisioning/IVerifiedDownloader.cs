@@ -6,5 +6,6 @@ public interface IVerifiedDownloader
         Uri source,
         string destination,
         string expectedSha256,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        long? maxBytes = null);
 }

@@ -43,7 +43,7 @@
                            Foreground="{StaticResource SecondaryTextBrush}"
                            TextWrapping="Wrap"
                            LineHeight="21"
-                           Text="Discorder resmi WireSock VPN Client x64 MSI kurucusunu indirir; SHA-256, Windows Authenticode, yayıncı ve sürüm bilgilerini doğrular. Ardından Windows yönetici onayıyla resmi kurucuyu açar ve kurulum bitince Discord uygulaması için profili otomatik hazırlar. Web modu açıksa desteklenen tarayıcılar da profile eklenir." />
+                           Text="Discorder resmi WireSock VPN Client x64 MSI kurucusunu indirir; SHA-256, Windows Authenticode, yayıncı ve sürüm bilgilerini doğrular. Ardından Windows yönetici onayıyla resmi kurucuyu açar ve kurulum bitince Discord uygulaması için profili otomatik hazırlar. Tarayıcı modu açıksa desteklenen tarayıcılar da profile eklenir." />
             </StackPanel>
         </Border>
 
@@ -71,26 +71,30 @@
             <Button Grid.Column="0"
                     Style="{StaticResource CommandButtonStyle}"
                     Content="Lisansı aç"
-                    Click="OpenLicense_Click" />
+                    Click="OpenLicense_Click"
+                    ToolTip="WireSock lisansını aç" />
 
             <Button Grid.Column="1"
                     Margin="10,0,0,0"
                     Style="{StaticResource CommandButtonStyle}"
                     Content="WARP koşulları"
-                    Click="OpenWarpTerms_Click" />
+                    Click="OpenWarpTerms_Click"
+                    ToolTip="Cloudflare WARP koşullarını aç" />
 
             <Button Grid.Column="3"
                     Margin="0,0,10,0"
                     Style="{StaticResource CommandButtonStyle}"
                     IsCancel="True"
                     Content="Vazgeç"
-                    Click="Cancel_Click" />
+                    Click="Cancel_Click"
+                    ToolTip="Kurulumu başlatmadan kapat" />
 
             <Button Grid.Column="4"
                     Style="{StaticResource PrimaryCommandButtonStyle}"
                     IsDefault="True"
                     Content="Kabul et ve kur"
-                    Click="Accept_Click" />
+                    Click="Accept_Click"
+                    ToolTip="Onay ver ve kurulumu başlat" />
         </Grid>
     </Grid>
 </Window>

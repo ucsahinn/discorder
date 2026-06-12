@@ -26,7 +26,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private IManagedProcess? _wireSockProcess;
     private TunnelSnapshot _snapshot = new(
         TunnelState.Disconnected,
-        "Bağlantı kapalı",
+        "Discorder Bağlı Değil",
         DateTimeOffset.Now);
     private bool _disposed;
     private bool _intentionalStop;
@@ -105,9 +105,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 return;
             }
 
-            _diagnostics.Info("controller.lock", "Discord kilidi etkinleştiriliyor.");
+            _diagnostics.Info("controller.lock", "Discord bağlantı koruması etkinleştiriliyor.");
             await _accessLock.EnableAsync(cancellationToken);
-            SetStatus(TunnelState.Disconnected, "Bağlantı kapalı, Discord kilitli");
+            SetStatus(TunnelState.Disconnected, "Discorder Bağlı Değil");
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -148,7 +148,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             }
 
             _intentionalStop = false;
-            SetStatus(TunnelState.Preparing, "Discord kilidi kaldırılıyor");
+            SetStatus(TunnelState.Preparing, "Discord bağlantısı hazırlanıyor");
             _diagnostics.Info(
                 "controller.connect",
                 "Bağlantı başlatıldı.",
@@ -161,7 +161,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 IncludeBrowserAccess,
                 cancellationToken);
 
-            SetStatus(TunnelState.Preparing, "Discord tüneli hazırlanıyor");
+            SetStatus(TunnelState.Preparing, "Discord bağlantısı açılıyor");
 
             var progress = new CallbackProgress(
                 message =>
@@ -222,8 +222,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             SetStatus(
                 TunnelState.Connected,
                 IncludeBrowserAccess
-                    ? "Discord uygulaması ve web erişimi tünelleniyor"
-                    : "Discord uygulaması tünelleniyor");
+                    ? "Discord uygulaması ve tarayıcı modu bağlı"
+                    : "Discord uygulaması bağlı");
             _diagnostics.WriteHealth(
                 "bağlı",
                 new Dictionary<string, string?>
@@ -295,10 +295,10 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         {
             if (_wireSockProcess is null)
             {
-                _diagnostics.Info("controller.disconnect", "Aktif WireSock süreci yok; kilit etkinleştiriliyor.");
+                _diagnostics.Info("controller.disconnect", "Aktif WireSock süreci yok; bağlantı koruması etkinleştiriliyor.");
                 await TryClearTunnelScopeAsync("DisconnectWithoutProcess");
                 await _accessLock.EnableAsync(cancellationToken);
-                SetStatus(TunnelState.Disconnected, "Bağlantı kapalı, Discord kilitli");
+                SetStatus(TunnelState.Disconnected, "Discorder Bağlı Değil");
                 return;
             }
 
@@ -317,7 +317,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             await TryClearTunnelScopeAsync("Disconnect");
             await _accessLock.EnableAsync(cancellationToken);
 
-            SetStatus(TunnelState.Disconnected, "Bağlantı kapalı, Discord kilitli");
+            SetStatus(TunnelState.Disconnected, "Discorder Bağlı Değil");
             _diagnostics.WriteHealth("kapalı", new Dictionary<string, string?>
             {
                 ["accessLock"] = "enabled"
@@ -493,7 +493,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 "Discord VPN kilidi",
                 StringComparison.OrdinalIgnoreCase))
         {
-            return "Discord kilidi güncellenemedi. Discorder'ı yönetici olarak açıp tekrar deneyin; hosts dosyasını koruyan güvenlik yazılımı varsa izin verin.";
+            return "Discord bağlantı koruması güncellenemedi. Discorder'ı yönetici olarak açıp tekrar deneyin; hosts dosyasını koruyan güvenlik yazılımı varsa izin verin.";
         }
 
         return exception.Message;

@@ -25,7 +25,7 @@ public sealed class DiscorderCleanupService
         cancellationToken.ThrowIfCancellationRequested();
         _diagnostics.Warning(
             "cleanup.cleanUninstall",
-            "Temiz kaldırma başladı.",
+            "Uygulama kaldırma başladı.",
             new Dictionary<string, string?>
             {
                 ["dataDirectory"] = _paths.DataDirectory

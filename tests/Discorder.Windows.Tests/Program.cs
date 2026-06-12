@@ -150,7 +150,8 @@ static void RenderMainWindow()
             new AppUpdateService(
                 new HttpClient(),
                 paths,
-                new FakeVerifiedDownloader()));
+                new FakeVerifiedDownloader(),
+                requireUpdateAuthenticode: false));
         window.Show();
         window.UpdateLayout();
 
@@ -158,22 +159,30 @@ static void RenderMainWindow()
             "\n",
             FindVisualChildren<TextBlock>(window).Select(block => block.Text));
         Assert(text.Contains("Discorder", StringComparison.Ordinal));
-        Assert(text.Contains("Uygulama modu hazır", StringComparison.Ordinal));
-        Assert(text.Contains("MOD SEÇİMİ", StringComparison.Ordinal));
-        Assert(text.Contains("Web modu", StringComparison.Ordinal));
+        Assert(text.Contains("Çalışma modu hazır", StringComparison.Ordinal));
+        Assert(text.Contains("Çalışma modu", StringComparison.Ordinal));
+        Assert(text.Contains("Tarayıcı modu", StringComparison.Ordinal));
         Assert(text.Contains("İŞLETİM MERKEZİ", StringComparison.Ordinal));
-        Assert(text.Contains("Arka plan", StringComparison.Ordinal));
-        Assert(text.Contains("Başlangıçta çalış", StringComparison.Ordinal));
+        Assert(text.Contains("Arka planda çalış", StringComparison.Ordinal));
+        Assert(text.Contains("Windows açılışında çalıştır", StringComparison.Ordinal));
         Assert(text.Contains("Tanılama", StringComparison.Ordinal));
         Assert(text.Contains("Hazır", StringComparison.Ordinal));
-        Assert(text.Contains("Hazır, Discord kilidi aktif", StringComparison.Ordinal));
+        Assert(text.Contains("Discorder Bağlı Değil", StringComparison.Ordinal));
+        Assert(text.Contains(
+            "Bağlantı sorunlarını incelemek için rapor hazırla",
+            StringComparison.Ordinal));
         var buttons = FindVisualChildren<Button>(window)
             .Select(button => button.Content?.ToString())
             .Where(content => !string.IsNullOrWhiteSpace(content))
             .ToArray();
         Assert(buttons.Contains("🛠 Onar"));
-        Assert(buttons.Contains("⛔ Temiz kaldır"));
+        Assert(buttons.Contains("⛔ Uygulamayı kaldır"));
         Assert(buttons.Contains("🧾 Tanılama"));
+        Assert(buttons.Contains("⟳ Güncelle"));
+        Assert(buttons.Contains("Yükle"));
+        var installUpdateButton = FindVisualChildren<Button>(window)
+            .Single(button => button.Name == "InstallUpdateButton");
+        Assert(installUpdateButton.Visibility == Visibility.Collapsed);
         var switches = FindVisualChildren<CheckBox>(window).ToArray();
         var browserSwitch = switches.Single(toggle =>
             toggle.Name == "BrowserAccessToggle");
@@ -186,7 +195,7 @@ static void RenderMainWindow()
         Assert(startupSwitch.IsChecked == false);
         Assert(FindVisualChildren<ProgressBar>(window).Any());
         Assert(text.Contains("DNS", StringComparison.Ordinal));
-        Assert(text.Contains("TÜNEL", StringComparison.Ordinal));
+        Assert(text.Contains("BAĞLANTI", StringComparison.Ordinal));
         Assert(!text.Contains("Advanced SplitWire", StringComparison.OrdinalIgnoreCase));
         Assert(!text.Contains("Discord-only", StringComparison.OrdinalIgnoreCase));
 
@@ -373,7 +382,8 @@ file sealed class FakeVerifiedDownloader : IVerifiedDownloader
         Uri source,
         string destination,
         string expectedSha256,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long? maxBytes = null)
     {
         throw new NotSupportedException();
     }

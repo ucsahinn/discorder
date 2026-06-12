@@ -22,10 +22,10 @@ jobs:
 
     steps:
       - name: Kaynak kodu al
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: .NET kur
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2
         with:
           global-json-file: global.json
 
@@ -50,7 +50,7 @@ jobs:
         run: ./scripts/prepare-background-video.ps1 -PublishDirectory artifacts/publish/win-x64
 
       - name: Uygulama paketini yükle
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: Discorder-win-x64
           path: artifacts/publish/win-x64

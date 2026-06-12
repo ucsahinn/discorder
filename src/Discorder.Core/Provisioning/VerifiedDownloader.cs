@@ -33,7 +33,8 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
         Uri source,
         string destination,
         string expectedSha256,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long? maxBytes = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentException.ThrowIfNullOrWhiteSpace(destination);
@@ -61,6 +62,7 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
                         temporaryPath,
                         destination,
                         expectedSha256,
+                        maxBytes,
                         cancellationToken);
                     return;
                 }
@@ -84,6 +86,7 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
         string temporaryPath,
         string destination,
         string expectedSha256,
+        long? maxBytes,
         CancellationToken cancellationToken)
     {
         using var response = await _httpClient.GetAsync(
@@ -99,6 +102,14 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
                 response.StatusCode);
         }
 
+        if (maxBytes is not null
+            && response.Content.Headers.ContentLength is > 0
+            && response.Content.Headers.ContentLength.Value > maxBytes.Value)
+        {
+            throw new InvalidDataException(
+                $"{source.Host} dosyası beklenenden büyük.");
+        }
+
         await using (var sourceStream = await response.Content.ReadAsStreamAsync(
                          cancellationToken))
         await using (var destinationStream = new FileStream(
@@ -109,7 +120,11 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
                          128 * 1024,
                          FileOptions.Asynchronous | FileOptions.SequentialScan))
         {
-            await sourceStream.CopyToAsync(destinationStream, cancellationToken);
+            await CopyToAsync(
+                sourceStream,
+                destinationStream,
+                maxBytes,
+                cancellationToken);
         }
 
         if (!await FileHashVerifier.MatchesSha256Async(
@@ -122,6 +137,35 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
         }
 
         File.Move(temporaryPath, destination, overwrite: true);
+    }
+
+    private static async Task CopyToAsync(
+        Stream source,
+        Stream destination,
+        long? maxBytes,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[128 * 1024];
+        var totalBytes = 0L;
+        while (true)
+        {
+            var bytesRead = await source.ReadAsync(buffer, cancellationToken);
+            if (bytesRead == 0)
+            {
+                return;
+            }
+
+            totalBytes += bytesRead;
+            if (maxBytes is not null && totalBytes > maxBytes.Value)
+            {
+                throw new InvalidDataException(
+                    "İndirilen dosya beklenenden büyük.");
+            }
+
+            await destination.WriteAsync(
+                buffer.AsMemory(0, bytesRead),
+                cancellationToken);
+        }
     }
 
     private static bool IsTransientDownloadFailure(

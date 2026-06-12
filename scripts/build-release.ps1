@@ -16,10 +16,15 @@ $version = $project.Project.PropertyGroup.Version
 if ([string]::IsNullOrWhiteSpace($version)) {
     throw "Discorder surumu proje dosyasindan okunamadi"
 }
+if ([string]::IsNullOrWhiteSpace($CodeSigningCertificatePassword) -and
+    -not [string]::IsNullOrWhiteSpace($env:DISCORDER_CODESIGN_PFX_PASSWORD)) {
+    $CodeSigningCertificatePassword = $env:DISCORDER_CODESIGN_PFX_PASSWORD
+}
 
 $archive = Join-Path $root "artifacts\Discorder-$version-$Runtime.zip"
 $shaPath = Join-Path $root "artifacts\Discorder-$version-$Runtime.sha256.txt"
 $signingStatusPath = Join-Path $root 'artifacts\signing-status.txt'
+$updateManifestPath = Join-Path $output 'discorder.update-manifest.json'
 
 Push-Location $root
 
@@ -62,6 +67,33 @@ try {
     else {
         Set-Content -LiteralPath $signingStatusPath -Value 'unsigned' -Encoding ASCII
     }
+
+    if (Test-Path -LiteralPath $updateManifestPath) {
+        Remove-Item -LiteralPath $updateManifestPath -Force
+    }
+
+    $publishRoot = [IO.Path]::GetFullPath($output).TrimEnd(
+        [IO.Path]::DirectorySeparatorChar,
+        [IO.Path]::AltDirectorySeparatorChar)
+    $manifestFiles = Get-ChildItem -LiteralPath $output -File -Recurse |
+        Sort-Object FullName |
+        ForEach-Object {
+            $relativePath = [IO.Path]::GetFullPath($_.FullName).Substring($publishRoot.Length).TrimStart('\', '/')
+            $relativePath = $relativePath -replace '\\', '/'
+            $fileHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash
+            [pscustomobject]@{
+                path = $relativePath
+                length = $_.Length
+                sha256 = $fileHash
+            }
+        }
+    $manifest = [pscustomobject]@{
+        version = $version
+        files = $manifestFiles
+    }
+    $manifest |
+        ConvertTo-Json -Depth 5 |
+        Set-Content -LiteralPath $updateManifestPath -Encoding UTF8
 
     if (Test-Path -LiteralPath $archive) {
         Remove-Item -LiteralPath $archive -Force
