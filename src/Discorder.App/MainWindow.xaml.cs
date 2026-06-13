@@ -17,6 +17,7 @@ using Discorder.Core.Updates;
 using Discorder.Core.WireSock;
 using Drawing = System.Drawing;
 using Forms = System.Windows.Forms;
+using MediaBrush = System.Windows.Media.Brush;
 using MediaColor = System.Windows.Media.Color;
 using MessageBox = System.Windows.MessageBox;
 
@@ -426,11 +427,7 @@ public partial class MainWindow : Window, IDisposable
             StatusBrush = new SolidColorBrush(statusColor);
             PowerBrush = new SolidColorBrush(powerColor);
             GlowColor = glowColor;
-            CoreFill = new SolidColorBrush(MediaColor.FromArgb(
-                76,
-                coreColor.R,
-                coreColor.G,
-                coreColor.B));
+            CoreFill = CreateCoreFill(coreColor, powerColor);
             BadgeBackground = new SolidColorBrush(MediaColor.FromArgb(
                 126,
                 coreColor.R,
@@ -448,9 +445,40 @@ public partial class MainWindow : Window, IDisposable
 
         public MediaColor GlowColor { get; }
 
-        public SolidColorBrush CoreFill { get; }
+        public MediaBrush CoreFill { get; }
 
         public SolidColorBrush BadgeBackground { get; }
+
+        private static RadialGradientBrush CreateCoreFill(
+            MediaColor coreColor,
+            MediaColor powerColor)
+        {
+            return new RadialGradientBrush
+            {
+                Center = new System.Windows.Point(0.46, 0.38),
+                GradientOrigin = new System.Windows.Point(0.34, 0.25),
+                RadiusX = 0.82,
+                RadiusY = 0.82,
+                GradientStops =
+                [
+                    new GradientStop(MediaColor.FromArgb(
+                        62,
+                        powerColor.R,
+                        powerColor.G,
+                        powerColor.B), 0),
+                    new GradientStop(MediaColor.FromArgb(
+                        39,
+                        coreColor.R,
+                        coreColor.G,
+                        coreColor.B), 0.48),
+                    new GradientStop(MediaColor.FromArgb(
+                        20,
+                        4,
+                        7,
+                        16), 1)
+                ]
+            };
+        }
     }
 
     private void ApplyProgress(

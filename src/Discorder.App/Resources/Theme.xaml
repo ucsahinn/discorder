@@ -1,16 +1,18 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <SolidColorBrush x:Key="WindowBrush" Color="#05070D" />
-    <SolidColorBrush x:Key="SurfaceBrush" Color="#111827" />
-    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#1B263A" />
-    <SolidColorBrush x:Key="BorderBrush" Color="#7F9FD8" />
+    <SolidColorBrush x:Key="WindowBrush" Color="#03050B" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#0D1728" />
+    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#16243A" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#8EC8FF" />
     <SolidColorBrush x:Key="PrimaryTextBrush" Color="#F5F7FB" />
     <SolidColorBrush x:Key="SecondaryTextBrush" Color="#C7D1E8" />
     <SolidColorBrush x:Key="MutedTextBrush" Color="#AAB6CE" />
-    <SolidColorBrush x:Key="AccentBrush" Color="#56F07B" />
-    <SolidColorBrush x:Key="AccentSoftBrush" Color="#254C47" />
-    <SolidColorBrush x:Key="AccentCyanBrush" Color="#73E8FF" />
-    <SolidColorBrush x:Key="GlassBorderBrush" Color="#7FA6FF" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#5DFF92" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#193F3B" />
+    <SolidColorBrush x:Key="AccentCyanBrush" Color="#7DEBFF" />
+    <SolidColorBrush x:Key="GlassBorderBrush" Color="#9CD4FF" />
+    <SolidColorBrush x:Key="PremiumLineBrush" Color="#C79CD4FF" />
+    <SolidColorBrush x:Key="PremiumGlowBrush" Color="#7DEBFF" />
     <SolidColorBrush x:Key="SuccessBrush" Color="#3BA55C" />
     <SolidColorBrush x:Key="DangerBrush" Color="#ED4245" />
     <SolidColorBrush x:Key="WarningBrush" Color="#FAA61A" />
@@ -24,10 +26,10 @@
 
     <Style x:Key="CommandButtonStyle" TargetType="Button">
         <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
-        <Setter Property="Background" Value="#4B132033" />
-        <Setter Property="BorderBrush" Value="#8F91B7FF" />
+        <Setter Property="Background" Value="#64101D31" />
+        <Setter Property="BorderBrush" Value="#A79CD4FF" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Padding" Value="16,9" />
+        <Setter Property="Padding" Value="17,10" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Cursor" Value="Hand" />
@@ -38,23 +40,30 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="7"
+                            CornerRadius="8"
                             Padding="{TemplateBinding Padding}">
                         <Border.Effect>
-                            <DropShadowEffect BlurRadius="18"
+                            <DropShadowEffect BlurRadius="24"
                                               Direction="270"
-                                              Opacity="0.28"
+                                              Opacity="0.34"
                                               ShadowDepth="0"
                                               Color="#73E8FF" />
                         </Border.Effect>
-                        <ContentPresenter HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
+                        <Grid>
+                            <Border Height="1"
+                                    Margin="8,0"
+                                    VerticalAlignment="Top"
+                                    Background="#55FFFFFF"
+                                    CornerRadius="1" />
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="ButtonBorder"
                                     Property="Background"
-                                    Value="#7A25405B" />
+                                    Value="#8A193756" />
                             <Setter TargetName="ButtonBorder"
                                     Property="BorderBrush"
                                     Value="{StaticResource AccentCyanBrush}" />
@@ -63,9 +72,6 @@
                             <Setter TargetName="ButtonBorder"
                                     Property="BorderBrush"
                                     Value="{StaticResource AccentBrush}" />
-                            <Setter TargetName="ButtonBorder"
-                                    Property="BorderThickness"
-                                    Value="2" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />
@@ -78,8 +84,8 @@
 
     <Style x:Key="PrimaryCommandButtonStyle" TargetType="Button">
         <Setter Property="Foreground" Value="White" />
-        <Setter Property="Background" Value="{StaticResource AccentBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+        <Setter Property="Background" Value="#E65DFF92" />
+        <Setter Property="BorderBrush" Value="#F57DEBFF" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="18,9" />
         <Setter Property="FontSize" Value="13" />
@@ -92,24 +98,35 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="6"
+                            CornerRadius="8"
                             Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="22"
+                                              Direction="270"
+                                              Opacity="0.56"
+                                              ShadowDepth="0"
+                                              Color="#5DFF92" />
+                        </Border.Effect>
+                        <Grid>
+                            <Border Height="1"
+                                    Margin="8,0"
+                                    VerticalAlignment="Top"
+                                    Background="#78FFFFFF"
+                                    CornerRadius="1" />
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="ButtonBorder"
                                     Property="Background"
-                                    Value="#6B76F6" />
+                                    Value="#F57DEBFF" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="ButtonBorder"
                                     Property="BorderBrush"
                                     Value="White" />
-                            <Setter TargetName="ButtonBorder"
-                                    Property="BorderThickness"
-                                    Value="2" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />
@@ -122,10 +139,10 @@
 
     <Style x:Key="DangerCommandButtonStyle" TargetType="Button">
         <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
-        <Setter Property="Background" Value="#5A2B1118" />
-        <Setter Property="BorderBrush" Value="#B8ED4245" />
+        <Setter Property="Background" Value="#66241422" />
+        <Setter Property="BorderBrush" Value="#C8FF6872" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Padding" Value="16,9" />
+        <Setter Property="Padding" Value="17,10" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Cursor" Value="Hand" />
@@ -136,17 +153,24 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="7"
+                            CornerRadius="8"
                             Padding="{TemplateBinding Padding}">
                         <Border.Effect>
-                            <DropShadowEffect BlurRadius="18"
+                            <DropShadowEffect BlurRadius="22"
                                               Direction="270"
                                               Opacity="0.25"
                                               ShadowDepth="0"
                                               Color="#ED4245" />
                         </Border.Effect>
-                        <ContentPresenter HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
+                        <Grid>
+                            <Border Height="1"
+                                    Margin="8,0"
+                                    VerticalAlignment="Top"
+                                    Background="#42FFFFFF"
+                                    CornerRadius="1" />
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -159,8 +183,8 @@
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="ButtonBorder"
-                                    Property="BorderThickness"
-                                    Value="2" />
+                                    Property="BorderBrush"
+                                    Value="#F5F7FB" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />
@@ -173,8 +197,8 @@
 
     <Style x:Key="InstallUpdateButtonStyle" TargetType="Button">
         <Setter Property="Foreground" Value="#06110C" />
-        <Setter Property="Background" Value="#BC56F07B" />
-        <Setter Property="BorderBrush" Value="#F073E8FF" />
+        <Setter Property="Background" Value="#F05DFF92" />
+        <Setter Property="BorderBrush" Value="#F97DEBFF" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="18,9" />
         <Setter Property="FontSize" Value="13" />
@@ -187,23 +211,30 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="7"
+                            CornerRadius="8"
                             Padding="{TemplateBinding Padding}">
                         <Border.Effect>
                             <DropShadowEffect BlurRadius="28"
                                               Direction="270"
                                               Opacity="0.78"
                                               ShadowDepth="0"
-                                              Color="#56F07B" />
+                                              Color="#5DFF92" />
                         </Border.Effect>
-                        <ContentPresenter HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
+                        <Grid>
+                            <Border Height="1"
+                                    Margin="8,0"
+                                    VerticalAlignment="Top"
+                                    Background="#90FFFFFF"
+                                    CornerRadius="1" />
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="ButtonBorder"
                                     Property="Background"
-                                    Value="#E073E8FF" />
+                                    Value="#F77DEBFF" />
                             <Setter TargetName="ButtonBorder"
                                     Property="BorderBrush"
                                     Value="#F5F7FB" />
@@ -212,9 +243,6 @@
                             <Setter TargetName="ButtonBorder"
                                     Property="BorderBrush"
                                     Value="#F5F7FB" />
-                            <Setter TargetName="ButtonBorder"
-                                    Property="BorderThickness"
-                                    Value="2" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />
@@ -229,7 +257,7 @@
         <Setter Property="Height" Value="8" />
         <Setter Property="Minimum" Value="0" />
         <Setter Property="Maximum" Value="100" />
-        <Setter Property="Background" Value="#42132033" />
+        <Setter Property="Background" Value="#56101D31" />
         <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Template">
@@ -250,7 +278,7 @@
                                                       Direction="270"
                                                       Opacity="0.72"
                                                       ShadowDepth="0"
-                                                      Color="#73E8FF" />
+                                                      Color="#7DEBFF" />
                                 </Border.Effect>
                             </Border>
                         </Grid>
@@ -266,15 +294,15 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
-                    <Grid Width="52" Height="30">
+                    <Grid Width="58" Height="32">
                         <Border x:Name="Track"
-                                CornerRadius="15"
-                                Background="#5A132033"
-                                BorderBrush="#9491B7FF"
+                                CornerRadius="16"
+                                Background="#72101D31"
+                                BorderBrush="#A79CD4FF"
                                 BorderThickness="1" />
                         <Ellipse x:Name="Knob"
-                                 Width="22"
-                                 Height="22"
+                                 Width="24"
+                                 Height="24"
                                  Margin="4"
                                  HorizontalAlignment="Left"
                                  Fill="#D7E4F5">
@@ -283,7 +311,7 @@
                                                   Direction="270"
                                                   Opacity="0.5"
                                                   ShadowDepth="0"
-                                                  Color="#78E5FF" />
+                                                  Color="#7DEBFF" />
                             </Ellipse.Effect>
                         </Ellipse>
                     </Grid>
@@ -291,7 +319,7 @@
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Track"
                                     Property="Background"
-                                    Value="#A5234B47" />
+                                    Value="#B01D4F43" />
                             <Setter TargetName="Track"
                                     Property="BorderBrush"
                                     Value="{StaticResource AccentBrush}" />
