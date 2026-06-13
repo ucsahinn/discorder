@@ -191,8 +191,8 @@
                                               ShadowDepth="0"
                                               Color="#7DEBFF" />
                         </Border.Effect>
-                        <Image Width="50"
-                               Height="50"
+                        <Image Width="56"
+                               Height="56"
                                Source="Assets/discorder-mark.png"
                                Stretch="Uniform"
                                RenderOptions.BitmapScalingMode="HighQuality" />
@@ -206,7 +206,7 @@
                         <TextBlock Margin="0,3,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Çalışma modu hazır. Tarayıcı modu isteğe bağlı." />
+                                   Text="Çalışma modu hazır. Tarayıcı modu açık." />
                     </StackPanel>
 
                     <Border Grid.Column="2"
@@ -351,7 +351,8 @@
                                                 </RadialGradientBrush>
                                             </Ellipse.Fill>
                                         </Ellipse>
-                                        <StackPanel HorizontalAlignment="Center"
+                                        <StackPanel Width="170"
+                                                    HorizontalAlignment="Center"
                                                     VerticalAlignment="Center">
                                             <TextBlock x:Name="PowerIcon"
                                                        HorizontalAlignment="Center"
@@ -368,9 +369,12 @@
                                                 </TextBlock.Effect>
                                             </TextBlock>
                                             <TextBlock x:Name="ToggleButtonLabel"
-                                                       Margin="0,14,0,0"
+                                                       Margin="0,10,0,0"
                                                        HorizontalAlignment="Center"
-                                                       FontSize="15"
+                                                       MaxWidth="164"
+                                                       TextAlignment="Center"
+                                                       TextWrapping="NoWrap"
+                                                       FontSize="14"
                                                        FontWeight="Bold"
                                                        Text="BAĞLAN" />
                                         </StackPanel>
@@ -606,7 +610,7 @@
                                                    Text="🌙" />
                                         <TextBlock FontSize="15"
                                                    FontWeight="SemiBold"
-                                                   Text="Arka planda çalış" />
+                                                   Text="Arka planda çalıştır" />
                                     </StackPanel>
                                     <TextBlock Grid.Row="1"
                                                x:Name="RunInBackgroundStatus"
@@ -623,7 +627,7 @@
                                               Checked="RunInBackgroundToggle_Changed"
                                               Unchecked="RunInBackgroundToggle_Changed"
                                               ToolTip="Pencere kapanınca çalışmaya devam et"
-                                              AutomationProperties.Name="Arka planda çalışmayı aç veya kapat" />
+                                              AutomationProperties.Name="Arka planda çalıştırmayı aç veya kapat" />
                                 </Grid>
 
                                 <Rectangle Grid.Column="1"
@@ -824,14 +828,14 @@
                                            FontWeight="SemiBold"
                                            TextWrapping="NoWrap"
                                            TextTrimming="CharacterEllipsis"
-                                           Text="Sadece uygulama" />
+                                           Text="Uygulama + tarayıcı" />
                                 <TextBlock x:Name="ScopeDetail"
                                            Margin="0,4,0,0"
                                            FontSize="11"
                                            Foreground="{StaticResource SecondaryTextBrush}"
                                            TextWrapping="NoWrap"
                                            TextTrimming="CharacterEllipsis"
-                                           Text="Tarayıcı modu kapalı" />
+                                           Text="Discord web bağlantıya dahil" />
                                 </StackPanel>
                             </Border>
                         </Grid>
@@ -913,17 +917,17 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.0.21" />
+                               Text="v2.0.22" />
 
                     <Button Grid.Column="5"
                             x:Name="AutoUpdateButton"
                             Margin="0,0,8,0"
-                            Width="114"
+                            Width="126"
                             Height="46"
                             VerticalAlignment="Center"
-                            Style="{StaticResource CommandButtonStyle}"
+                            Style="{StaticResource UpdateCheckButtonStyle}"
                             Click="AutoUpdate_Click"
-                            Content="⟳ Güncelle"
+                            Content="↻ Güncelle"
                             ToolTip="Yeni sürüm var mı denetle"
                             AutomationProperties.Name="Güncellemeyi denetle" />
 

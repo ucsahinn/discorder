@@ -422,7 +422,7 @@ public partial class MainWindow : Window, IDisposable
                 MediaColor.FromRgb(249, 214, 107)),
             TunnelState.Disconnecting => new StateVisual(
                 "KAPANIYOR",
-                "KAPATILIYOR",
+                "KAPANIYOR",
                 MediaColor.FromRgb(255, 163, 92),
                 MediaColor.FromRgb(115, 232, 255),
                 MediaColor.FromRgb(86, 43, 22),
@@ -993,14 +993,6 @@ public partial class MainWindow : Window, IDisposable
             StringComparison.Ordinal);
     }
 
-    private static bool IsBackgroundVideoAlwaysEnabled()
-    {
-        return string.Equals(
-            Environment.GetEnvironmentVariable("DISCORDER_BACKGROUND_VIDEO_ALWAYS"),
-            "1",
-            StringComparison.Ordinal);
-    }
-
     private static bool IsBackgroundVideoRemoteFallbackEnabled()
     {
         return string.Equals(
@@ -1021,9 +1013,7 @@ public partial class MainWindow : Window, IDisposable
             return false;
         }
 
-        return IsBackgroundVideoAlwaysEnabled()
-            || snapshot.IsBusy
-            || snapshot.IsConnected;
+        return true;
     }
 
     private void UpdateBackgroundVideoForSnapshot(TunnelSnapshot snapshot)

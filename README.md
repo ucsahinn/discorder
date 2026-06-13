@@ -41,7 +41,7 @@ Discorder resmi bir Discord, Cloudflare veya WireSock ürünü değildir. Amaç,
 
 ## 🧭 Discorder Nedir?
 
-Discorder, Discord uygulaması için hazırlanan dar kapsamlı bir bağlantı aracıdır. Varsayılan kullanımda sadece Discord masaüstü uygulamasına odaklanır. İsteyen kullanıcı Tarayıcı moduyla desteklenen tarayıcıları da bağlantı kapsamına alabilir.
+Discorder, Discord uygulaması için hazırlanan dar kapsamlı bir bağlantı aracıdır. Varsayılan kullanımda Discord masaüstü uygulamasıyla birlikte desteklenen tarayıcıları da kapsama alır. İsteyen kullanıcı Tarayıcı modunu kapatıp yalnızca masaüstü uygulamasına odaklanabilir.
 
 Bu repo, uygulamanın kaynak kodunu, doğrulama betiklerini, güvenlik sınırlarını, release notlarını ve kullanım dokümanlarını içerir.
 
@@ -50,7 +50,7 @@ Bu repo, uygulamanın kaynak kodunu, doğrulama betiklerini, güvenlik sınırla
 | Özellik | Kullanıcıya etkisi |
 | --- | --- |
 | 🔌 Tek tuşla bağlantı | Discord bağlantısını açıp kapatmayı kolaylaştırır. |
-| 🌐 Tarayıcı modu | Discord Web kullanılıyorsa desteklenen tarayıcıları isteğe bağlı kapsama alır. |
+| 🌐 Tarayıcı modu | Yeni kurulumda açık gelir; Discord Web için desteklenen tarayıcıları kapsama alır. |
 | 📊 Canlı durum kartları | DNS, bağlantı durumu ve uygulama kapsamı gibi bilgileri sade biçimde gösterir. |
 | 🧾 Tanılama paketi | Bağlantı sorunlarını incelemek için paylaşılabilir rapor hazırlar. |
 | 📦 Portable kullanım | Kurulum sihirbazı olmadan ZIP içinden çalışır. |
@@ -98,7 +98,7 @@ Yükleme, denetlenen sürümle eşleşen paketi kullanır. Paket önce staging a
 | Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
 | Mimari | [docs/mimari.md](docs/mimari.md) |
 | Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
-| v2.0.21 release notu | [docs/releases/v2.0.21.md](docs/releases/v2.0.21.md) |
+| v2.0.22 release notu | [docs/releases/v2.0.22.md](docs/releases/v2.0.22.md) |
 
 ## 🧪 Geliştirme
 

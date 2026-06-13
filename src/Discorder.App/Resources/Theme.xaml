@@ -77,6 +77,67 @@
         </Setter>
     </Style>
 
+    <Style x:Key="UpdateCheckButtonStyle" TargetType="Button">
+        <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
+        <Setter Property="Background" Value="#8E102236" />
+        <Setter Property="BorderBrush" Value="#E87DEBFF" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="16,10" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="ButtonBorder"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#9E12253C" Offset="0" />
+                                <GradientStop Color="#A51B4A58" Offset="0.55" />
+                                <GradientStop Color="#7A173224" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="32"
+                                              Direction="270"
+                                              Opacity="0.62"
+                                              ShadowDepth="0"
+                                              Color="#7DEBFF" />
+                        </Border.Effect>
+                        <Grid>
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ButtonBorder"
+                                    Property="BorderBrush"
+                                    Value="#F55DFF92" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="ButtonBorder"
+                                    Property="BorderBrush"
+                                    Value="#F5F7FB" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="ButtonBorder"
+                                    Property="Opacity"
+                                    Value="0.86" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="PrimaryCommandButtonStyle" TargetType="Button">
         <Setter Property="Foreground" Value="White" />
         <Setter Property="Background" Value="#E65DFF92" />
@@ -234,7 +295,7 @@
     </Style>
 
     <Style x:Key="StageProgressStyle" TargetType="ProgressBar">
-        <Setter Property="Height" Value="8" />
+        <Setter Property="Height" Value="11" />
         <Setter Property="Minimum" Value="0" />
         <Setter Property="Maximum" Value="100" />
         <Setter Property="Background" Value="#56101D31" />
@@ -245,22 +306,47 @@
                 <ControlTemplate TargetType="ProgressBar">
                     <Grid x:Name="TemplateRoot"
                           SnapsToDevicePixels="True">
-                        <Border Background="{TemplateBinding Background}"
-                                CornerRadius="4" />
+                        <Border CornerRadius="5.5"
+                                BorderBrush="#459CD4FF"
+                                BorderThickness="1">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#80101D31" Offset="0" />
+                                    <GradientStop Color="#66203542" Offset="0.5" />
+                                    <GradientStop Color="#50101D31" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
                         <Grid x:Name="PART_Track"
                               ClipToBounds="True">
-                            <Border x:Name="PART_Indicator"
-                                    HorizontalAlignment="Left"
-                                    Background="{TemplateBinding Foreground}"
-                                    CornerRadius="4">
-                                <Border.Effect>
+                            <Grid x:Name="PART_Indicator"
+                                  HorizontalAlignment="Left"
+                                  ClipToBounds="True">
+                                <Border Background="{TemplateBinding Foreground}"
+                                        CornerRadius="5.5" />
+                                <Border CornerRadius="5.5"
+                                        Opacity="0.5">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Color="#00FFFFFF" Offset="0" />
+                                            <GradientStop Color="#CC7DEBFF" Offset="0.54" />
+                                            <GradientStop Color="#F55DFF92" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Border Width="22"
+                                        HorizontalAlignment="Right"
+                                        CornerRadius="5.5"
+                                        Background="#C8F5F7FB"
+                                        Opacity="0.42" />
+                                <Grid.Effect>
                                     <DropShadowEffect BlurRadius="14"
                                                       Direction="270"
-                                                      Opacity="0.72"
+                                                      Opacity="0.86"
                                                       ShadowDepth="0"
                                                       Color="#7DEBFF" />
-                                </Border.Effect>
-                            </Border>
+                                </Grid.Effect>
+                            </Grid>
                         </Grid>
                     </Grid>
                 </ControlTemplate>

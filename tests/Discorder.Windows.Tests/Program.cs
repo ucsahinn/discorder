@@ -120,38 +120,19 @@ static void RenderMainWindow()
     var root = CreateTemporaryDirectory();
     var previousVideoSetting = Environment.GetEnvironmentVariable(
         "DISCORDER_DISABLE_BACKGROUND_VIDEO");
+    var previousRemoteFallbackSetting = Environment.GetEnvironmentVariable(
+        "DISCORDER_BACKGROUND_VIDEO_REMOTE_FALLBACK");
 
     try
     {
         Environment.SetEnvironmentVariable(
             "DISCORDER_DISABLE_BACKGROUND_VIDEO",
             null);
+        Environment.SetEnvironmentVariable(
+            "DISCORDER_BACKGROUND_VIDEO_REMOTE_FALLBACK",
+            null);
 
-        var bootstrapper = new FakeWireSockBootstrapper();
-        var paths = new AppPaths(root);
-        var controller = new DiscordTunnelController(
-            paths,
-            new DiscordAppScope(root, root, root),
-            bootstrapper,
-            new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
-            new FakeProcessLauncher(),
-            TimeSpan.Zero);
-
-        window = new MainWindow(
-            controller,
-            paths,
-            bootstrapper,
-            new AppSettingsStore(paths),
-            new DiscorderCleanupService(
-                paths,
-                new NullDiscordAccessLock()),
-            new FakeStartupLaunchService(),
-            new FakeWireSockUninstaller(),
-            new AppUpdateService(
-                new HttpClient(),
-                paths,
-                new FakeVerifiedDownloader(),
-                requireUpdateAuthenticode: false));
+        window = CreateMainWindow(root);
         window.Show();
         window.UpdateLayout();
 
@@ -167,7 +148,7 @@ static void RenderMainWindow()
         Assert(text.Contains("Çalışma modu", StringComparison.Ordinal));
         Assert(text.Contains("Tarayıcı modu", StringComparison.Ordinal));
         Assert(text.Contains("İŞLETİM MERKEZİ", StringComparison.Ordinal));
-        Assert(text.Contains("Arka planda çalış", StringComparison.Ordinal));
+        Assert(text.Contains("Arka planda çalıştır", StringComparison.Ordinal));
         Assert(text.Contains("Windows açılışında çalıştır", StringComparison.Ordinal));
         Assert(text.Contains("Tanılama", StringComparison.Ordinal));
         Assert(text.Contains("Hazır", StringComparison.Ordinal));
@@ -182,7 +163,7 @@ static void RenderMainWindow()
         Assert(buttons.Contains("🛠 Onar"));
         Assert(buttons.Contains("⛔ Uygulamayı kaldır"));
         Assert(buttons.Contains("🧾 Tanılama"));
-        Assert(buttons.Contains("⟳ Güncelle"));
+        Assert(buttons.Contains("↻ Güncelle"));
         Assert(buttons.Contains("Yükle"));
         var installUpdateButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "InstallUpdateButton");
@@ -194,7 +175,7 @@ static void RenderMainWindow()
             toggle.Name == "RunInBackgroundToggle");
         var startupSwitch = switches.Single(toggle =>
             toggle.Name == "StartupToggle");
-        Assert(browserSwitch.IsChecked == false);
+        Assert(browserSwitch.IsChecked == true);
         Assert(runInBackgroundSwitch.IsChecked == false);
         Assert(startupSwitch.IsChecked == false);
         Assert(FindVisualChildren<ProgressBar>(window).Any());
@@ -211,6 +192,21 @@ static void RenderMainWindow()
             FindRepositoryRoot(),
             "artifacts",
             "ui-window.png"));
+
+        window.Close();
+        window = null;
+
+        Environment.SetEnvironmentVariable(
+            "DISCORDER_BACKGROUND_VIDEO_REMOTE_FALLBACK",
+            "1");
+
+        window = CreateMainWindow(root);
+        window.Show();
+        window.UpdateLayout();
+
+        backgroundVideo = FindVisualChildren<MediaElement>(window).Single();
+        Assert(backgroundVideo.Visibility == Visibility.Visible);
+        Assert(backgroundVideo.Source is not null);
     }
     finally
     {
@@ -218,10 +214,42 @@ static void RenderMainWindow()
         Environment.SetEnvironmentVariable(
             "DISCORDER_DISABLE_BACKGROUND_VIDEO",
             previousVideoSetting);
+        Environment.SetEnvironmentVariable(
+            "DISCORDER_BACKGROUND_VIDEO_REMOTE_FALLBACK",
+            previousRemoteFallbackSetting);
         Directory.Delete(root, recursive: true);
     }
 
     Console.WriteLine("GEÇTİ Ana pencere çizildi");
+}
+
+static MainWindow CreateMainWindow(string root)
+{
+    var bootstrapper = new FakeWireSockBootstrapper();
+    var paths = new AppPaths(root);
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        bootstrapper,
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(),
+        TimeSpan.Zero);
+
+    return new MainWindow(
+        controller,
+        paths,
+        bootstrapper,
+        new AppSettingsStore(paths),
+        new DiscorderCleanupService(
+            paths,
+            new NullDiscordAccessLock()),
+        new FakeStartupLaunchService(),
+        new FakeWireSockUninstaller(),
+        new AppUpdateService(
+            new HttpClient(),
+            paths,
+            new FakeVerifiedDownloader(),
+            requireUpdateAuthenticode: false));
 }
 
 static void RenderConsentWindow()

@@ -20,7 +20,7 @@ using Discorder.Core.WireSock;
 
 var tests = new (string Name, Func<Task> Run)[]
 {
-    ("Discord kapsamı varsayılan olarak tarayıcıları kapalı tutar", DiscordScopeDefaultsToAppOnlyAsync),
+    ("Discord kapsamı parametresiz çağrıda sadece uygulamayı içerir", DiscordScopeDefaultsToAppOnlyAsync),
     ("Tarayıcı modu uygulama ve desteklenen tarayıcıları içerir", DiscordScopeIncludesBrowsersWhenEnabledAsync),
     ("Profil üretici geniş AllowedApps değerlerini değiştirir", ProfileBuilderIsStrictAsync),
     ("Profil üretici yapılandırma enjeksiyonunu reddeder", ProfileBuilderRejectsInjectionAsync),
@@ -1259,7 +1259,7 @@ static async Task SettingsPersistConsentAsync()
         var paths = new AppPaths(root);
         var firstStore = new AppSettingsStore(paths);
         Assert(!firstStore.IsSetupConsentAccepted(WireSockPackage.Version));
-        Assert(!firstStore.IsBrowserAccessEnabled());
+        Assert(firstStore.IsBrowserAccessEnabled());
         Assert(!firstStore.IsRunInBackgroundOnCloseEnabled());
         Assert(!firstStore.IsStartWithWindowsEnabled());
         Assert(!firstStore.IsWireSockInstalledByDiscorder());
@@ -1296,7 +1296,7 @@ static async Task SettingsPersistConsentAsync()
             """);
         var legacyStore = new AppSettingsStore(paths);
         Assert(legacyStore.IsSetupConsentAccepted(WireSockPackage.Version));
-        Assert(!legacyStore.IsBrowserAccessEnabled());
+        Assert(legacyStore.IsBrowserAccessEnabled());
         Assert(!legacyStore.IsRunInBackgroundOnCloseEnabled());
         Assert(!legacyStore.IsStartWithWindowsEnabled());
         Assert(!legacyStore.IsWireSockInstalledByDiscorder());

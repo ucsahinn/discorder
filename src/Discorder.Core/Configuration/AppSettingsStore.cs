@@ -36,7 +36,7 @@ public sealed class AppSettingsStore
     {
         lock (_gate)
         {
-            return Load().BrowserAccessEnabled;
+            return Load().BrowserAccessEnabled ?? true;
         }
     }
 
@@ -179,7 +179,7 @@ public sealed class AppSettingsStore
     private sealed record StoredSettings(
         string? AcceptedWireSockVersion,
         bool AcceptedCloudflareWarpTerms,
-        bool BrowserAccessEnabled,
+        bool? BrowserAccessEnabled,
         bool? RunInBackgroundOnClose,
         bool? StartWithWindows,
         bool? WireSockInstalledByDiscorder)
@@ -187,7 +187,7 @@ public sealed class AppSettingsStore
         public static StoredSettings Default { get; } = new(
             null,
             AcceptedCloudflareWarpTerms: false,
-            BrowserAccessEnabled: false,
+            BrowserAccessEnabled: true,
             RunInBackgroundOnClose: false,
             StartWithWindows: false,
             WireSockInstalledByDiscorder: false);
