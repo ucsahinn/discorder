@@ -62,6 +62,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici kilit doğrulanmadan kapanışta kilidi yeniler", ControllerDisposeRefreshesUnconfirmedDisconnectedLockAsync),
     ("Denetleyici aktif bağlantıyı kapanışta güvenle temizler", ControllerDisposeCleansActiveConnectionAsync),
     ("Denetleyici web kapsamını bağlıyken kilitler", ControllerLocksBrowserScopeWhileConnectedAsync),
+    ("Denetleyici bağlantıyı Discord oturumu sanmadan doğrular", ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync),
     ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
     ("Denetleyici GitHub DNS hatasını Türkçe açıklar", ControllerNetworkFailureIsUserFriendlyAsync),
     ("Denetleyici indirme zaman aşımını Türkçe açıklar", ControllerDownloadTimeoutIsUserFriendlyAsync),
@@ -106,15 +107,21 @@ static Task DiscordScopeDefaultsToAppOnlyAsync()
 {
     var root = CreateTemporaryDirectory();
     Directory.CreateDirectory(Path.Combine(root, "Discord"));
+    var discordAppDirectory = Path.Combine(root, "Discord", "app-1.0.9999");
+    Directory.CreateDirectory(discordAppDirectory);
+    File.WriteAllText(Path.Combine(discordAppDirectory, "Discord.exe"), "discord");
     Directory.CreateDirectory(Path.Combine(root, "Google", "Chrome", "Application"));
 
     try
     {
         var apps = new DiscordAppScope(root, root, root).GetAllowedApplications();
 
-        Assert(apps.Any(app => app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals(
             Path.Combine(root, "Discord"),
+            StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals(
+            Path.Combine(discordAppDirectory, "Discord.exe"),
             StringComparison.OrdinalIgnoreCase)));
         Assert(apps.All(app => !app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.All(app => !app.Contains("Chrome", StringComparison.OrdinalIgnoreCase)));
@@ -133,32 +140,48 @@ static Task DiscordScopeIncludesBrowsersWhenEnabledAsync()
 {
     var root = CreateTemporaryDirectory();
     Directory.CreateDirectory(Path.Combine(root, "Discord"));
+    var discordAppDirectory = Path.Combine(root, "Discord", "app-1.0.9999");
+    Directory.CreateDirectory(discordAppDirectory);
+    File.WriteAllText(Path.Combine(discordAppDirectory, "Discord.exe"), "discord");
     Directory.CreateDirectory(Path.Combine(
         root,
         "Google",
         "Chrome",
         "Application"));
+    File.WriteAllText(
+        Path.Combine(root, "Google", "Chrome", "Application", "chrome.exe"),
+        "chrome");
     Directory.CreateDirectory(Path.Combine(
         root,
         "Mozilla Firefox"));
+    File.WriteAllText(Path.Combine(root, "Mozilla Firefox", "firefox.exe"), "firefox");
+    Directory.CreateDirectory(Path.Combine(root, "Opera"));
+    File.WriteAllText(Path.Combine(root, "Opera", "opera.exe"), "opera");
 
     try
     {
         var apps = new DiscordAppScope(root, root, root)
             .GetAllowedApplications(includeBrowserAccess: true);
 
-        Assert(apps.Any(app => app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals("msedge.exe", StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.Any(app => app.Equals("firefox.exe", StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.Any(app => app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Equals("firefox.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Equals("opera.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals(
             Path.Combine(root, "Discord"),
             StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.All(app => !app.Equals(
-            Path.Combine(root, "Google", "Chrome", "Application"),
+        Assert(apps.Any(app => app.Equals(
+            Path.Combine(discordAppDirectory, "Discord.exe"),
             StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.All(app => !app.Equals(
-            Path.Combine(root, "Mozilla Firefox"),
+        Assert(apps.Any(app => app.Equals(
+            Path.Combine(root, "Google", "Chrome", "Application", "chrome.exe"),
+            StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals(
+            Path.Combine(root, "Mozilla Firefox", "firefox.exe"),
+            StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals(
+            Path.Combine(root, "Opera", "opera.exe"),
             StringComparison.OrdinalIgnoreCase)));
         Assert(apps.All(app => !app.Equals("Update.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.All(app => !app.Contains("roblox", StringComparison.OrdinalIgnoreCase)));
@@ -1759,6 +1782,61 @@ static async Task ControllerLocksBrowserScopeWhileConnectedAsync()
     }
 }
 
+static async Task ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var accessLock = new FakeDiscordAccessLock();
+    var diagnostics = new DiscorderDiagnostics(
+        new AppPaths(root),
+        TimeSpan.Zero);
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        new FakeDiscordProcessInspector(
+            new DiscordProcessSnapshot(
+                2,
+                [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")])));
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(controller.Snapshot.Message.Contains(
+            "Discord'u yeniden başlatın",
+            StringComparison.Ordinal));
+        Assert(!controller.Snapshot.Message.Contains(
+            "Discord uygulaması bağlı",
+            StringComparison.OrdinalIgnoreCase));
+
+        var health = await File.ReadAllTextAsync(
+            Path.Combine(root, "Discorder", "logs", "health.json"));
+        Assert(health.Contains("\"status\":\"bağlantı açık\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"discordProcessCount\":\"2\"", StringComparison.Ordinal));
+        Assert(health.Contains("Discord açıksa tamamen kapatıp yeniden açın.", StringComparison.Ordinal));
+        var details = controller.CreateDiagnosticDetails();
+        Assert(details["wireSockRunning"] == "True");
+        Assert(details["discordProcessCount"] == "2");
+        Assert(details["nextAction"] == "Discord açıksa tamamen kapatıp yeniden açın.");
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task ControllerBootstrapFailureAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -2096,7 +2174,9 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
 static async Task CleanupServiceRemovesDiscorderStateAsync()
 {
     var root = CreateTemporaryDirectory();
-    var paths = new AppPaths(root);
+    var paths = new AppPaths(
+        Path.Combine(root, "local"),
+        Path.Combine(root, "shared"));
     var accessLock = new FakeDiscordAccessLock();
     var cleanup = new DiscorderCleanupService(paths, accessLock);
 
@@ -2111,6 +2191,7 @@ static async Task CleanupServiceRemovesDiscorderStateAsync()
 
         Assert(accessLock.RemoveCount == 1);
         Assert(!Directory.Exists(paths.DataDirectory));
+        Assert(!Directory.Exists(paths.SharedDataDirectory));
         Assert(Directory.Exists(root));
     }
     finally
@@ -2125,7 +2206,9 @@ static async Task CleanupServiceRemovesDiscorderStateAsync()
 static async Task CleanupServiceRepairsGeneratedStateAsync()
 {
     var root = CreateTemporaryDirectory();
-    var paths = new AppPaths(root);
+    var paths = new AppPaths(
+        Path.Combine(root, "local"),
+        Path.Combine(root, "shared"));
     var accessLock = new FakeDiscordAccessLock();
     var cleanup = new DiscorderCleanupService(paths, accessLock);
 
@@ -2186,6 +2269,12 @@ static async Task DiagnosticsWritesDevOpsBundleAsync()
         await File.WriteAllTextAsync(
             Path.Combine(paths.LogDirectory, "unexpected.tmp"),
             "pakete alinmamali");
+        await File.WriteAllTextAsync(
+            paths.ErrorLog,
+            "PrivateKey = fake-private-key-with-padding=\nAuthorization: Basic fake:token==\n");
+        await File.WriteAllTextAsync(
+            paths.TunnelLog,
+            "access_token = fake-access-token\nnormal line\n");
 
         var bundlePath = diagnostics.CreateBundle();
 
@@ -2222,6 +2311,24 @@ static async Task DiagnosticsWritesDevOpsBundleAsync()
         using var bundledSummaryReader = new StreamReader(bundledSummaryStream);
         var bundledSummaryText = await bundledSummaryReader.ReadToEndAsync();
         Assert(!bundledSummaryText.Contains("unexpected.tmp", StringComparison.OrdinalIgnoreCase));
+
+        var bundledErrors = archive.GetEntry("errors.log")
+            ?? throw new InvalidOperationException("errors.log pakette yok.");
+        await using var bundledErrorsStream = bundledErrors.Open();
+        using var bundledErrorsReader = new StreamReader(bundledErrorsStream);
+        var bundledErrorsText = await bundledErrorsReader.ReadToEndAsync();
+        Assert(!bundledErrorsText.Contains("fake-private-key", StringComparison.Ordinal));
+        Assert(!bundledErrorsText.Contains("fake:token", StringComparison.Ordinal));
+        Assert(bundledErrorsText.Contains("PrivateKey = [REDACTED]", StringComparison.Ordinal));
+        Assert(bundledErrorsText.Contains("Authorization: [REDACTED]", StringComparison.Ordinal));
+
+        var bundledTunnel = archive.GetEntry("tunnel.log")
+            ?? throw new InvalidOperationException("tunnel.log pakette yok.");
+        await using var bundledTunnelStream = bundledTunnel.Open();
+        using var bundledTunnelReader = new StreamReader(bundledTunnelStream);
+        var bundledTunnelText = await bundledTunnelReader.ReadToEndAsync();
+        Assert(!bundledTunnelText.Contains("fake-access-token", StringComparison.Ordinal));
+        Assert(bundledTunnelText.Contains("access_token = [REDACTED]", StringComparison.Ordinal));
     }
     finally
     {
@@ -3119,4 +3226,10 @@ file sealed class FakeManagedProcess : IManagedProcess
         HasExited = true;
         return ValueTask.CompletedTask;
     }
+}
+
+file sealed class FakeDiscordProcessInspector(DiscordProcessSnapshot snapshot)
+    : IDiscordProcessInspector
+{
+    public DiscordProcessSnapshot Capture() => snapshot;
 }

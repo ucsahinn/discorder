@@ -1,6 +1,6 @@
 # Discorder Release ve Tag Denetimi
 
-> 2026-06-13 guncellemesi: aktif patch hedefi `v2.0.22` olarak belirlendi. Bu surum, `v2.0.21` uzerine animasyonlu video geri donusu, Tarayici modu default acik davranisi ve premium UI polish ekler. Eski release/tag silme islemi yapilmadi; cleanup icin yine ayrica `APPROVED - CLEAN RELEASES` gerekir.
+> 2026-06-13 guncellemesi: aktif patch hedefi `v2.0.23` olarak belirlendi. Bu surum, `v2.0.22` uzerine Discord executable kapsam duzeltmesi, baglanti dogrulama metinleri ve tanilama redaction hotfix'i ekler. Eski release/tag silme islemi yapilmadi; cleanup icin yine ayrica `APPROVED - CLEAN RELEASES` gerekir.
 
 Bu tablo, v2.0.20 public yüzeyi hazırlanırken çıkarılan non-destructive release temizliği planıdır. GitHub Release veya tag silme işlemi yapılmadı. Silme/cleanup için ayrıca `APPROVED - CLEAN RELEASES` onayı gerekir.
 
@@ -17,18 +17,19 @@ Aşağıdaki kararlar, erişilebilen tag ve artifact kanıtına göre hazırlanm
 
 | Release/tag | Öneri | Gerekçe | Risk | Komut/API aksiyonu |
 | --- | --- | --- | --- | --- |
-| `v2.0.22` | Oluştur / latest yap | Arka plan videosu gorunur pencerede calisir, Tarayici modu yeni kurulumda acik gelir, update/progress/ikon polish tamamlanir. | Authenticode yoksa kullanıcı Windows SmartScreen uyarısı görebilir. | GitHub Release workflow veya `gh release create v2.0.22 ... --latest`. |
-| `v2.0.21` | Koru | Bellek/tanılama hardening, runtime metrikleri ve düşük bellek video lifecycle bu sürümde yayınlandı. | Latest olarak kalırsa v2.0.22 UI/default düzeltmeleri kullanıcıya ulaşmaz. | v2.0.22 yayınlanınca latest güncellenir. |
-| `v2.0.20` | Koru | Update indirme progress logları seyreltilir, tanılama dosyası şişmesi azaltılır, logo mikro animasyonu ve footer buton polish tamamlanır. | Latest olarak kalırsa v2.0.22 düzeltmeleri kullanıcıya ulaşmaz. | v2.0.22 yayınlanınca latest güncellenir. |
-| `v2.0.19` | Koru | Ana ekran premium görsel polish, daha güçlü header/logo, bağlantı dairesi, kart derinliği ve canlı durum mikro-kartları içerir. | Latest olarak kalırsa v2.0.22 düzeltmeleri kullanıcıya ulaşmaz. | v2.0.22 yayınlanınca latest güncellenir. |
-| `v2.0.18` | Koru | WireSock sonrası Cloudflare WARP aracı ve profil hazırlığı artık canlı durum, retry, max size ve sade hata mesajları içerir. | Latest olarak kalırsa v2.0.22 düzeltmeleri kullanıcıya ulaşmaz. | v2.0.22 yayınlanınca latest güncellenir. |
-| `v2.0.17` | Koru | WireSock ilk kurulum indirmesi bağlantı kurma, retry, boyut ilerlemesi, max size ve protected staging davranışı içerir. | Latest olarak kalırsa v2.0.22 düzeltmeleri kullanıcıya ulaşmaz. | v2.0.22 yayınlanınca latest güncellenir. |
-| `v2.0.16` | Koru | Görünür güncelleme penceresi, helper staging düzeltmesi ve target reparse guard bu sürümde yayınlandı. | Latest olarak kalırsa v2.0.22 düzeltmeleri kullanıcıya ulaşmaz. | v2.0.22 yayınlanınca latest güncellenir. |
-| `v2.0.15` | Koru | Tanılama loglarından çıkan Tarayıcı modu kapalı kapsamı, kötü internet/DNS retry davranışı ve kapanış hızı düzeltmeleri bu sürümde yayınlandı. | Latest olarak kalırsa sonraki runtime düzeltmeleri kullanıcıya ulaşmaz. | v2.0.22 yayınlanınca latest güncellenir. |
-| `v2.0.14` | Koru | Sertifikasız ama GitHub digest, SHA-256 ve manifest doğrulamalı otomatik update modu bu sürümde yayınlandı. | Latest olarak kalırsa sonraki runtime düzeltmeleri kullanıcıya ulaşmaz. | Latest v2.0.22 olmalı. |
-| `v2.0.13` | Koru / release oluşturma | Tag pushlandı fakat workflow test çalıştırma yolu yüzünden paket üretiminde durdu; tag taşımak force/destructive olacağı için korunur. | Eski tag release'siz kalır; latest v2.0.22 ile düzeltilir. | Silme veya retag yok. |
-| `v2.0.12` | Koru / release oluşturma | Tag daha önce pushlandı fakat release oluşmadı. Tag silmek destructive olduğundan korunur. | Eski tag release'siz kalır; latest v2.0.22 ile düzeltilir. | Silme yok. |
-| `v2.0.11` | Koru | Remote ve local tag mevcut; önceki stabil yayın hattı. | Latest olarak kalırsa README v2.0.22 hazırlığıyla çelişebilir. | v2.0.22 yayınlanınca latest otomatik/manuel güncellenir. |
+| `v2.0.23` | Oluştur / latest yap | Gercek Discord `app-*\\Discord.exe` yollari profile eklenir, baglanti sonrasi dogrulama durumu ve tanilama kanitlari iyilestirilir. | Authenticode yoksa kullanıcı Windows SmartScreen uyarısı görebilir. | GitHub Release workflow veya `gh release create v2.0.23 ... --latest`. |
+| `v2.0.22` | Koru | Arka plan videosu gorunur pencerede calisir, Tarayici modu yeni kurulumda acik gelir, update/progress/ikon polish tamamlanir. | Latest olarak kalırsa v2.0.23 baglanti hotfix'i kullanıcıya ulaşmaz. | v2.0.23 yayınlanınca latest güncellenir. |
+| `v2.0.21` | Koru | Bellek/tanılama hardening, runtime metrikleri ve düşük bellek video lifecycle bu sürümde yayınlandı. | Latest olarak kalırsa v2.0.23 bağlantı hotfix'i kullanıcıya ulaşmaz. | v2.0.23 yayınlanınca latest güncellenir. |
+| `v2.0.20` | Koru | Update indirme progress logları seyreltilir, tanılama dosyası şişmesi azaltılır, logo mikro animasyonu ve footer buton polish tamamlanır. | Latest olarak kalırsa v2.0.23 düzeltmeleri kullanıcıya ulaşmaz. | v2.0.23 yayınlanınca latest güncellenir. |
+| `v2.0.19` | Koru | Ana ekran premium görsel polish, daha güçlü header/logo, bağlantı dairesi, kart derinliği ve canlı durum mikro-kartları içerir. | Latest olarak kalırsa v2.0.23 düzeltmeleri kullanıcıya ulaşmaz. | v2.0.23 yayınlanınca latest güncellenir. |
+| `v2.0.18` | Koru | WireSock sonrası Cloudflare WARP aracı ve profil hazırlığı artık canlı durum, retry, max size ve sade hata mesajları içerir. | Latest olarak kalırsa v2.0.23 düzeltmeleri kullanıcıya ulaşmaz. | v2.0.23 yayınlanınca latest güncellenir. |
+| `v2.0.17` | Koru | WireSock ilk kurulum indirmesi bağlantı kurma, retry, boyut ilerlemesi, max size ve protected staging davranışı içerir. | Latest olarak kalırsa v2.0.23 düzeltmeleri kullanıcıya ulaşmaz. | v2.0.23 yayınlanınca latest güncellenir. |
+| `v2.0.16` | Koru | Görünür güncelleme penceresi, helper staging düzeltmesi ve target reparse guard bu sürümde yayınlandı. | Latest olarak kalırsa v2.0.23 düzeltmeleri kullanıcıya ulaşmaz. | v2.0.23 yayınlanınca latest güncellenir. |
+| `v2.0.15` | Koru | Tanılama loglarından çıkan Tarayıcı modu kapalı kapsamı, kötü internet/DNS retry davranışı ve kapanış hızı düzeltmeleri bu sürümde yayınlandı. | Latest olarak kalırsa sonraki runtime düzeltmeleri kullanıcıya ulaşmaz. | v2.0.23 yayınlanınca latest güncellenir. |
+| `v2.0.14` | Koru | Sertifikasız ama GitHub digest, SHA-256 ve manifest doğrulamalı otomatik update modu bu sürümde yayınlandı. | Latest olarak kalırsa sonraki runtime düzeltmeleri kullanıcıya ulaşmaz. | Latest v2.0.23 olmalı. |
+| `v2.0.13` | Koru / release oluşturma | Tag pushlandı fakat workflow test çalıştırma yolu yüzünden paket üretiminde durdu; tag taşımak force/destructive olacağı için korunur. | Eski tag release'siz kalır; latest v2.0.23 ile düzeltilir. | Silme veya retag yok. |
+| `v2.0.12` | Koru / release oluşturma | Tag daha önce pushlandı fakat release oluşmadı. Tag silmek destructive olduğundan korunur. | Eski tag release'siz kalır; latest v2.0.23 ile düzeltilir. | Silme yok. |
+| `v2.0.11` | Koru | Remote ve local tag mevcut; önceki stabil yayın hattı. | Latest olarak kalırsa README v2.0.23 hazırlığıyla çelişebilir. | v2.0.23 yayınlanınca latest otomatik/manuel güncellenir. |
 | `v2.0.10` | Koru / release notunu eski olarak bırak | v2.0.11 öncesi anlamlı geçiş sürümü olabilir. | Canlı release body görülmeden silmek yanlış olabilir. | Silme yok. |
 | `v2.0.9` | Koru, local artifact tekrarlarını temizleme adayı | `artifacts/` altında `complete`, `fix`, `complete2`, `complete3` gibi local tekrarlar var. | Public release silinirse indirme geçmişi ve güven kaybı oluşabilir. | Release silme yok; local artifact cleanup ayrı onay gerektirir. |
 | `v2.0.8` | Koru / arşiv olarak bırak | 2.0.9 öncesi tag mevcut. | Canlı release durumu bilinmiyor. | Silme yok. |
@@ -43,7 +44,7 @@ Aşağıdaki kararlar, erişilebilen tag ve artifact kanıtına göre hazırlanm
 
 ## Sürüm Kararı
 
-Bu public yüzey için anlamlı SemVer sürümü `v2.0.22` olarak belirlendi.
+Bu public yüzey için anlamlı SemVer sürümü `v2.0.23` olarak belirlendi.
 
 Neden patch?
 
@@ -53,11 +54,11 @@ Neden patch?
 
 ## Yayın Kapısı
 
-v2.0.22 GitHub Release yayınlanmadan önce şu koşullar gerekir:
+v2.0.23 GitHub Release yayınlanmadan önce şu koşullar gerekir:
 
 - GitHub yayın yetkisi geçerli olmalı.
-- `v2.0.22` tag'i doğru commit'e işaret etmeli.
-- Release workflow veya local build `Discorder-2.0.22-win-x64.zip` üretmeli.
+- `v2.0.23` tag'i doğru commit'e işaret etmeli.
+- Release workflow veya local build `Discorder-2.0.23-win-x64.zip` üretmeli.
 - `.sha256.txt` dosyası ZIP ile eşleşmeli.
 - Secret scan temiz olmalı.
-- Release body `docs/releases/v2.0.22.md` ile uyumlu olmalı.
+- Release body `docs/releases/v2.0.23.md` ile uyumlu olmalı.

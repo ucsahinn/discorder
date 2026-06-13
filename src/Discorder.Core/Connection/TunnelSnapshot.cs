@@ -8,6 +8,7 @@ public sealed record TunnelSnapshot(
 {
     public bool IsBusy => State is TunnelState.Preparing
         or TunnelState.Connecting
+        or TunnelState.Verifying
         or TunnelState.Disconnecting;
 
     public bool IsConnected => State is TunnelState.Connected;

@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Discorder.Core.Configuration;
 
 namespace Discorder.Core.Diagnostics;
@@ -18,6 +19,20 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
         WriteIndented = false,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
+
+    private static readonly Regex SensitiveAssignmentPattern = new(
+        @"(?ix)
+        \b(
+            privatekey|presharedkey|token|access[_-]?token|refresh[_-]?token|
+            password|passwd|secret|client[_-]?secret|cookie|authorization
+        )\b
+        \s*[:=]\s*
+        [^\r\n]+",
+        RegexOptions.Compiled);
+
+    private static readonly Regex BearerPattern = new(
+        @"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}",
+        RegexOptions.Compiled);
 
     private readonly AppPaths _paths;
     private readonly TimeSpan _summaryWriteInterval;
@@ -192,17 +207,25 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
                     continue;
                 }
 
-                using var source = new FileStream(
-                    file,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.ReadWrite | FileShare.Delete);
-                using var target = new FileStream(
-                    destination,
-                    FileMode.Create,
-                    FileAccess.Write,
-                    FileShare.None);
-                source.CopyTo(target);
+                using var source = new StreamReader(
+                    new FileStream(
+                        file,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.ReadWrite | FileShare.Delete),
+                    Encoding.UTF8,
+                    detectEncodingFromByteOrderMarks: true);
+                using var target = new StreamWriter(
+                    new FileStream(
+                        destination,
+                        FileMode.Create,
+                        FileAccess.Write,
+                        FileShare.None),
+                    new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                while (source.ReadLine() is { } line)
+                {
+                    target.WriteLine(Redact(line));
+                }
             }
             catch (Exception exception)
                 when (exception is IOException or UnauthorizedAccessException)
@@ -436,6 +459,28 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
         {
             result = result.Replace(pair.Key, pair.Value, StringComparison.OrdinalIgnoreCase);
         }
+
+        result = SensitiveAssignmentPattern.Replace(
+            result,
+            match =>
+            {
+                var equalsIndex = match.Value.IndexOf('=');
+                var colonIndex = match.Value.IndexOf(':');
+                var separatorIndex = (equalsIndex, colonIndex) switch
+                {
+                    (>= 0, >= 0) => Math.Min(equalsIndex, colonIndex),
+                    (>= 0, _) => equalsIndex,
+                    (_, >= 0) => colonIndex,
+                    _ => -1
+                };
+                if (separatorIndex < 0)
+                {
+                    return "[REDACTED]";
+                }
+
+                return match.Value[..(separatorIndex + 1)] + " [REDACTED]";
+            });
+        result = BearerPattern.Replace(result, "Bearer [REDACTED]");
 
         return result;
     }

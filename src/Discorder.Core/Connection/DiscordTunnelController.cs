@@ -20,6 +20,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private readonly IProcessLauncher _processLauncher;
     private readonly IDiscordAccessLock _accessLock;
     private readonly IDiscorderDiagnostics _diagnostics;
+    private readonly IDiscordProcessInspector _discordProcessInspector;
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly TimeSpan _startupGracePeriod;
 
@@ -31,6 +32,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private bool _disposed;
     private bool _intentionalStop;
     private bool _accessLockConfirmed;
+    private DiscordProcessSnapshot _lastDiscordProcessSnapshot = new(0, []);
+    private string? _lastProfilePath;
+    private string? _lastNextAction;
 
     public DiscordTunnelController(
         AppPaths paths,
@@ -40,7 +44,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         IProcessLauncher processLauncher,
         TimeSpan? startupGracePeriod = null,
         IDiscordAccessLock? accessLock = null,
-        IDiscorderDiagnostics? diagnostics = null)
+        IDiscorderDiagnostics? diagnostics = null,
+        IDiscordProcessInspector? discordProcessInspector = null)
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _discordScope = discordScope ?? throw new ArgumentNullException(nameof(discordScope));
@@ -51,6 +56,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             ?? throw new ArgumentNullException(nameof(processLauncher));
         _accessLock = accessLock ?? new NullDiscordAccessLock();
         _diagnostics = diagnostics ?? NullDiscorderDiagnostics.Instance;
+        _discordProcessInspector = discordProcessInspector
+            ?? new WindowsDiscordProcessInspector();
         _startupGracePeriod = startupGracePeriod ?? TimeSpan.FromSeconds(2);
     }
 
@@ -137,6 +144,33 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         }
     }
 
+    public IReadOnlyDictionary<string, string?> CreateDiagnosticDetails()
+    {
+        var liveDiscordProcesses = _discordProcessInspector.Capture();
+        var wireSockRunning = _wireSockProcess is not null
+            && !_wireSockProcess.HasExited;
+
+        return new Dictionary<string, string?>
+        {
+            ["browserAccess"] = IncludeBrowserAccess.ToString(),
+            ["state"] = _snapshot.State.ToString(),
+            ["message"] = _snapshot.Message,
+            ["diagnostic"] = _snapshot.Diagnostic,
+            ["wireSockRunning"] = wireSockRunning.ToString(),
+            ["discordProcessCount"] =
+                liveDiscordProcesses.RunningProcessCount.ToString(CultureInfo.InvariantCulture),
+            ["discordExecutablePathCount"] =
+                liveDiscordProcesses.KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture),
+            ["lastDiscordProcessCount"] =
+                _lastDiscordProcessSnapshot.RunningProcessCount.ToString(CultureInfo.InvariantCulture),
+            ["lastDiscordExecutablePathCount"] =
+                _lastDiscordProcessSnapshot.KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture),
+            ["nextAction"] = _lastNextAction,
+            ["profilePath"] = _lastProfilePath,
+            ["tunnelLog"] = _paths.TunnelLog
+        };
+    }
+
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -182,6 +216,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 allowedApplications,
                 progress,
                 cancellationToken);
+            _lastProfilePath = profilePath;
             _diagnostics.Info(
                 "controller.profile",
                 "Discord profili hazırlandı.",
@@ -212,6 +247,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 _paths.TunnelLog);
             _wireSockProcess.Exited += OnWireSockExited;
 
+            SetStatus(TunnelState.Verifying, "Bağlantı doğrulanıyor");
             await Task.Delay(_startupGracePeriod, cancellationToken);
 
             if (_wireSockProcess.HasExited)
@@ -223,18 +259,46 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     $"{exitCode?.ToString(CultureInfo.InvariantCulture) ?? "bilinmiyor"}.");
             }
 
+            var discordProcesses = _discordProcessInspector.Capture();
+            _lastDiscordProcessSnapshot = discordProcesses;
+            var nextAction = discordProcesses.HasRunningProcesses
+                ? "Discord açıksa tamamen kapatıp yeniden açın."
+                : "Discord'u şimdi açın.";
+            _lastNextAction = nextAction;
+            var connectionMessage = discordProcesses.HasRunningProcesses
+                ? "Bağlantı açık. Discord'u yeniden başlatın"
+                : "Bağlantı açık. Discord'u şimdi açın";
+
             SetStatus(
                 TunnelState.Connected,
-                IncludeBrowserAccess
-                    ? "Discord uygulaması ve tarayıcı modu bağlı"
-                    : "Discord uygulaması bağlı");
-            _diagnostics.WriteHealth(
-                "bağlı",
+                connectionMessage,
+                nextAction);
+            _diagnostics.Info(
+                "controller.verify",
+                "WireSock süreci açık; Discord kullanımı için sonraki adım belirlendi.",
                 new Dictionary<string, string?>
                 {
                     ["browserAccess"] = IncludeBrowserAccess.ToString(),
+                    ["discordProcessCount"] =
+                        discordProcesses.RunningProcessCount.ToString(CultureInfo.InvariantCulture),
+                    ["discordExecutablePathCount"] =
+                        discordProcesses.KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture),
+                    ["nextAction"] = nextAction,
+                    ["wireSockRunning"] = "True"
+                });
+            _diagnostics.WriteHealth(
+                "bağlantı açık",
+                new Dictionary<string, string?>
+                {
+                    ["browserAccess"] = IncludeBrowserAccess.ToString(),
+                    ["discordProcessCount"] =
+                        discordProcesses.RunningProcessCount.ToString(CultureInfo.InvariantCulture),
+                    ["discordExecutablePathCount"] =
+                        discordProcesses.KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture),
+                    ["nextAction"] = nextAction,
                     ["profilePath"] = profilePath,
-                    ["tunnelLog"] = _paths.TunnelLog
+                    ["tunnelLog"] = _paths.TunnelLog,
+                    ["wireSockRunning"] = "True"
                 });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -324,6 +388,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             _accessLockConfirmed = true;
 
             SetStatus(TunnelState.Disconnected, "Discorder Bağlı Değil");
+            _lastNextAction = null;
             _diagnostics.WriteHealth("kapalı", new Dictionary<string, string?>
             {
                 ["accessLock"] = "enabled"

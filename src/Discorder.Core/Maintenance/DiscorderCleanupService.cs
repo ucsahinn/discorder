@@ -32,6 +32,7 @@ public sealed class DiscorderCleanupService
             });
         await _accessLock.RemoveAsync(cancellationToken);
         DeleteDiscorderDataDirectory(cancellationToken);
+        DeleteDiscorderSharedDataDirectory(cancellationToken);
     }
 
     public async Task RepairAsync(CancellationToken cancellationToken)
@@ -60,7 +61,27 @@ public sealed class DiscorderCleanupService
 
     private void DeleteDiscorderDataDirectory(CancellationToken cancellationToken)
     {
-        var directory = new DirectoryInfo(_paths.DataDirectory);
+        DeleteDiscorderDirectory(_paths.DataDirectory, cancellationToken);
+    }
+
+    private void DeleteDiscorderSharedDataDirectory(CancellationToken cancellationToken)
+    {
+        if (string.Equals(
+                Path.GetFullPath(_paths.SharedDataDirectory),
+                Path.GetFullPath(_paths.DataDirectory),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        DeleteDiscorderDirectory(_paths.SharedDataDirectory, cancellationToken);
+    }
+
+    private static void DeleteDiscorderDirectory(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        var directory = new DirectoryInfo(path);
         if (!directory.Exists)
         {
             return;
@@ -117,14 +138,21 @@ public sealed class DiscorderCleanupService
             return;
         }
 
-        var dataRoot = Path.GetFullPath(_paths.DataDirectory)
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var allowedRoots = new[]
+        {
+            _paths.DataDirectory,
+            _paths.SharedDataDirectory
+        }
+            .Select(root => Path.GetFullPath(root)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         var target = Path.GetFullPath(directory.FullName)
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-        if (!target.StartsWith(
-                dataRoot + Path.DirectorySeparatorChar,
-                StringComparison.OrdinalIgnoreCase))
+        if (!allowedRoots.Any(root => target.StartsWith(
+                root + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase)))
         {
             throw new InvalidOperationException(
                 "Onarim klasoru Discorder veri kokunun disinda.");

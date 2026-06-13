@@ -1,12 +1,16 @@
+using Discorder.Core.Updates;
+
 namespace Discorder.Core.Configuration;
 
 public sealed class AppPaths
 {
-    public AppPaths(string? localAppData = null)
+    public AppPaths(string? localAppData = null, string? commonAppData = null)
     {
         var root = localAppData ?? Environment.GetFolderPath(
             Environment.SpecialFolder.LocalApplicationData);
-        var sharedRoot = localAppData ?? Environment.GetFolderPath(
+        var sharedRoot = commonAppData
+            ?? localAppData
+            ?? Environment.GetFolderPath(
             Environment.SpecialFolder.CommonApplicationData);
 
         if (string.IsNullOrWhiteSpace(root)
@@ -22,9 +26,10 @@ public sealed class AppPaths
             SharedDataDirectory,
             "installers");
         ProtectUpdateStaging = localAppData is null;
-        ToolsDirectory = Path.Combine(DataDirectory, "tools");
-        InstallerDirectory = Path.Combine(DataDirectory, "installers");
-        ProfileDirectory = Path.Combine(DataDirectory, "profiles");
+        ProtectSharedData = localAppData is null && commonAppData is null;
+        ToolsDirectory = Path.Combine(SharedDataDirectory, "tools");
+        InstallerDirectory = Path.Combine(SharedDataDirectory, "installers");
+        ProfileDirectory = Path.Combine(SharedDataDirectory, "profiles");
         LogDirectory = Path.Combine(DataDirectory, "logs");
         DiagnosticBundleDirectory = Path.Combine(DataDirectory, "diagnostic-bundles");
         SettingsFile = Path.Combine(DataDirectory, "settings.json");
@@ -49,6 +54,8 @@ public sealed class AppPaths
     public string WireSockInstallerStagingDirectory { get; }
 
     public bool ProtectUpdateStaging { get; }
+
+    public bool ProtectSharedData { get; }
 
     public string ToolsDirectory { get; }
 
@@ -84,11 +91,60 @@ public sealed class AppPaths
 
     public void EnsureDirectories()
     {
-        Directory.CreateDirectory(DataDirectory);
-        Directory.CreateDirectory(ToolsDirectory);
-        Directory.CreateDirectory(InstallerDirectory);
-        Directory.CreateDirectory(ProfileDirectory);
-        Directory.CreateDirectory(LogDirectory);
-        Directory.CreateDirectory(DiagnosticBundleDirectory);
+        PrepareDirectory(DataDirectory, restrictAccess: false);
+        PrepareDirectory(LogDirectory, restrictAccess: false);
+        PrepareDirectory(DiagnosticBundleDirectory, restrictAccess: false);
+        PrepareDirectory(SharedDataDirectory, ProtectSharedData);
+        PrepareDirectory(ToolsDirectory, ProtectSharedData);
+        PrepareDirectory(InstallerDirectory, ProtectSharedData);
+        PrepareDirectory(ProfileDirectory, ProtectSharedData);
+        PrepareDirectory(WireSockInstallerStagingDirectory, ProtectSharedData);
+    }
+
+    private static void PrepareDirectory(string directory, bool restrictAccess)
+    {
+        var fullPath = Path.GetFullPath(directory);
+        RejectReparsePointsInExistingAncestors(fullPath);
+        Directory.CreateDirectory(fullPath);
+        RejectReparsePoint(fullPath);
+
+        if (restrictAccess)
+        {
+            ProtectedUpdateStaging.RestrictToAdministrators(fullPath);
+        }
+    }
+
+    private static void RejectReparsePointsInExistingAncestors(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var root = Path.GetPathRoot(fullPath);
+        if (string.IsNullOrWhiteSpace(root))
+        {
+            throw new InvalidOperationException(
+                "Discorder veri yolu çözümlenemedi.");
+        }
+
+        var current = root;
+        foreach (var part in fullPath[root.Length..].Split(
+                     [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, part);
+            if (Directory.Exists(current))
+            {
+                RejectReparsePoint(current);
+            }
+        }
+    }
+
+    private static void RejectReparsePoint(string directory)
+    {
+        var info = new DirectoryInfo(directory);
+        if (info.Exists
+            && info.Attributes.HasFlag(FileAttributes.ReparsePoint))
+        {
+            throw new InvalidOperationException(
+                "Discorder veri klasörü junction veya symlink olamaz.");
+        }
     }
 }

@@ -5,6 +5,7 @@ public enum TunnelState
     Disconnected,
     Preparing,
     Connecting,
+    Verifying,
     Connected,
     Disconnecting,
     Error
