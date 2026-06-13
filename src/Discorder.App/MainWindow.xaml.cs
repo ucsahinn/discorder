@@ -48,6 +48,8 @@ public partial class MainWindow : Window, IDisposable
     private bool _isToggleOperationRunning;
     private bool _isUpdateOperationRunning;
     private bool _isUpdateProgressPinned;
+    private string? _lastLoggedUpdateProgressKey;
+    private int _lastLoggedUpdateProgressPercent = -1;
     private AppUpdateCheckResult? _pendingUpdate;
     private bool _backgroundVideoRemoteFallbackTried;
     private Forms.NotifyIcon? _trayIcon;
@@ -1279,6 +1281,7 @@ public partial class MainWindow : Window, IDisposable
         try
         {
             _diagnostics.Info("ui.update.install", "Güncelleme yükleme istendi.");
+            ResetUpdateProgressLogThrottle();
 
             if (_controller.Snapshot.IsConnected)
             {
@@ -1423,14 +1426,50 @@ public partial class MainWindow : Window, IDisposable
         DiagnosticsStatus.Text = string.IsNullOrWhiteSpace(progress.Detail)
             ? progress.Message
             : $"{progress.Message}. {progress.Detail}";
-        _diagnostics.Info(
-            "ui.update.progress",
-            progress.Message,
-            new Dictionary<string, string?>
-            {
-                ["percent"] = progress.Percent.ToString("0", CultureInfo.InvariantCulture),
-                ["detail"] = progress.Detail
-            });
+        if (ShouldLogUpdateProgress(progress))
+        {
+            _diagnostics.Info(
+                "ui.update.progress",
+                progress.Message,
+                new Dictionary<string, string?>
+                {
+                    ["percent"] = progress.Percent.ToString("0", CultureInfo.InvariantCulture),
+                    ["detail"] = progress.Detail
+                });
+        }
+    }
+
+    private void ResetUpdateProgressLogThrottle()
+    {
+        _lastLoggedUpdateProgressKey = null;
+        _lastLoggedUpdateProgressPercent = -1;
+    }
+
+    private bool ShouldLogUpdateProgress(AppUpdateProgress progress)
+    {
+        var percent = (int)Math.Floor(progress.Percent);
+        var key = IsByteDownloadDetail(progress.Detail)
+            ? progress.Message
+            : $"{progress.Message}|{progress.Detail}";
+        if (!string.Equals(
+                key,
+                _lastLoggedUpdateProgressKey,
+                StringComparison.Ordinal)
+            || percent >= 100
+            || percent - _lastLoggedUpdateProgressPercent >= 2)
+        {
+            _lastLoggedUpdateProgressKey = key;
+            _lastLoggedUpdateProgressPercent = percent;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsByteDownloadDetail(string? detail)
+    {
+        return !string.IsNullOrWhiteSpace(detail)
+            && detail.EndsWith(" indirildi.", StringComparison.Ordinal);
     }
 
     private static Version GetCurrentVersion()

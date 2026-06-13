@@ -40,6 +40,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Otomatik güncelleme geçici release gövde hatasını tekrar dener", AppUpdateCheckRetriesTransientMetadataBodyFailureAsync),
     ("Otomatik güncelleme geçici checksum hatasını tekrar dener", AppUpdateCheckRetriesTransientChecksumFailureAsync),
     ("Otomatik güncelleme yeni GitHub paketini hazırlar", AppUpdatePreparesVerifiedReleaseAsync),
+    ("Otomatik güncelleme indirme ilerlemesini log dostu sınırlar", AppUpdateThrottlesDownloadProgressAsync),
+    ("Otomatik güncelleme indirme tekrar denemesini görünür tutar", AppUpdatePreservesDownloadRetryProgressAsync),
     ("Otomatik güncelleme GitHub digest uyuşmazlığını reddeder", AppUpdateRejectsDigestMismatchAsync),
     ("Otomatik güncelleme manifest sürüm uyuşmazlığını reddeder", AppUpdateRejectsManifestVersionMismatchAsync),
     ("Otomatik güncelleme büyük checksum dosyasını reddeder", AppUpdateRejectsOversizedChecksumAsync),
@@ -874,6 +876,114 @@ static async Task AppUpdatePreparesVerifiedReleaseAsync()
             "indiriliyor",
             StringComparison.OrdinalIgnoreCase)));
         Assert(progressEvents.Any(item => item.Percent >= 90));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task AppUpdateThrottlesDownloadProgressAsync()
+{
+    var root = CreateTemporaryDirectory();
+    try
+    {
+        var latestUri = new Uri("https://updates.example.test/releases/latest");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.sha256.txt");
+        var packageBytes = CreateUpdatePackage();
+        var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
+        var handler = new MapHttpMessageHandler();
+        handler.AddJson(
+            latestUri,
+            CreateReleaseJson("2.0.14", zipUri, checksumUri, expectedSha256, packageBytes.Length));
+        handler.AddText(
+            checksumUri,
+            $"{expectedSha256}  Discorder-2.0.14-win-x64.zip");
+        using var httpClient = new HttpClient(handler);
+        var downloader = new FloodingVerifiedDownloader(packageBytes, reports: 5000);
+        var service = new AppUpdateService(
+            httpClient,
+            new AppPaths(root),
+            downloader,
+            latestUri,
+            requireUpdateAuthenticode: false);
+        await WriteUpdaterHelperAsync(root);
+        var progressEvents = new List<AppUpdateProgress>();
+        var progress = new ImmediateProgress<AppUpdateProgress>(
+            progressEvents.Add);
+
+        var check = await service.CheckLatestUpdateAsync(
+            new Version(2, 0, 12, 0),
+            CancellationToken.None);
+        var update = await service.PrepareCheckedUpdateAsync(
+            check,
+            root,
+            "Discorder.exe",
+            CancellationToken.None,
+            progress);
+
+        Assert(update.Status == AppUpdatePreparationStatus.Prepared);
+        Assert(downloader.ReportCount == 5000);
+        Assert(progressEvents.Count < 80);
+        Assert(progressEvents.Any(item => item.Message.Contains(
+            "indiriliyor",
+            StringComparison.OrdinalIgnoreCase)));
+        Assert(progressEvents.Any(item => item.Percent >= 90));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task AppUpdatePreservesDownloadRetryProgressAsync()
+{
+    var root = CreateTemporaryDirectory();
+    try
+    {
+        var latestUri = new Uri("https://updates.example.test/releases/latest");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.14/Discorder-2.0.14-win-x64.sha256.txt");
+        var packageBytes = CreateUpdatePackage();
+        var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
+        var handler = new MapHttpMessageHandler();
+        handler.AddJson(
+            latestUri,
+            CreateReleaseJson("2.0.14", zipUri, checksumUri, expectedSha256, packageBytes.Length));
+        handler.AddText(
+            checksumUri,
+            $"{expectedSha256}  Discorder-2.0.14-win-x64.zip");
+        using var httpClient = new HttpClient(handler);
+        var downloader = new RetryProgressVerifiedDownloader(packageBytes);
+        var service = new AppUpdateService(
+            httpClient,
+            new AppPaths(root),
+            downloader,
+            latestUri,
+            requireUpdateAuthenticode: false);
+        await WriteUpdaterHelperAsync(root);
+        var progressEvents = new List<AppUpdateProgress>();
+        var progress = new ImmediateProgress<AppUpdateProgress>(
+            progressEvents.Add);
+
+        var check = await service.CheckLatestUpdateAsync(
+            new Version(2, 0, 12, 0),
+            CancellationToken.None);
+        var update = await service.PrepareCheckedUpdateAsync(
+            check,
+            root,
+            "Discorder.exe",
+            CancellationToken.None,
+            progress);
+
+        Assert(update.Status == AppUpdatePreparationStatus.Prepared);
+        Assert(progressEvents.Any(item => item.Message.Contains(
+            "tekrar",
+            StringComparison.OrdinalIgnoreCase)));
+        Assert(progressEvents.Any(item => item.Detail?.Contains(
+            "Deneme 2/2",
+            StringComparison.OrdinalIgnoreCase) == true));
     }
     finally
     {
@@ -2637,6 +2747,73 @@ file sealed class CapturingVerifiedDownloader(byte[] payload) : IVerifiedDownloa
         progress?.Report(new DownloadProgress(0, payload.Length, 0));
         await File.WriteAllBytesAsync(destination, payload, cancellationToken);
         progress?.Report(new DownloadProgress(payload.Length, payload.Length, 100));
+    }
+}
+
+file sealed class FloodingVerifiedDownloader(byte[] payload, int reports) : IVerifiedDownloader
+{
+    public int ReportCount { get; private set; }
+
+    public async Task DownloadAsync(
+        Uri source,
+        string destination,
+        string expectedSha256,
+        CancellationToken cancellationToken,
+        long? maxBytes = null,
+        IProgress<DownloadProgress>? progress = null)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        for (var index = 0; index < reports; index++)
+        {
+            var percent = reports <= 1
+                ? 100
+                : index * 100d / (reports - 1);
+            var bytesReceived = (long)Math.Round(payload.Length * (percent / 100d));
+            progress?.Report(new DownloadProgress(
+                bytesReceived,
+                payload.Length,
+                percent));
+            ReportCount++;
+        }
+
+        await File.WriteAllBytesAsync(destination, payload, cancellationToken);
+    }
+}
+
+file sealed class RetryProgressVerifiedDownloader(byte[] payload) : IVerifiedDownloader
+{
+    public async Task DownloadAsync(
+        Uri source,
+        string destination,
+        string expectedSha256,
+        CancellationToken cancellationToken,
+        long? maxBytes = null,
+        IProgress<DownloadProgress>? progress = null)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        progress?.Report(new DownloadProgress(
+            0,
+            payload.Length,
+            0,
+            Message: "İndirme bağlantısı kuruluyor.",
+            Attempt: 1,
+            MaxAttempts: 2));
+        progress?.Report(new DownloadProgress(
+            0,
+            payload.Length,
+            null,
+            Message: "Bağlantı kurulamadı, tekrar deneniyor.",
+            Attempt: 2,
+            MaxAttempts: 2,
+            IsRetry: true));
+        progress?.Report(new DownloadProgress(
+            payload.Length,
+            payload.Length,
+            100));
+
+        await File.WriteAllBytesAsync(destination, payload, cancellationToken);
     }
 }
 

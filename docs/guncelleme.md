@@ -59,10 +59,10 @@ Güncelleme sırasında:
 
 - Yeni dosyalar staging alanında hazırlanır.
 - Mevcut uygulama klasörü değiştirilmeden önce yedeklenir.
-- Hata oluşursa önceki dosyalar geri taşınır.
+- Hata oluşursa önceki dosyalar geri taşınmaya çalışılır.
 - Başarılı olursa yeni `Discorder.exe` başlatılır.
 
-Amaç, indirme veya doğrulama hatasının çalışan uygulama klasörünü kullanılmaz hale getirmemesidir.
+Amaç, indirme veya doğrulama hatasının çalışan uygulama klasörünü kullanılmaz hale getirmemesidir. Dosya kilidi, antivirüs/EDR veya yetki problemi geri yüklemeyi de engellerse kullanıcı doğrulanmış ZIP paketini yeniden çıkararak kurtarabilir.
 
 ## Kısayol ve Başlangıç Kaydı
 

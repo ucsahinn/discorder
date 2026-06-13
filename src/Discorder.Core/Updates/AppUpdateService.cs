@@ -165,13 +165,37 @@ public sealed class AppUpdateService
             _paths.ProtectUpdateStaging);
 
         var packagePath = Path.Combine(updateDirectory, packageFileName);
+        var lastReportedDownloadBucket = -1;
         var downloadProgress = new DirectProgress<DownloadProgress>(download =>
         {
+            if (!string.IsNullOrWhiteSpace(download.Message))
+            {
+                var statusPercent = download.Percent is null
+                    ? 20
+                    : 20 + (download.Percent.Value * 0.45);
+                progress?.Report(new AppUpdateProgress(
+                    Math.Clamp(statusPercent, 20, 65),
+                    download.IsRetry
+                        ? "Bağlantı tekrar deneniyor"
+                        : $"v{versionText} indiriliyor",
+                    FormatDownloadStatusDetail(download)));
+                return;
+            }
+
             var percent = download.Percent is null
                 ? 30
                 : 20 + (download.Percent.Value * 0.45);
+            percent = Math.Clamp(percent, 20, 65);
+            var bucket = (int)Math.Floor(percent);
+            if (bucket <= lastReportedDownloadBucket
+                && download.Percent is not >= 100)
+            {
+                return;
+            }
+
+            lastReportedDownloadBucket = bucket;
             progress?.Report(new AppUpdateProgress(
-                Math.Clamp(percent, 20, 65),
+                percent,
                 $"v{versionText} indiriliyor",
                 FormatDownloadDetail(download)));
         });
@@ -717,6 +741,23 @@ public sealed class AppUpdateService
         }
 
         return $"{FormatBytes(progress.BytesReceived)} / {FormatBytes(progress.TotalBytes.Value)} indirildi.";
+    }
+
+    private static string FormatDownloadStatusDetail(DownloadProgress progress)
+    {
+        var message = progress.Message?.Trim();
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return FormatDownloadDetail(progress);
+        }
+
+        if (progress.Attempt is > 0
+            && progress.MaxAttempts is > 1)
+        {
+            return $"{message} Deneme {progress.Attempt}/{progress.MaxAttempts}.";
+        }
+
+        return message;
     }
 
     private static string FormatBytes(long bytes)

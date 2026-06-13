@@ -50,11 +50,6 @@
                                               Color="#73E8FF" />
                         </Border.Effect>
                         <Grid>
-                            <Border Height="1"
-                                    Margin="8,0"
-                                    VerticalAlignment="Top"
-                                    Background="#55FFFFFF"
-                                    CornerRadius="1" />
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center" />
                         </Grid>
@@ -108,11 +103,6 @@
                                               Color="#5DFF92" />
                         </Border.Effect>
                         <Grid>
-                            <Border Height="1"
-                                    Margin="8,0"
-                                    VerticalAlignment="Top"
-                                    Background="#78FFFFFF"
-                                    CornerRadius="1" />
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center" />
                         </Grid>
@@ -163,11 +153,6 @@
                                               Color="#ED4245" />
                         </Border.Effect>
                         <Grid>
-                            <Border Height="1"
-                                    Margin="8,0"
-                                    VerticalAlignment="Top"
-                                    Background="#42FFFFFF"
-                                    CornerRadius="1" />
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center" />
                         </Grid>
@@ -221,11 +206,6 @@
                                               Color="#5DFF92" />
                         </Border.Effect>
                         <Grid>
-                            <Border Height="1"
-                                    Margin="8,0"
-                                    VerticalAlignment="Top"
-                                    Background="#90FFFFFF"
-                                    CornerRadius="1" />
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center" />
                         </Grid>
