@@ -63,6 +63,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici aktif bağlantıyı kapanışta güvenle temizler", ControllerDisposeCleansActiveConnectionAsync),
     ("Denetleyici web kapsamını bağlıyken kilitler", ControllerLocksBrowserScopeWhileConnectedAsync),
     ("Denetleyici bağlantıyı Discord oturumu sanmadan doğrular", ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync),
+    ("Denetleyici Discord otomatik yenileme başarısızlığını ayrı durum yapar", ControllerKeepsTunnelActiveWhenDiscordRestartFailsAsync),
     ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
     ("Denetleyici GitHub DNS hatasını Türkçe açıklar", ControllerNetworkFailureIsUserFriendlyAsync),
     ("Denetleyici indirme zaman aşımını Türkçe açıklar", ControllerDownloadTimeoutIsUserFriendlyAsync),
@@ -116,7 +117,7 @@ static Task DiscordScopeDefaultsToAppOnlyAsync()
     {
         var apps = new DiscordAppScope(root, root, root).GetAllowedApplications();
 
-        Assert(apps.All(app => !app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals(
             Path.Combine(root, "Discord"),
             StringComparison.OrdinalIgnoreCase)));
@@ -163,11 +164,11 @@ static Task DiscordScopeIncludesBrowsersWhenEnabledAsync()
         var apps = new DiscordAppScope(root, root, root)
             .GetAllowedApplications(includeBrowserAccess: true);
 
-        Assert(apps.All(app => !app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals("msedge.exe", StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.All(app => !app.Equals("firefox.exe", StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.All(app => !app.Equals("opera.exe", StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.All(app => !app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals("firefox.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals("opera.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals(
             Path.Combine(root, "Discord"),
             StringComparison.OrdinalIgnoreCase)));
@@ -1790,6 +1791,11 @@ static async Task ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync()
     var diagnostics = new DiscorderDiagnostics(
         new AppPaths(root),
         TimeSpan.Zero);
+    var discordManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            2,
+            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+            [100, 101]));
     var controller = new DiscordTunnelController(
         new AppPaths(root),
         new DiscordAppScope(root, root, root),
@@ -1803,10 +1809,7 @@ static async Task ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync()
         TimeSpan.Zero,
         accessLock,
         diagnostics,
-        new FakeDiscordProcessInspector(
-            new DiscordProcessSnapshot(
-                2,
-                [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")])));
+        discordManager);
 
     try
     {
@@ -1814,7 +1817,7 @@ static async Task ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync()
 
         Assert(controller.Snapshot.State == TunnelState.Connected);
         Assert(controller.Snapshot.Message.Contains(
-            "Discord'u yeniden başlatın",
+            "Discord yenilendi",
             StringComparison.Ordinal));
         Assert(!controller.Snapshot.Message.Contains(
             "Discord uygulaması bağlı",
@@ -1822,13 +1825,73 @@ static async Task ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync()
 
         var health = await File.ReadAllTextAsync(
             Path.Combine(root, "Discorder", "logs", "health.json"));
-        Assert(health.Contains("\"status\":\"bağlantı açık\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"status\":\"bağlantı hazır\"", StringComparison.Ordinal));
         Assert(health.Contains("\"discordProcessCount\":\"2\"", StringComparison.Ordinal));
-        Assert(health.Contains("Discord açıksa tamamen kapatıp yeniden açın.", StringComparison.Ordinal));
+        Assert(health.Contains("\"discordRestartStatus\":\"Discord yenilendi.\"", StringComparison.Ordinal));
         var details = controller.CreateDiagnosticDetails();
         Assert(details["wireSockRunning"] == "True");
         Assert(details["discordProcessCount"] == "2");
-        Assert(details["nextAction"] == "Discord açıksa tamamen kapatıp yeniden açın.");
+        Assert(details["nextAction"] == "Discord yenilendi. Bağlantı hazır.");
+        Assert(details["discordRestartStatus"] == "Discord yenilendi.");
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerKeepsTunnelActiveWhenDiscordRestartFailsAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var accessLock = new FakeDiscordAccessLock();
+    var diagnostics = new DiscorderDiagnostics(
+        new AppPaths(root),
+        TimeSpan.Zero);
+    var discordManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            1,
+            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+            [100]),
+        new DiscordRestartResult(
+            false,
+            "Discord otomatik yenilenemedi.",
+            "access denied"));
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        discordManager);
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.DiscordRestartRequired);
+        Assert(controller.Snapshot.IsConnected);
+        Assert(controller.Snapshot.Message.Contains(
+            "Discord'u yeniden başlatın",
+            StringComparison.Ordinal));
+        Assert(discordManager.RestartCount == 1);
+
+        var health = await File.ReadAllTextAsync(
+            Path.Combine(root, "Discorder", "logs", "health.json"));
+        Assert(health.Contains("\"status\":\"discord yeniden başlatılmalı\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"discordRestartStatus\":\"Discord otomatik yenilenemedi.\"", StringComparison.Ordinal));
+
+        await controller.DisconnectAsync();
+        Assert(controller.Snapshot.State == TunnelState.Disconnected);
+        Assert(process.StopCount == 1);
     }
     finally
     {
@@ -3228,8 +3291,23 @@ file sealed class FakeManagedProcess : IManagedProcess
     }
 }
 
-file sealed class FakeDiscordProcessInspector(DiscordProcessSnapshot snapshot)
-    : IDiscordProcessInspector
+file sealed class FakeDiscordProcessManager(
+    DiscordProcessSnapshot snapshot,
+    DiscordRestartResult? restartResult = null)
+    : IDiscordProcessManager
 {
+    public int RestartCount { get; private set; }
+
     public DiscordProcessSnapshot Capture() => snapshot;
+
+    public Task<DiscordRestartResult> RestartAsync(
+        DiscordProcessSnapshot snapshot,
+        TimeSpan gracefulTimeout,
+        CancellationToken cancellationToken)
+    {
+        RestartCount++;
+        return Task.FromResult(
+            restartResult
+            ?? new DiscordRestartResult(true, "Discord yenilendi."));
+    }
 }

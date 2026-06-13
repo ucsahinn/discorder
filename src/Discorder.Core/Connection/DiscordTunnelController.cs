@@ -20,7 +20,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private readonly IProcessLauncher _processLauncher;
     private readonly IDiscordAccessLock _accessLock;
     private readonly IDiscorderDiagnostics _diagnostics;
-    private readonly IDiscordProcessInspector _discordProcessInspector;
+    private readonly IDiscordProcessManager _discordProcessManager;
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly TimeSpan _startupGracePeriod;
 
@@ -35,6 +35,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private DiscordProcessSnapshot _lastDiscordProcessSnapshot = new(0, []);
     private string? _lastProfilePath;
     private string? _lastNextAction;
+    private string? _lastDiscordRestartStatus;
 
     public DiscordTunnelController(
         AppPaths paths,
@@ -45,7 +46,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         TimeSpan? startupGracePeriod = null,
         IDiscordAccessLock? accessLock = null,
         IDiscorderDiagnostics? diagnostics = null,
-        IDiscordProcessInspector? discordProcessInspector = null)
+        IDiscordProcessManager? discordProcessManager = null)
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _discordScope = discordScope ?? throw new ArgumentNullException(nameof(discordScope));
@@ -56,8 +57,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             ?? throw new ArgumentNullException(nameof(processLauncher));
         _accessLock = accessLock ?? new NullDiscordAccessLock();
         _diagnostics = diagnostics ?? NullDiscorderDiagnostics.Instance;
-        _discordProcessInspector = discordProcessInspector
-            ?? new WindowsDiscordProcessInspector();
+        _discordProcessManager = discordProcessManager
+            ?? new NullDiscordProcessManager();
         _startupGracePeriod = startupGracePeriod ?? TimeSpan.FromSeconds(2);
     }
 
@@ -146,7 +147,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
     public IReadOnlyDictionary<string, string?> CreateDiagnosticDetails()
     {
-        var liveDiscordProcesses = _discordProcessInspector.Capture();
+        var liveDiscordProcesses = _discordProcessManager.Capture();
         var wireSockRunning = _wireSockProcess is not null
             && !_wireSockProcess.HasExited;
 
@@ -166,6 +167,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             ["lastDiscordExecutablePathCount"] =
                 _lastDiscordProcessSnapshot.KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture),
             ["nextAction"] = _lastNextAction,
+            ["discordRestartStatus"] = _lastDiscordRestartStatus,
             ["profilePath"] = _lastProfilePath,
             ["tunnelLog"] = _paths.TunnelLog
         };
@@ -259,26 +261,70 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     $"{exitCode?.ToString(CultureInfo.InvariantCulture) ?? "bilinmiyor"}.");
             }
 
-            var discordProcesses = _discordProcessInspector.Capture();
+            var discordProcesses = _discordProcessManager.Capture();
             _lastDiscordProcessSnapshot = discordProcesses;
-            var nextAction = discordProcesses.HasRunningProcesses
-                ? "Discord açıksa tamamen kapatıp yeniden açın."
-                : "Discord'u şimdi açın.";
+            TunnelState finalState;
+            string nextAction;
+            string connectionMessage;
+            string restartStatus;
+
+            if (discordProcesses.HasRunningProcesses)
+            {
+                SetStatus(TunnelState.Verifying, "Discord yenileniyor");
+                var restart = await _discordProcessManager.RestartAsync(
+                    discordProcesses,
+                    TimeSpan.FromSeconds(4),
+                    cancellationToken);
+                restartStatus = restart.Message;
+                _lastDiscordRestartStatus = restartStatus;
+
+                if (restart.Restarted)
+                {
+                    finalState = TunnelState.Connected;
+                    nextAction = restart.Message.Contains("şimdi açın", StringComparison.OrdinalIgnoreCase)
+                        ? "Discord'u şimdi açın."
+                        : "Discord yenilendi. Bağlantı hazır.";
+                    connectionMessage = restart.Message.Contains("şimdi açın", StringComparison.OrdinalIgnoreCase)
+                        ? "Bağlantı hazır. Discord'u şimdi açın"
+                        : "Discord yenilendi. Bağlantı hazır";
+                }
+                else
+                {
+                    finalState = TunnelState.DiscordRestartRequired;
+                    nextAction = "Discord'u tamamen kapatıp yeniden açın.";
+                    connectionMessage = "Discord'u yeniden başlatın";
+                    _diagnostics.Warning(
+                        "controller.discordRestart",
+                        "Discord otomatik yenilenemedi.",
+                        new Dictionary<string, string?>
+                        {
+                            ["message"] = restart.Message,
+                            ["diagnostic"] = restart.Diagnostic
+                        });
+                }
+            }
+            else
+            {
+                finalState = TunnelState.Connected;
+                nextAction = "Discord'u şimdi açın.";
+                connectionMessage = "Bağlantı hazır. Discord'u şimdi açın";
+                restartStatus = "Discord kapalıydı.";
+                _lastDiscordRestartStatus = restartStatus;
+            }
+
             _lastNextAction = nextAction;
-            var connectionMessage = discordProcesses.HasRunningProcesses
-                ? "Bağlantı açık. Discord'u yeniden başlatın"
-                : "Bağlantı açık. Discord'u şimdi açın";
 
             SetStatus(
-                TunnelState.Connected,
+                finalState,
                 connectionMessage,
                 nextAction);
             _diagnostics.Info(
                 "controller.verify",
-                "WireSock süreci açık; Discord kullanımı için sonraki adım belirlendi.",
+                "WireSock süreci açık; Discord kullanımı için son durum belirlendi.",
                 new Dictionary<string, string?>
                 {
                     ["browserAccess"] = IncludeBrowserAccess.ToString(),
+                    ["discordRestartStatus"] = restartStatus,
                     ["discordProcessCount"] =
                         discordProcesses.RunningProcessCount.ToString(CultureInfo.InvariantCulture),
                     ["discordExecutablePathCount"] =
@@ -287,10 +333,13 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["wireSockRunning"] = "True"
                 });
             _diagnostics.WriteHealth(
-                "bağlantı açık",
+                finalState is TunnelState.Connected
+                    ? "bağlantı hazır"
+                    : "discord yeniden başlatılmalı",
                 new Dictionary<string, string?>
                 {
                     ["browserAccess"] = IncludeBrowserAccess.ToString(),
+                    ["discordRestartStatus"] = restartStatus,
                     ["discordProcessCount"] =
                         discordProcesses.RunningProcessCount.ToString(CultureInfo.InvariantCulture),
                     ["discordExecutablePathCount"] =

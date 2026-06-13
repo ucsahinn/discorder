@@ -69,21 +69,16 @@ public sealed class DiscordAppScope
 
         foreach (var (installationName, processName) in DiscordInstallations)
         {
-            var executableFound = false;
+            allowed.Add(processName);
             if (!string.IsNullOrWhiteSpace(_localAppData))
             {
                 var installationPath = Path.GetFullPath(
                     Path.Combine(_localAppData, installationName));
 
-                executableFound = AddDiscordInstallation(
+                AddDiscordInstallation(
                     allowed,
                     installationPath,
                     processName);
-            }
-
-            if (!executableFound)
-            {
-                allowed.Add(processName);
             }
         }
 
@@ -91,11 +86,8 @@ public sealed class DiscordAppScope
         {
             foreach (var browser in BrowserDefinitions)
             {
-                var pathCount = AddKnownBrowserPaths(allowed, browser);
-                if (pathCount == 0)
-                {
-                    allowed.Add(browser.ProcessName);
-                }
+                allowed.Add(browser.ProcessName);
+                AddKnownBrowserPaths(allowed, browser);
             }
         }
 

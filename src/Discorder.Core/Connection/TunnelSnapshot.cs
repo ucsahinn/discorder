@@ -11,5 +11,6 @@ public sealed record TunnelSnapshot(
         or TunnelState.Verifying
         or TunnelState.Disconnecting;
 
-    public bool IsConnected => State is TunnelState.Connected;
+    public bool IsConnected => State is TunnelState.Connected
+        or TunnelState.DiscordRestartRequired;
 }

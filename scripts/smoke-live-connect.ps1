@@ -17,7 +17,7 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 }
 
 $settingsPath = Join-Path $env:LOCALAPPDATA 'Discorder\settings.json'
-$profilePath = Join-Path $env:LOCALAPPDATA 'Discorder\profiles\discord.conf'
+$profilePath = Join-Path $env:ProgramData 'Discorder\profiles\discord.conf'
 $logPath = Join-Path $env:LOCALAPPDATA 'Discorder\logs\tunnel.log'
 $hostsPath = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
 $beginMarker = '# BEGIN Discorder Discord kilidi'
@@ -299,9 +299,11 @@ $result = [ordered]@{
     FirewallRuleDisabledWhileConnected = $false
     DirectDiscordTcp443WhileConnected = $false
     ProfileHasDiscord = $false
+    ProfileHasDiscordFullPath = $false
     ProfileHasChrome = $false
     ProfileHasEdge = $false
     ProfileHasFirefox = $false
+    ProfileHasBrowserFullPath = $false
     DisconnectClicked = $false
     WireSockProcessStoppedAfterDisconnect = $false
     FinalHostsLock = $false
@@ -355,12 +357,16 @@ try {
             $allowedAppsText = [string]$allowedAppsLine.Line
             $result.ProfileHasDiscord =
                 $allowedAppsText -match 'Discord\.exe'
+            $result.ProfileHasDiscordFullPath =
+                $allowedAppsText -match '\\Discord(?:PTB|Canary|Development)?\\app-[^,\\]+\\Discord(?:PTB|Canary|Development)?\.exe'
             $result.ProfileHasChrome =
                 $allowedAppsText -match 'chrome\.exe'
             $result.ProfileHasEdge =
                 $allowedAppsText -match 'msedge\.exe'
             $result.ProfileHasFirefox =
                 $allowedAppsText -match 'firefox\.exe'
+            $result.ProfileHasBrowserFullPath =
+                $allowedAppsText -match '\\(?:BraveSoftware\\Brave-Browser\\Application\\brave|Google\\Chrome\\Application\\chrome|Microsoft\\Edge\\Application\\msedge|Mozilla Firefox\\firefox|Opera\\opera|Programs\\Opera\\opera|Programs\\Opera GX\\opera|Vivaldi\\Application\\vivaldi)\.exe'
         }
 
         $result.ConnectionEstablishedLog =
@@ -415,9 +421,11 @@ $criticalChecks = @(
     'FirewallRuleDisabledWhileConnected',
     'DirectDiscordTcp443WhileConnected',
     'ProfileHasDiscord',
+    'ProfileHasDiscordFullPath',
     'ProfileHasChrome',
     'ProfileHasEdge',
     'ProfileHasFirefox',
+    'ProfileHasBrowserFullPath',
     'DisconnectClicked',
     'WireSockProcessStoppedAfterDisconnect',
     'FinalHostsLock',

@@ -6,6 +6,7 @@ public enum TunnelState
     Preparing,
     Connecting,
     Verifying,
+    DiscordRestartRequired,
     Connected,
     Disconnecting,
     Error

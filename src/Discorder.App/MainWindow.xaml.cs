@@ -361,6 +361,7 @@ public partial class MainWindow : Window, IDisposable
     {
         return state switch
         {
+            TunnelState.DiscordRestartRequired => "Discord yenilenmeli",
             TunnelState.Connected => "Bağlı",
             TunnelState.Verifying => "Doğrulanıyor",
             TunnelState.Preparing => "Hazırlanıyor",
@@ -379,6 +380,7 @@ public partial class MainWindow : Window, IDisposable
 
         return snapshot.State switch
         {
+            TunnelState.DiscordRestartRequired => $"Discord yeniden başlatılmalı, {time}",
             TunnelState.Connected => $"Tünel aktif, son durum {time}",
             TunnelState.Verifying => $"Discord için son adım kontrol ediliyor, {time}",
             TunnelState.Preparing or TunnelState.Connecting
@@ -408,6 +410,13 @@ public partial class MainWindow : Window, IDisposable
     {
         return state switch
         {
+            TunnelState.DiscordRestartRequired => new StateVisual(
+                "DİSCORD",
+                "BAĞLANTIYI KES",
+                MediaColor.FromRgb(249, 214, 107),
+                MediaColor.FromRgb(255, 232, 145),
+                MediaColor.FromRgb(82, 62, 22),
+                MediaColor.FromRgb(249, 214, 107)),
             TunnelState.Connected => new StateVisual(
                 "BAĞLI",
                 "BAĞLANTIYI KES",
@@ -539,6 +548,7 @@ public partial class MainWindow : Window, IDisposable
         return snapshot.State switch
         {
             TunnelState.Connected => (100, "Bağlandı", 4),
+            TunnelState.DiscordRestartRequired => (96, "Discord yeniden başlatılmalı", 4),
             TunnelState.Verifying => (92, "Bağlantı doğrulanıyor", 4),
             TunnelState.Connecting => (82, "Bağlantı açılıyor", 4),
             TunnelState.Disconnecting => (62, "Bağlantı kapatılıyor", 4),
@@ -585,8 +595,9 @@ public partial class MainWindow : Window, IDisposable
         return state switch
         {
             TunnelState.Connected => _controller.IncludeBrowserAccess
-                ? "Discord açıksa yeniden başlatın; tarayıcı modu da kapsamda."
-                : "Discord açıksa yeniden başlatın; yalnızca uygulama kapsamda.",
+                ? "Discord uygulaması ve tarayıcı bağlantıya dahil."
+                : "Yalnızca Discord uygulaması bağlantıya dahil.",
+            TunnelState.DiscordRestartRequired => "Discord'u tamamen kapatıp yeniden açın.",
             TunnelState.Verifying => "WireSock süreci açık, Discord kapsamı kontrol ediliyor.",
             TunnelState.Preparing => "Kurulum, dijital imza ve bağlantı profili doğrulanıyor.",
             TunnelState.Connecting => "WireSock VPN Client süreci başlatılıyor.",
