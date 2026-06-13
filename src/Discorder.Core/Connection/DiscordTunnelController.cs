@@ -261,55 +261,60 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     $"{exitCode?.ToString(CultureInfo.InvariantCulture) ?? "bilinmiyor"}.");
             }
 
-            var discordProcesses = _discordProcessManager.Capture();
+            DiscordProcessSnapshot discordProcesses = _discordProcessManager.Capture();
             _lastDiscordProcessSnapshot = discordProcesses;
             TunnelState finalState;
             string nextAction;
             string connectionMessage;
             string restartStatus;
 
-            if (discordProcesses.HasRunningProcesses)
-            {
-                SetStatus(TunnelState.Verifying, "Discord yenileniyor");
-                var restart = await _discordProcessManager.RestartAsync(
-                    discordProcesses,
-                    TimeSpan.FromSeconds(4),
-                    cancellationToken);
-                restartStatus = restart.Message;
-                _lastDiscordRestartStatus = restartStatus;
+            SetStatus(
+                TunnelState.Verifying,
+                discordProcesses.HasRunningProcesses
+                    ? "Discord yenileniyor"
+                    : "Discord açılıyor");
+            var restart = await _discordProcessManager.RestartAsync(
+                discordProcesses,
+                TimeSpan.FromSeconds(4),
+                cancellationToken);
+            restartStatus = restart.Message;
+            _lastDiscordRestartStatus = restartStatus;
+            discordProcesses = _discordProcessManager.Capture();
+            _lastDiscordProcessSnapshot = discordProcesses;
 
-                if (restart.Restarted)
+            if (restart.Restarted)
+            {
+                finalState = TunnelState.Connected;
+                if (restart.Message.Contains("şimdi açın", StringComparison.OrdinalIgnoreCase)
+                    || restart.Message.Contains("kapalıydı", StringComparison.OrdinalIgnoreCase))
                 {
-                    finalState = TunnelState.Connected;
-                    nextAction = restart.Message.Contains("şimdi açın", StringComparison.OrdinalIgnoreCase)
-                        ? "Discord'u şimdi açın."
-                        : "Discord yenilendi. Bağlantı hazır.";
-                    connectionMessage = restart.Message.Contains("şimdi açın", StringComparison.OrdinalIgnoreCase)
-                        ? "Bağlantı hazır. Discord'u şimdi açın"
-                        : "Discord yenilendi. Bağlantı hazır";
+                    nextAction = "Discord'u şimdi açın.";
+                    connectionMessage = "Bağlantı hazır. Discord'u şimdi açın";
+                }
+                else if (restart.Message.Contains("açıldı", StringComparison.OrdinalIgnoreCase))
+                {
+                    nextAction = "Discord açıldı. Bağlantı hazır.";
+                    connectionMessage = "Discord açıldı. Bağlantı hazır";
                 }
                 else
                 {
-                    finalState = TunnelState.DiscordRestartRequired;
-                    nextAction = "Discord'u tamamen kapatıp yeniden açın.";
-                    connectionMessage = "Discord'u yeniden başlatın";
-                    _diagnostics.Warning(
-                        "controller.discordRestart",
-                        "Discord otomatik yenilenemedi.",
-                        new Dictionary<string, string?>
-                        {
-                            ["message"] = restart.Message,
-                            ["diagnostic"] = restart.Diagnostic
-                        });
+                    nextAction = "Discord yenilendi. Bağlantı hazır.";
+                    connectionMessage = "Discord yenilendi. Bağlantı hazır";
                 }
             }
             else
             {
-                finalState = TunnelState.Connected;
-                nextAction = "Discord'u şimdi açın.";
-                connectionMessage = "Bağlantı hazır. Discord'u şimdi açın";
-                restartStatus = "Discord kapalıydı.";
-                _lastDiscordRestartStatus = restartStatus;
+                finalState = TunnelState.DiscordRestartRequired;
+                nextAction = restart.Message;
+                connectionMessage = restart.Message;
+                _diagnostics.Warning(
+                    "controller.discordRestart",
+                    "Discord otomatik açılamadı.",
+                    new Dictionary<string, string?>
+                    {
+                        ["message"] = restart.Message,
+                        ["diagnostic"] = restart.Diagnostic
+                    });
             }
 
             _lastNextAction = nextAction;
@@ -416,6 +421,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 await TryClearTunnelScopeAsync("DisconnectWithoutProcess");
                 await _accessLock.EnableAsync(cancellationToken);
                 _accessLockConfirmed = true;
+                await CloseDiscordAfterDisconnectAsync(cancellationToken);
                 SetStatus(TunnelState.Disconnected, "Discorder Bağlı Değil");
                 return;
             }
@@ -435,6 +441,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             await TryClearTunnelScopeAsync("Disconnect");
             await _accessLock.EnableAsync(cancellationToken);
             _accessLockConfirmed = true;
+            await CloseDiscordAfterDisconnectAsync(cancellationToken);
 
             SetStatus(TunnelState.Disconnected, "Discorder Bağlı Değil");
             _lastNextAction = null;
@@ -469,6 +476,40 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         {
             _intentionalStop = false;
             _operationGate.Release();
+        }
+    }
+
+    private async Task CloseDiscordAfterDisconnectAsync(CancellationToken cancellationToken)
+    {
+        var discordProcesses = _discordProcessManager.Capture();
+        _lastDiscordProcessSnapshot = discordProcesses;
+        if (!discordProcesses.HasRunningProcesses)
+        {
+            _lastDiscordRestartStatus = "Discord zaten kapalıydı.";
+            return;
+        }
+
+        var close = await _discordProcessManager.CloseAsync(
+            discordProcesses,
+            TimeSpan.FromSeconds(3),
+            cancellationToken);
+        _lastDiscordRestartStatus = close.Message;
+        if (!close.Restarted)
+        {
+            _diagnostics.Warning(
+                "controller.discordClose",
+                "Discord otomatik kapatılamadı.",
+                new Dictionary<string, string?>
+                {
+                    ["message"] = close.Message,
+                    ["diagnostic"] = close.Diagnostic
+                });
+        }
+        else
+        {
+            _diagnostics.Info(
+                "controller.discordClose",
+                close.Message);
         }
     }
 

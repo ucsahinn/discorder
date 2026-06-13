@@ -9,4 +9,10 @@ public sealed class NullDiscordProcessManager : IDiscordProcessManager
         TimeSpan gracefulTimeout,
         CancellationToken cancellationToken) =>
         Task.FromResult(DiscordRestartResult.NotNeeded());
+
+    public Task<DiscordRestartResult> CloseAsync(
+        DiscordProcessSnapshot snapshot,
+        TimeSpan gracefulTimeout,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(DiscordRestartResult.NotNeeded());
 }

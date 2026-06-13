@@ -56,6 +56,43 @@ public static class AuthenticodeSignatureVerifier
         }
     }
 
+    public static string? TryGetSignerPublisher(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        if (!OperatingSystem.IsWindows())
+        {
+            throw new PlatformNotSupportedException(
+                "Authenticode dogrulamasi Windows gerektirir.");
+        }
+
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException(
+                "Imza dogrulanacak dosya bulunamadi.",
+                path);
+        }
+
+        try
+        {
+            VerifyAuthenticode(path);
+#pragma warning disable SYSLIB0057
+            using var certificate = new X509Certificate2(
+                X509Certificate.CreateFromSignedFile(path));
+#pragma warning restore SYSLIB0057
+            return certificate.GetNameInfo(
+                X509NameType.SimpleName,
+                forIssuer: false);
+        }
+        catch (CryptographicException)
+        {
+            return null;
+        }
+        catch (InvalidDataException)
+        {
+            return null;
+        }
+    }
+
     public static void VerifyFile(string path, string expectedSignerThumbprint)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expectedSignerThumbprint);

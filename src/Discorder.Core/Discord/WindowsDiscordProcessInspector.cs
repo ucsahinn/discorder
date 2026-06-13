@@ -1,15 +1,40 @@
+using Discorder.Core.Security;
 using System.Diagnostics;
+using System.Globalization;
+using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace Discorder.Core.Discord;
 
 public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
 {
+    private const string ExpectedPublisher = "Discord Inc.";
+    private const int CsidlDesktop = 0;
+    private const int ShowNormal = 1;
+    private const int SwcDesktop = 8;
+    private const int SwfoNeedDispatch = 1;
+    private const int RestoreWindow = 9;
+
+    private static readonly Guid ShellWindowsClsid = new(
+        "9BA05972-F6A8-11CF-A442-00A0C90A8F39");
+    private static readonly TimeSpan LaunchVerificationTimeout = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan LaunchVerificationInterval = TimeSpan.FromMilliseconds(300);
+    private static readonly string SquirrelUpdateExecutableName = string.Concat("Update", ".exe");
+
     private static readonly string[] ProcessNames =
     [
         "Discord",
         "DiscordPTB",
         "DiscordCanary",
         "DiscordDevelopment"
+    ];
+
+    private static readonly InstallationSpec[] KnownInstallations =
+    [
+        new("Discord", "Discord.exe", "Discord"),
+        new("DiscordPTB", "DiscordPTB.exe", "DiscordPTB"),
+        new("DiscordCanary", "DiscordCanary.exe", "DiscordCanary"),
+        new("DiscordDevelopment", "DiscordDevelopment.exe", "DiscordDevelopment")
     ];
 
     public DiscordProcessSnapshot Capture()
@@ -50,82 +75,53 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
 
         if (!snapshot.HasRunningProcesses)
         {
-            return DiscordRestartResult.NotNeeded();
-        }
-
-        var effectiveSnapshot = snapshot.ProcessIds.Count > 0
-            ? snapshot
-            : Capture();
-        var processIds = effectiveSnapshot.ProcessIds
-            .Distinct()
-            .ToArray();
-        if (processIds.Length == 0)
-        {
-            return new DiscordRestartResult(
-                true,
-                "Discord kapatıldı. Discord'u şimdi açın.");
-        }
-
-        var expectedExecutablePaths = effectiveSnapshot.ExecutablePaths
-            .Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var targets = new List<RestartTarget>();
-        var failures = new List<string>();
-
-        try
-        {
-            foreach (var processId in processIds)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Process process;
-                try
-                {
-                    process = Process.GetProcessById(processId);
-                }
-                catch (ArgumentException)
-                {
-                    continue;
-                }
-
-                if (!TryCreateRestartTarget(
-                        process,
-                        expectedExecutablePaths,
-                        out var target,
-                        out var validationError))
-                {
-                    process.Dispose();
-                    if (!string.IsNullOrWhiteSpace(validationError))
-                    {
-                        failures.Add($"{processId}: {validationError}");
-                    }
-
-                    continue;
-                }
-
-                targets.Add(target);
-            }
-
-            if (failures.Count > 0)
+            var installedLaunchSpecs = ResolveInstalledLaunchSpecs(snapshot.ExecutablePaths);
+            if (installedLaunchSpecs.Length == 0)
             {
                 return new DiscordRestartResult(
                     false,
-                    "Discord otomatik yenilenemedi.",
-                    string.Join("; ", failures));
+                    "Discord bulunamadı. Discord'u açıp tekrar deneyin.",
+                    "No trusted Discord installation was found.");
             }
 
-            if (targets.Count == 0)
+            return await LaunchDiscordAsync(
+                installedLaunchSpecs,
+                "Discord açıldı.",
+                cancellationToken);
+        }
+
+        var targets = ResolveRestartTargets(snapshot);
+        if (targets.Failures.Count > 0)
+        {
+            DisposeTargets(targets.Targets);
+            return new DiscordRestartResult(
+                false,
+                "Discord otomatik yenilenemedi.",
+                string.Join("; ", targets.Failures));
+        }
+
+        if (targets.Targets.Count == 0)
+        {
+            return new DiscordRestartResult(
+                false,
+                "Discord yolu doğrulanamadı.",
+                "No trusted Discord process target was available.");
+        }
+
+        try
+        {
+            var launchSpecs = ResolveLaunchSpecs(
+                targets.Targets.Select(target => target.ExecutablePath));
+            if (launchSpecs.Length == 0)
             {
                 return new DiscordRestartResult(
-                    true,
-                    "Discord kapatıldı. Discord'u şimdi açın.");
+                    false,
+                    "Discord yolu doğrulanamadı.",
+                    "No trusted Discord launch target was available after process validation.");
             }
 
-            var launchPaths = targets
-                .Select(target => target.ExecutablePath)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-
-            foreach (var target in targets)
+            var failures = new List<string>();
+            foreach (var target in targets.Targets)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 try
@@ -151,46 +147,496 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
                     string.Join("; ", failures));
             }
 
-            foreach (var launchPath in launchPaths)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                try
-                {
-                    using var started = Process.Start(new ProcessStartInfo
-                    {
-                        FileName = launchPath,
-                        WorkingDirectory = Path.GetDirectoryName(launchPath)!,
-                        UseShellExecute = true
-                    });
-                }
-                catch (Exception exception)
-                    when (exception is InvalidOperationException
-                        or System.ComponentModel.Win32Exception)
-                {
-                    failures.Add($"{launchPath}: {exception.Message}");
-                }
-            }
-
-            if (failures.Count > 0)
-            {
-                return new DiscordRestartResult(
-                    false,
-                    "Discord kapatıldı ancak yeniden açılamadı.",
-                    string.Join("; ", failures));
-            }
-
-            return new DiscordRestartResult(
-                true,
-                launchPaths.Length > 1
+            return await LaunchDiscordAsync(
+                launchSpecs,
+                launchSpecs.Length > 1
                     ? "Discord uygulamaları yenilendi."
-                    : "Discord yenilendi.");
+                    : "Discord yenilendi.",
+                cancellationToken);
         }
         finally
         {
-            foreach (var target in targets)
+            DisposeTargets(targets.Targets);
+        }
+    }
+
+    public async Task<DiscordRestartResult> CloseAsync(
+        DiscordProcessSnapshot snapshot,
+        TimeSpan gracefulTimeout,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (!snapshot.HasRunningProcesses)
+        {
+            return DiscordRestartResult.NotNeeded();
+        }
+
+        var targets = ResolveRestartTargets(snapshot);
+        if (targets.Failures.Count > 0)
+        {
+            DisposeTargets(targets.Targets);
+            return new DiscordRestartResult(
+                false,
+                "Discord kapatılamadı.",
+                string.Join("; ", targets.Failures));
+        }
+
+        if (targets.Targets.Count == 0)
+        {
+            return new DiscordRestartResult(
+                false,
+                "Discord kapatılamadı.",
+                "No trusted Discord process target was available.");
+        }
+
+        try
+        {
+            foreach (var target in targets.Targets)
             {
-                target.Process.Dispose();
+                cancellationToken.ThrowIfCancellationRequested();
+                await StopDiscordProcessAsync(
+                    target.Process,
+                    gracefulTimeout,
+                    cancellationToken);
             }
+
+            return new DiscordRestartResult(true, "Discord kapatıldı.");
+        }
+        finally
+        {
+            DisposeTargets(targets.Targets);
+        }
+    }
+
+    private static RestartTargets ResolveRestartTargets(DiscordProcessSnapshot snapshot)
+    {
+        var effectiveSnapshot = snapshot.ProcessIds.Count > 0
+            ? snapshot
+            : new WindowsDiscordProcessInspector().Capture();
+        var processIds = effectiveSnapshot.ProcessIds
+            .Distinct()
+            .ToArray();
+        var expectedExecutablePaths = effectiveSnapshot.ExecutablePaths
+            .Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var targets = new List<RestartTarget>();
+        var failures = new List<string>();
+
+        foreach (var processId in processIds)
+        {
+            Process process;
+            try
+            {
+                process = Process.GetProcessById(processId);
+            }
+            catch (ArgumentException)
+            {
+                continue;
+            }
+
+            if (!TryCreateRestartTarget(
+                    process,
+                    expectedExecutablePaths,
+                    out var target,
+                    out var validationError))
+            {
+                process.Dispose();
+                if (!string.IsNullOrWhiteSpace(validationError))
+                {
+                    failures.Add($"{processId}: {validationError}");
+                }
+
+                continue;
+            }
+
+            targets.Add(target);
+        }
+
+        return new RestartTargets(targets, failures);
+    }
+
+    private static async Task<DiscordRestartResult> LaunchDiscordAsync(
+        IReadOnlyList<LaunchSpec> launchSpecs,
+        string successMessage,
+        CancellationToken cancellationToken)
+    {
+        var failures = new List<string>();
+
+        foreach (var launchSpec in launchSpecs)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                ShellExecuteUnelevated(launchSpec);
+            }
+            catch (Exception exception)
+                when (exception is InvalidOperationException
+                    or TargetInvocationException
+                    or System.ComponentModel.Win32Exception
+                    or COMException)
+            {
+                failures.Add($"{launchSpec.FileName}: {exception.Message}");
+            }
+        }
+
+        if (failures.Count > 0)
+        {
+            return new DiscordRestartResult(
+                false,
+                "Discord açılamadı.",
+                string.Join("; ", failures));
+        }
+
+        if (await WaitForVisibleDiscordWindowAsync(launchSpecs, cancellationToken))
+        {
+            return new DiscordRestartResult(true, successMessage);
+        }
+
+        return new DiscordRestartResult(
+            false,
+            "Discord açıldı ama pencere görünmedi. Görev çubuğundan Discord'u açın.",
+            "Discord process was launched, but no visible trusted Discord main window was detected.");
+    }
+
+    private static void ShellExecuteUnelevated(LaunchSpec launchSpec)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            throw new PlatformNotSupportedException(
+                "Discord otomatik açma Windows gerektirir.");
+        }
+
+        var shellWindowsType = Type.GetTypeFromCLSID(ShellWindowsClsid)
+            ?? throw new InvalidOperationException("Windows Explorer başlatıcısı bulunamadı.");
+        var shellWindows = Activator.CreateInstance(shellWindowsType)
+            ?? throw new InvalidOperationException("Windows Shell başlatıcısı açılamadı.");
+        object? desktopBrowser = null;
+        object? desktopDocument = null;
+        object? shellApplication = null;
+
+        try
+        {
+            desktopBrowser = GetDesktopShellBrowser(shellWindowsType, shellWindows);
+            desktopDocument = desktopBrowser
+                .GetType()
+                .InvokeMember(
+                    "Document",
+                    BindingFlags.GetProperty,
+                    binder: null,
+                    target: desktopBrowser,
+                    args: null,
+                    culture: CultureInfo.InvariantCulture);
+            if (desktopDocument is null)
+            {
+                throw new InvalidOperationException("Windows Explorer masaüstü görünümü bulunamadı.");
+            }
+
+            shellApplication = desktopDocument
+                .GetType()
+                .InvokeMember(
+                    "Application",
+                    BindingFlags.GetProperty,
+                    binder: null,
+                    target: desktopDocument,
+                    args: null,
+                    culture: CultureInfo.InvariantCulture);
+            if (shellApplication is null)
+            {
+                throw new InvalidOperationException("Windows Explorer başlatıcısı bulunamadı.");
+            }
+
+            shellApplication
+                .GetType()
+                .InvokeMember(
+                    "ShellExecute",
+                    BindingFlags.InvokeMethod,
+                    binder: null,
+                    target: shellApplication,
+                    args:
+                    [
+                        launchSpec.FileName,
+                        launchSpec.Arguments,
+                        launchSpec.WorkingDirectory,
+                        "open",
+                        ShowNormal
+                    ],
+                    culture: CultureInfo.InvariantCulture);
+        }
+        finally
+        {
+            ReleaseComObject(shellApplication);
+            ReleaseComObject(desktopDocument);
+            ReleaseComObject(desktopBrowser);
+            ReleaseComObject(shellWindows);
+        }
+    }
+
+    private static object GetDesktopShellBrowser(Type shellWindowsType, object shellWindows)
+    {
+        var args = new object[]
+        {
+            CsidlDesktop,
+            Type.Missing,
+            SwcDesktop,
+            0,
+            SwfoNeedDispatch
+        };
+        var modifier = new ParameterModifier(5);
+        modifier[0] = true;
+        modifier[1] = true;
+        modifier[3] = true;
+
+        return shellWindowsType.InvokeMember(
+                "FindWindowSW",
+                BindingFlags.InvokeMethod,
+                binder: null,
+                target: shellWindows,
+                args,
+                modifiers: [modifier],
+                culture: CultureInfo.InvariantCulture,
+                namedParameters: null)
+            ?? throw new InvalidOperationException("Windows Explorer masaüstü başlatıcısı bulunamadı.");
+    }
+
+    private static void ReleaseComObject(object? instance)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        if (instance is not null && Marshal.IsComObject(instance))
+        {
+            try
+            {
+                Marshal.FinalReleaseComObject(instance);
+            }
+            catch (ArgumentException)
+            {
+            }
+        }
+    }
+
+    private static async Task<bool> WaitForVisibleDiscordWindowAsync(
+        IReadOnlyList<LaunchSpec> launchSpecs,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow + LaunchVerificationTimeout;
+
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (var processName in launchSpecs
+                         .Select(launchSpec => launchSpec.ProcessName)
+                         .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                foreach (var process in GetProcessesByName(processName))
+                {
+                    using (process)
+                    {
+                        if (HasVisibleDiscordMainWindow(process, launchSpecs))
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            await Task.Delay(LaunchVerificationInterval, cancellationToken);
+        }
+
+        return false;
+    }
+
+    private static bool HasVisibleDiscordMainWindow(
+        Process process,
+        IReadOnlyList<LaunchSpec> launchSpecs)
+    {
+        try
+        {
+            if (process.HasExited)
+            {
+                return false;
+            }
+
+            var executablePath = TryGetExecutablePath(process);
+            if (string.IsNullOrWhiteSpace(executablePath)
+                || !launchSpecs.Any(spec => spec.MatchesExecutablePath(executablePath))
+                || !IsTrustedDiscordExecutable(executablePath))
+            {
+                return false;
+            }
+
+            process.Refresh();
+            var handle = process.MainWindowHandle;
+            if (handle == IntPtr.Zero || !IsWindowVisible(handle))
+            {
+                return false;
+            }
+
+            if (IsIconic(handle))
+            {
+                ShowWindow(handle, RestoreWindow);
+                return false;
+            }
+
+            var title = process.MainWindowTitle;
+            return !title.Contains("Updater", StringComparison.OrdinalIgnoreCase)
+                && !title.Contains("Update", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException
+                or System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
+    }
+
+    private static LaunchSpec[] ResolveLaunchSpecs(
+        IEnumerable<string> executablePaths)
+    {
+        var launchSpecs = new List<LaunchSpec>();
+        foreach (var executablePath in executablePaths)
+        {
+            if (TryCreateLaunchSpecFromExecutablePath(executablePath, out var launchSpec))
+            {
+                launchSpecs.Add(launchSpec);
+            }
+        }
+
+        return launchSpecs
+            .DistinctBy(launchSpec => launchSpec.CommandKey, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static LaunchSpec[] ResolveInstalledLaunchSpecs(
+        IReadOnlyList<string> executablePaths)
+    {
+        var launchSpecs = ResolveLaunchSpecs(executablePaths).ToList();
+        if (launchSpecs.Count > 0)
+        {
+            return launchSpecs
+                .DistinctBy(launchSpec => launchSpec.CommandKey, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
+        var localAppData = Environment.GetFolderPath(
+            Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrWhiteSpace(localAppData))
+        {
+            return [];
+        }
+
+        foreach (var spec in KnownInstallations)
+        {
+            var root = Path.Combine(localAppData, spec.DirectoryName);
+            var updatePath = Path.Combine(root, SquirrelUpdateExecutableName);
+            var executablePath = FindInstalledDiscordExecutable(root, spec.ExecutableName);
+            if (executablePath is null
+                || !IsTrustedDiscordExecutable(updatePath, SquirrelUpdateExecutableName)
+                || !IsTrustedDiscordExecutable(executablePath, spec.ExecutableName))
+            {
+                continue;
+            }
+
+            launchSpecs.Add(new LaunchSpec(
+                updatePath,
+                $"--processStart {spec.ExecutableName}",
+                root,
+                spec.ProcessName,
+                root,
+                [executablePath]));
+            break;
+        }
+
+        return launchSpecs
+            .DistinctBy(launchSpec => launchSpec.CommandKey, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static string? FindInstalledDiscordExecutable(
+        string installRoot,
+        string executableName)
+    {
+        try
+        {
+            if (!Directory.Exists(installRoot))
+            {
+                return null;
+            }
+
+            return Directory
+                .EnumerateDirectories(installRoot, "app-*", SearchOption.TopDirectoryOnly)
+                .Select(directory => Path.Combine(directory, executableName))
+                .Where(File.Exists)
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+        }
+        catch (Exception exception)
+            when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static bool TryCreateLaunchSpecFromExecutablePath(
+        string? executablePath,
+        out LaunchSpec launchSpec)
+    {
+        launchSpec = default!;
+        if (string.IsNullOrWhiteSpace(executablePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var fullPath = Path.GetFullPath(executablePath);
+            if (!IsTrustedDiscordExecutable(fullPath))
+            {
+                return false;
+            }
+
+            var executableName = Path.GetFileName(fullPath);
+            var processName = Path.GetFileNameWithoutExtension(fullPath);
+            var appDirectory = Directory.GetParent(fullPath);
+            var installRoot = appDirectory?.Parent;
+            if (appDirectory is not null
+                && installRoot is not null
+                && appDirectory.Name.StartsWith("app-", StringComparison.OrdinalIgnoreCase))
+            {
+                var updatePath = Path.Combine(installRoot.FullName, SquirrelUpdateExecutableName);
+                if (IsTrustedDiscordExecutable(updatePath, SquirrelUpdateExecutableName))
+                {
+                    launchSpec = new LaunchSpec(
+                        updatePath,
+                        $"--processStart {executableName}",
+                        installRoot.FullName,
+                        processName,
+                        installRoot.FullName,
+                        [fullPath]);
+                    return true;
+                }
+            }
+
+            launchSpec = new LaunchSpec(
+                fullPath,
+                string.Empty,
+                Path.GetDirectoryName(fullPath)!,
+                processName,
+                Path.GetDirectoryName(fullPath)!,
+                [fullPath]);
+            return true;
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException
+                or NotSupportedException
+                or PathTooLongException)
+        {
+            return false;
         }
     }
 
@@ -254,7 +700,6 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
             if (string.IsNullOrWhiteSpace(executablePath)
                 || !File.Exists(executablePath))
             {
-                validationError = "Discord yolu doğrulanamadı.";
                 return false;
             }
 
@@ -262,6 +707,12 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
                 && !expectedExecutablePaths.Contains(executablePath))
             {
                 validationError = "Discord yolu değişti.";
+                return false;
+            }
+
+            if (!IsTrustedDiscordExecutable(executablePath))
+            {
+                validationError = "Discord imzası doğrulanamadı.";
                 return false;
             }
 
@@ -275,6 +726,77 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
             validationError = exception.Message;
             return false;
         }
+    }
+
+    private static bool IsTrustedDiscordExecutable(
+        string? path,
+        string? expectedFileName = null)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            var fullPath = Path.GetFullPath(path);
+            if (!File.Exists(fullPath)
+                || HasReparsePointInPath(fullPath)
+                || (expectedFileName is not null
+                    && !Path.GetFileName(fullPath).Equals(
+                        expectedFileName,
+                        StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+
+            var publisher = AuthenticodeSignatureVerifier.TryGetSignerPublisher(fullPath);
+            return string.Equals(
+                publisher,
+                ExpectedPublisher,
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException
+                or IOException
+                or NotSupportedException
+                or PathTooLongException
+                or UnauthorizedAccessException
+                or PlatformNotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private static bool HasReparsePointInPath(string path)
+    {
+        var current = File.Exists(path)
+            ? new FileInfo(path).FullName
+            : new DirectoryInfo(path).FullName;
+
+        while (!string.IsNullOrWhiteSpace(current))
+        {
+            try
+            {
+                var attributes = File.GetAttributes(current);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    return true;
+                }
+            }
+            catch (Exception exception)
+                when (exception is IOException
+                    or UnauthorizedAccessException
+                    or ArgumentException
+                    or NotSupportedException)
+            {
+                return true;
+            }
+
+            current = Directory.GetParent(current)?.FullName;
+        }
+
+        return false;
     }
 
     private static bool IsKnownDiscordProcess(Process process)
@@ -320,6 +842,55 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
             return null;
         }
     }
+
+    private static void DisposeTargets(IEnumerable<RestartTarget> targets)
+    {
+        foreach (var target in targets)
+        {
+            target.Process.Dispose();
+        }
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    private sealed record InstallationSpec(
+        string DirectoryName,
+        string ExecutableName,
+        string ProcessName);
+
+    private sealed record LaunchSpec(
+        string FileName,
+        string Arguments,
+        string WorkingDirectory,
+        string ProcessName,
+        string TrustedRoot,
+        IReadOnlyList<string> ExpectedExecutablePaths)
+    {
+        public string CommandKey => $"{FileName}\n{Arguments}";
+
+        public bool MatchesExecutablePath(string executablePath)
+        {
+            var fullPath = Path.GetFullPath(executablePath);
+            return ExpectedExecutablePaths.Any(path => string.Equals(
+                    Path.GetFullPath(path),
+                    fullPath,
+                    StringComparison.OrdinalIgnoreCase))
+                || fullPath.StartsWith(
+                    Path.GetFullPath(TrustedRoot) + Path.DirectorySeparatorChar,
+                    StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private sealed record RestartTargets(
+        IReadOnlyList<RestartTarget> Targets,
+        IReadOnlyList<string> Failures);
 
     private sealed record RestartTarget(Process Process, string ExecutablePath);
 }

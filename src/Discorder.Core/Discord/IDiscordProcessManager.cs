@@ -6,4 +6,9 @@ public interface IDiscordProcessManager : IDiscordProcessInspector
         DiscordProcessSnapshot snapshot,
         TimeSpan gracefulTimeout,
         CancellationToken cancellationToken);
+
+    Task<DiscordRestartResult> CloseAsync(
+        DiscordProcessSnapshot snapshot,
+        TimeSpan gracefulTimeout,
+        CancellationToken cancellationToken);
 }
