@@ -796,8 +796,8 @@ public partial class MainWindow : Window, IDisposable
     private async void CleanUninstall_Click(object sender, RoutedEventArgs e)
     {
         var confirmation = MessageBox.Show(
-            "Discorder bağlantıyı kapatacak, yerel ayarları ve uygulama verilerini kaldıracak. " +
-            "WireSock Discorder tarafından kurulduysa Windows'tan kaldırılacak.\n\nDevam edilsin mi?",
+            "Discorder bağlantıyı kapatacak; kendi bağlantı kilidini, yerel ayarlarını, loglarını ve uygulama verilerini kaldıracak. " +
+            "Discord uygulaması silinmez. WireSock Discorder tarafından kurulduysa Windows'tan kaldırılacak.\n\nDevam edilsin mi?",
             "Discorder uygulamayı kaldır",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,
@@ -812,7 +812,7 @@ public partial class MainWindow : Window, IDisposable
         _operationCancellation?.Cancel();
         StopBackgroundVideo();
         StatusMessage.Text = "Kaldırma çalışıyor";
-        StatusDetail.Text = "Bağlantı kapatılıyor, yerel Discorder verileri kaldırılıyor.";
+        StatusDetail.Text = "Bağlantı kapatılıyor, Discorder verileri ve kilidi kaldırılıyor.";
         SetMaintenanceProgress(24, "Bağlantı kapatılıyor");
         _diagnostics.Warning("ui.cleanUninstall", "Kullanıcı temiz kaldırmayı başlattı.");
 

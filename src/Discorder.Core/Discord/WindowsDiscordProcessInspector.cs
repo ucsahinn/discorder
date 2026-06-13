@@ -19,8 +19,6 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
         "9BA05972-F6A8-11CF-A442-00A0C90A8F39");
     private static readonly TimeSpan LaunchVerificationTimeout = TimeSpan.FromSeconds(8);
     private static readonly TimeSpan LaunchVerificationInterval = TimeSpan.FromMilliseconds(300);
-    private static readonly string SquirrelUpdateExecutableName = string.Concat("Update", ".exe");
-
     private static readonly string[] ProcessNames =
     [
         "Discord",
@@ -64,6 +62,22 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
             runningCount,
             executablePaths.ToArray(),
             processIds.ToArray());
+    }
+
+    internal static IReadOnlyList<string> CreateLaunchPlanForTesting(
+        IEnumerable<string> executablePaths)
+    {
+        return executablePaths
+            .Select(path => Path.GetFullPath(path))
+            .Where(path => TryCreateLaunchSpecFromTrustedExecutablePath(
+                path,
+                out _))
+            .Select(path =>
+            {
+                TryCreateLaunchSpecFromTrustedExecutablePath(path, out var launchSpec);
+                return launchSpec.CommandKey;
+            })
+            .ToArray();
     }
 
     public async Task<DiscordRestartResult> RestartAsync(
@@ -530,21 +544,25 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
         foreach (var spec in KnownInstallations)
         {
             var root = Path.Combine(localAppData, spec.DirectoryName);
-            var updatePath = Path.Combine(root, SquirrelUpdateExecutableName);
             var executablePath = FindInstalledDiscordExecutable(root, spec.ExecutableName);
             if (executablePath is null
-                || !IsTrustedDiscordExecutable(updatePath, SquirrelUpdateExecutableName)
                 || !IsTrustedDiscordExecutable(executablePath, spec.ExecutableName))
             {
                 continue;
             }
 
+            var appDirectory = Path.GetDirectoryName(executablePath);
+            if (string.IsNullOrWhiteSpace(appDirectory))
+            {
+                continue;
+            }
+
             launchSpecs.Add(new LaunchSpec(
-                updatePath,
-                $"--processStart {spec.ExecutableName}",
-                root,
+                executablePath,
+                string.Empty,
+                appDirectory,
                 spec.ProcessName,
-                root,
+                appDirectory,
                 [executablePath]));
             break;
         }
@@ -600,7 +618,27 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
                 return false;
             }
 
-            var executableName = Path.GetFileName(fullPath);
+            return TryCreateLaunchSpecFromTrustedExecutablePath(
+                fullPath,
+                out launchSpec);
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException
+                or NotSupportedException
+                or PathTooLongException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryCreateLaunchSpecFromTrustedExecutablePath(
+        string fullPath,
+        out LaunchSpec launchSpec)
+    {
+        launchSpec = default!;
+
+        try
+        {
             var processName = Path.GetFileNameWithoutExtension(fullPath);
             var appDirectory = Directory.GetParent(fullPath);
             var installRoot = appDirectory?.Parent;
@@ -608,18 +646,14 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
                 && installRoot is not null
                 && appDirectory.Name.StartsWith("app-", StringComparison.OrdinalIgnoreCase))
             {
-                var updatePath = Path.Combine(installRoot.FullName, SquirrelUpdateExecutableName);
-                if (IsTrustedDiscordExecutable(updatePath, SquirrelUpdateExecutableName))
-                {
-                    launchSpec = new LaunchSpec(
-                        updatePath,
-                        $"--processStart {executableName}",
-                        installRoot.FullName,
-                        processName,
-                        installRoot.FullName,
-                        [fullPath]);
-                    return true;
-                }
+                launchSpec = new LaunchSpec(
+                    fullPath,
+                    string.Empty,
+                    appDirectory.FullName,
+                    processName,
+                    appDirectory.FullName,
+                    [fullPath]);
+                return true;
             }
 
             launchSpec = new LaunchSpec(

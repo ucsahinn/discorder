@@ -40,6 +40,7 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
     private DateTimeOffset _lastSummaryWriteUtc = DateTimeOffset.MinValue;
     private string? _pendingSummaryStatus;
     private bool _summaryFlushScheduled;
+    private bool _persistentWritesStopped;
 
     public DiscorderDiagnostics(
         AppPaths paths,
@@ -74,6 +75,24 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
         WriteEvent("error", source, message, exception, details);
     }
 
+    public void StopPersistentWrites()
+    {
+        lock (_gate)
+        {
+            _persistentWritesStopped = true;
+            _pendingSummaryStatus = null;
+            _summaryFlushScheduled = false;
+        }
+    }
+
+    public void ResumePersistentWrites()
+    {
+        lock (_gate)
+        {
+            _persistentWritesStopped = false;
+        }
+    }
+
     public void WriteHealth(
         string status,
         IReadOnlyDictionary<string, string?>? details = null)
@@ -82,6 +101,11 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
         {
             lock (_gate)
             {
+                if (_persistentWritesStopped)
+                {
+                    return;
+                }
+
                 _paths.EnsureDirectories();
                 var document = new Dictionary<string, object?>
                 {
@@ -117,6 +141,12 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
     {
         lock (_gate)
         {
+            if (_persistentWritesStopped)
+            {
+                throw new InvalidOperationException(
+                    "Tanilama yazimi durduruldu.");
+            }
+
             _paths.EnsureDirectories();
             WriteSummaryLocked("tanılama paketi hazırlanıyor");
 
@@ -267,6 +297,11 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
         {
             lock (_gate)
             {
+                if (_persistentWritesStopped)
+                {
+                    return;
+                }
+
                 _paths.EnsureDirectories();
                 var record = new Dictionary<string, object?>
                 {
@@ -340,7 +375,8 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
             lock (_gate)
             {
                 _summaryFlushScheduled = false;
-                if (string.IsNullOrWhiteSpace(_pendingSummaryStatus))
+                if (_persistentWritesStopped
+                    || string.IsNullOrWhiteSpace(_pendingSummaryStatus))
                 {
                     return;
                 }
@@ -360,6 +396,11 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
 
     private void WriteSummaryLocked(string lastStatus)
     {
+        if (_persistentWritesStopped)
+        {
+            return;
+        }
+
         var runtime = CaptureRuntimeMetrics();
         var builder = new StringBuilder();
         builder.AppendLine("# Discorder tanılama özeti");

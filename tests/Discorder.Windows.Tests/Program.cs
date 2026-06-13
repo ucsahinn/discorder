@@ -242,7 +242,8 @@ static MainWindow CreateMainWindow(string root)
         new AppSettingsStore(paths),
         new DiscorderCleanupService(
             paths,
-            new NullDiscordAccessLock()),
+            new NullDiscordAccessLock(),
+            allowNonDefaultDataRoots: true),
         new FakeStartupLaunchService(),
         new FakeWireSockUninstaller(),
         new AppUpdateService(

@@ -64,6 +64,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici bağlantı kapanınca Discord'u kapatmayı dener", ControllerClosesDiscordOnDisconnectAsync),
     ("Denetleyici web kapsamını bağlıyken kilitler", ControllerLocksBrowserScopeWhileConnectedAsync),
     ("Denetleyici bağlantıyı Discord oturumu sanmadan doğrular", ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync),
+    ("Windows Discord başlatma planı updater yerine uygulamayı hedefler", WindowsDiscordLaunchPlanUsesAppExecutableAsync),
     ("Denetleyici Discord kapalıyken uygulamayı açmayı dener", ControllerOpensDiscordWhenItIsClosedAsync),
     ("Denetleyici Discord otomatik yenileme başarısızlığını ayrı durum yapar", ControllerKeepsTunnelActiveWhenDiscordRestartFailsAsync),
     ("Denetleyici Discord penceresi görünmezse hazır demeyi bırakır", ControllerRequiresManualActionWhenDiscordWindowIsHiddenAsync),
@@ -75,6 +76,9 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Windows Firewall koruması Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
     ("Onarım ayarları ve logları koruyup üretilen veriyi yeniler", CleanupServiceRepairsGeneratedStateAsync),
     ("Uygulamayı kaldırma Discorder verisini ve korumayı siler", CleanupServiceRemovesDiscorderStateAsync),
+    ("Uygulamayı kaldırma tanılama loglarını geri oluşturmaz", CleanupServiceStopsDiagnosticsAfterRemovingStateAsync),
+    ("Uygulamayı kaldırma beklenmeyen veri kökünü reddeder", CleanupServiceRejectsUnexpectedDataRootAsync),
+    ("Uygulamayı kaldırma salt okunur Discorder dosyalarını siler", CleanupServiceDeletesReadOnlyFilesAsync),
     ("Tanılama logları devops paketi üretir", DiagnosticsWritesDevOpsBundleAsync),
     ("Tanılama özeti son bilgi durumunu gecikmeli yazar", DiagnosticsFlushesDebouncedSummaryAsync)
 };
@@ -1892,6 +1896,44 @@ static async Task ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync()
     }
 }
 
+static Task WindowsDiscordLaunchPlanUsesAppExecutableAsync()
+{
+    var root = Path.Combine(
+        CreateTemporaryDirectory(),
+        "Discord");
+    var executablePath = Path.Combine(
+        root,
+        "app-1.0.9999",
+        "Discord.exe");
+
+    try
+    {
+        var plan = WindowsDiscordProcessInspector.CreateLaunchPlanForTesting(
+            [executablePath]);
+
+        Assert(plan.Count == 1);
+        Assert(plan[0].Contains(
+            Path.Combine("app-1.0.9999", "Discord.exe"),
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!plan[0].Contains(
+            "Update.exe",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!plan[0].Contains(
+            "--processStart",
+            StringComparison.OrdinalIgnoreCase));
+        return Task.CompletedTask;
+    }
+    finally
+    {
+        var testRoot = Directory.GetParent(root)?.FullName;
+        if (!string.IsNullOrWhiteSpace(testRoot)
+            && Directory.Exists(testRoot))
+        {
+            Directory.Delete(testRoot, recursive: true);
+        }
+    }
+}
+
 static async Task ControllerOpensDiscordWhenItIsClosedAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -2389,7 +2431,10 @@ static async Task CleanupServiceRemovesDiscorderStateAsync()
         Path.Combine(root, "local"),
         Path.Combine(root, "shared"));
     var accessLock = new FakeDiscordAccessLock();
-    var cleanup = new DiscorderCleanupService(paths, accessLock);
+    var cleanup = new DiscorderCleanupService(
+        paths,
+        accessLock,
+        allowNonDefaultDataRoots: true);
 
     try
     {
@@ -2414,6 +2459,125 @@ static async Task CleanupServiceRemovesDiscorderStateAsync()
     }
 }
 
+static async Task CleanupServiceStopsDiagnosticsAfterRemovingStateAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(
+        Path.Combine(root, "local"),
+        Path.Combine(root, "shared"));
+    var accessLock = new FakeDiscordAccessLock();
+    var diagnostics = new DiscorderDiagnostics(
+        paths,
+        TimeSpan.FromMilliseconds(25));
+    var cleanup = new DiscorderCleanupService(
+        paths,
+        accessLock,
+        diagnostics,
+        allowNonDefaultDataRoots: true);
+
+    try
+    {
+        paths.EnsureDirectories();
+        diagnostics.Info("test.beforeCleanup", "kaldırma öncesi");
+
+        await cleanup.CleanUninstallAsync(CancellationToken.None);
+
+        diagnostics.Info("test.afterCleanup", "kaldırma sonrası");
+        diagnostics.WriteHealth("kaldırma sonrası");
+        await AssertThrowsAsync<InvalidOperationException>(
+            () => Task.FromResult(diagnostics.CreateBundle()));
+        await Task.Delay(80);
+
+        Assert(accessLock.RemoveCount == 1);
+        Assert(!Directory.Exists(paths.DataDirectory));
+        Assert(!Directory.Exists(paths.SharedDataDirectory));
+    }
+    finally
+    {
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
+static async Task CleanupServiceRejectsUnexpectedDataRootAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(
+        Path.Combine(root, "local"),
+        Path.Combine(root, "shared"));
+    var accessLock = new FakeDiscordAccessLock();
+    var diagnostics = new DiscorderDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var cleanup = new DiscorderCleanupService(paths, accessLock, diagnostics);
+
+    try
+    {
+        paths.EnsureDirectories();
+
+        await AssertThrowsAsync<InvalidOperationException>(
+            () => cleanup.CleanUninstallAsync(CancellationToken.None));
+
+        Assert(accessLock.RemoveCount == 0);
+        diagnostics.Info("test.afterRejectedCleanup", "beklenen hata sonrasi");
+        Assert(File.Exists(paths.EventLog));
+        Assert(Directory.Exists(paths.DataDirectory));
+        Assert(Directory.Exists(paths.SharedDataDirectory));
+    }
+    finally
+    {
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
+static async Task CleanupServiceDeletesReadOnlyFilesAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(
+        Path.Combine(root, "local"),
+        Path.Combine(root, "shared"));
+    var accessLock = new FakeDiscordAccessLock();
+    var cleanup = new DiscorderCleanupService(
+        paths,
+        accessLock,
+        allowNonDefaultDataRoots: true);
+    var localReadOnlyFile = Path.Combine(paths.LogDirectory, "readonly.log");
+    var sharedReadOnlyFile = Path.Combine(paths.ProfileDirectory, "readonly.conf");
+
+    try
+    {
+        paths.EnsureDirectories();
+        await File.WriteAllTextAsync(localReadOnlyFile, "log");
+        await File.WriteAllTextAsync(sharedReadOnlyFile, "profile");
+        File.SetAttributes(
+            localReadOnlyFile,
+            File.GetAttributes(localReadOnlyFile) | FileAttributes.ReadOnly);
+        File.SetAttributes(
+            sharedReadOnlyFile,
+            File.GetAttributes(sharedReadOnlyFile) | FileAttributes.ReadOnly);
+
+        await cleanup.CleanUninstallAsync(CancellationToken.None);
+
+        Assert(accessLock.RemoveCount == 1);
+        Assert(!Directory.Exists(paths.DataDirectory));
+        Assert(!Directory.Exists(paths.SharedDataDirectory));
+    }
+    finally
+    {
+        ResetReadOnlyAttribute(localReadOnlyFile);
+        ResetReadOnlyAttribute(sharedReadOnlyFile);
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
 static async Task CleanupServiceRepairsGeneratedStateAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -2421,7 +2585,10 @@ static async Task CleanupServiceRepairsGeneratedStateAsync()
         Path.Combine(root, "local"),
         Path.Combine(root, "shared"));
     var accessLock = new FakeDiscordAccessLock();
-    var cleanup = new DiscorderCleanupService(paths, accessLock);
+    var cleanup = new DiscorderCleanupService(
+        paths,
+        accessLock,
+        allowNonDefaultDataRoots: true);
 
     try
     {
@@ -2630,6 +2797,16 @@ static string CreateTemporaryDirectory()
         Guid.NewGuid().ToString("N"));
     Directory.CreateDirectory(path);
     return path;
+}
+
+static void ResetReadOnlyAttribute(string path)
+{
+    if (!File.Exists(path))
+    {
+        return;
+    }
+
+    File.SetAttributes(path, File.GetAttributes(path) & ~FileAttributes.ReadOnly);
 }
 
 static async Task WaitForConditionAsync(Func<Task<bool>> condition)
