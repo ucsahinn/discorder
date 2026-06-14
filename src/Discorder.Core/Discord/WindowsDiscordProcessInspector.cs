@@ -174,6 +174,58 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
         }
     }
 
+    public async Task<DiscordRestartResult> VerifyReadyAsync(
+        DiscordProcessSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        var effectiveSnapshot = snapshot.HasRunningProcesses
+            ? snapshot
+            : Capture();
+        if (!effectiveSnapshot.HasRunningProcesses)
+        {
+            return new DiscordRestartResult(
+                false,
+                "Discord kapanmış. Discord'u açıp tekrar deneyin.",
+                "No trusted Discord process was running after tunnel resume.",
+                DiscordRestartFailureKind.Unknown);
+        }
+
+        var launchSpecs = ResolveLaunchSpecs(effectiveSnapshot.ExecutablePaths);
+        if (launchSpecs.Length == 0)
+        {
+            return new DiscordRestartResult(
+                false,
+                "Discord yolu doğrulanamadı.",
+                "No trusted Discord executable path was available after tunnel resume.",
+                DiscordRestartFailureKind.Unknown);
+        }
+
+        var windowResult = await WaitForVisibleDiscordWindowAsync(
+            launchSpecs,
+            cancellationToken);
+        if (windowResult is VisibleDiscordWindowResult.MainWindow)
+        {
+            return new DiscordRestartResult(true, "Discord güncellendi.");
+        }
+
+        if (windowResult is VisibleDiscordWindowResult.UpdaterWindow)
+        {
+            return new DiscordRestartResult(
+                false,
+                "Discord güncellendi ama ana pencere hazır olmadı. Discord'u kapatıp tekrar deneyin.",
+                "Only a trusted Discord updater window was detected after tunnel resume.",
+                DiscordRestartFailureKind.UpdaterWindow);
+        }
+
+        return new DiscordRestartResult(
+            false,
+            "Discord açıldı ama pencere görünmedi. Görev çubuğundan Discord'u açın.",
+            "No trusted visible Discord main window was detected after tunnel resume.",
+            DiscordRestartFailureKind.Unknown);
+    }
+
     public async Task<DiscordRestartResult> CloseAsync(
         DiscordProcessSnapshot snapshot,
         TimeSpan gracefulTimeout,

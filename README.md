@@ -98,7 +98,7 @@ Yükleme, denetlenen sürümle eşleşen paketi kullanır. Paket önce staging a
 | Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
 | Mimari | [docs/mimari.md](docs/mimari.md) |
 | Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
-| v2.0.28 release notu | [docs/releases/v2.0.28.md](docs/releases/v2.0.28.md) |
+| v2.0.29 release notu | [docs/releases/v2.0.29.md](docs/releases/v2.0.29.md) |
 
 ## 🧪 Geliştirme
 

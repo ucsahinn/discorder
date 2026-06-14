@@ -53,7 +53,7 @@ C:\Tools\Discorder\Discorder.exe
 
 Bu durumda güncelleme `C:\Tools\Discorder` klasörünü hedef alır.
 
-Yeni elle kurulumlarda klasör adını sabit `Discorder` tutmak önerilir. `Discorder-2.0.28-win-x64` veya `2.0.28` gibi eski sürüm adlı klasörlerden çalıştırma desteklenir, ancak Discorder bu durumu tanılama paketine yazar ve kullanıcı onayı olmadan klasör taşımaz.
+Yeni elle kurulumlarda klasör adını sabit `Discorder` tutmak önerilir. `Discorder-2.0.29-win-x64` veya `2.0.29` gibi sürüm adlı klasörlerden çalıştırma desteklenir, ancak Discorder bu durumu tanılama paketine yazar ve kullanıcı onayı olmadan klasör taşımaz.
 
 ## Güvenli Değiştirme ve Geri Dönüş
 

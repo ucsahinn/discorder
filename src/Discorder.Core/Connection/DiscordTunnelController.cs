@@ -463,24 +463,42 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 directRestart.FailureKind);
         }
 
-        SetStatus(TunnelState.Verifying, "Discord bağlantısı doğrulanıyor");
-        var tunnelSnapshot = _discordProcessManager.Capture();
-        _lastDiscordProcessSnapshot = tunnelSnapshot;
-        var tunnelRestart = await _discordProcessManager.RestartAsync(
-            tunnelSnapshot,
-            TimeSpan.FromSeconds(4),
-            cancellationToken);
+        _diagnostics.Info(
+            "controller.discordUpdaterRecovery",
+            "Discord güncellemesi tamamlandı; bağlantı yeniden açılıyor.",
+            new Dictionary<string, string?>
+            {
+                ["directMessage"] = directRestart.Message,
+                ["recoveryMode"] = "DirectRestartThenTunnelResume",
+                ["tunnelRestart"] = "Skipped"
+            });
 
-        if (tunnelRestart.Restarted)
+        SetStatus(TunnelState.Verifying, "Discord bağlantısı doğrulanıyor");
+        var resumedSnapshot = _discordProcessManager.Capture();
+        _lastDiscordProcessSnapshot = resumedSnapshot;
+        var verifyReady = await _discordProcessManager.VerifyReadyAsync(
+            resumedSnapshot,
+            cancellationToken);
+        _diagnostics.Info(
+            "controller.discordUpdaterRecovery",
+            "Discord bağlantısı yeniden başlatmadan doğrulandı.",
+            new Dictionary<string, string?>
+            {
+                ["message"] = verifyReady.Message,
+                ["diagnostic"] = verifyReady.Diagnostic,
+                ["ready"] = verifyReady.Restarted.ToString()
+            });
+
+        if (verifyReady.Restarted)
         {
-            return tunnelRestart;
+            return verifyReady;
         }
 
         return new DiscordRestartResult(
             false,
-            "Discord güncellendi ama bağlantı altında yeniden açılamadı. Tekrar deneyin.",
-            tunnelRestart.Diagnostic,
-            tunnelRestart.FailureKind);
+            verifyReady.Message,
+            verifyReady.Diagnostic,
+            verifyReady.FailureKind);
     }
 
     private static Task<IReadOnlyList<string>> PrepareWireSockArgumentsAsync(
