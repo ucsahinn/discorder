@@ -61,6 +61,19 @@ public partial class App : System.Windows.Application, IDisposable
         _diagnostics = new DiscorderDiagnostics(
             _paths,
             isDebugDiagnosticsEnabled: settingsStore.IsDebugDiagnosticsEnabled);
+        var browserAccessMigrated = settingsStore.EnsureBrowserAccessPreferenceInitialized();
+        if (browserAccessMigrated)
+        {
+            _diagnostics.Info(
+                "settings.browserAccess.migrated",
+                "Tarayici modu guvenli varsayilana alindi.",
+                new Dictionary<string, string?>
+                {
+                    ["reason"] = "legacy-implicit-enabled",
+                    ["browserAccess"] = "False"
+                });
+        }
+
         var startupDetails = new Dictionary<string, string?>
         {
             ["args"] = string.Join(" ", e.Args),
@@ -88,7 +101,7 @@ public partial class App : System.Windows.Application, IDisposable
             Timeout = TimeSpan.FromMinutes(10)
         };
         _httpClient.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("Discorder", "2.1.0"));
+            new ProductInfoHeaderValue("Discorder", "2.1.1"));
 
         var downloader = new VerifiedDownloader(_httpClient, maxAttempts: 5);
         var wireSockLocator = new WireSockLocator();

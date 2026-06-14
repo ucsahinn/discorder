@@ -14,6 +14,7 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
     private const int SwcDesktop = 8;
     private const int SwfoNeedDispatch = 1;
     private const int RestoreWindow = 9;
+    private const string SquirrelUpdateExecutableName = "Update" + ".exe";
 
     private static readonly Guid ShellWindowsClsid = new(
         "9BA05972-F6A8-11CF-A442-00A0C90A8F39");
@@ -29,10 +30,10 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
 
     private static readonly InstallationSpec[] KnownInstallations =
     [
-        new("Discord", "Discord.exe", "Discord"),
-        new("DiscordPTB", "DiscordPTB.exe", "DiscordPTB"),
-        new("DiscordCanary", "DiscordCanary.exe", "DiscordCanary"),
-        new("DiscordDevelopment", "DiscordDevelopment.exe", "DiscordDevelopment")
+        new("Discord", "Discord.exe", SquirrelUpdateExecutableName, "Discord"),
+        new("DiscordPTB", "DiscordPTB.exe", SquirrelUpdateExecutableName, "DiscordPTB"),
+        new("DiscordCanary", "DiscordCanary.exe", SquirrelUpdateExecutableName, "DiscordCanary"),
+        new("DiscordDevelopment", "DiscordDevelopment.exe", SquirrelUpdateExecutableName, "DiscordDevelopment")
     ];
 
     public DiscordProcessSnapshot Capture()
@@ -78,6 +79,24 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
                 return launchSpec.CommandKey;
             })
             .ToArray();
+    }
+
+    internal static IReadOnlyList<string> CreateUpdaterLaunchPlanForTesting(
+        string installRoot,
+        string executableName,
+        string processName)
+    {
+        var updateExecutable = Path.Combine(
+            installRoot,
+            SquirrelUpdateExecutableName);
+        return
+        [
+            CreateUpdaterLaunchSpec(
+                updateExecutable,
+                installRoot,
+                executableName,
+                processName).CommandKey
+        ];
     }
 
     public async Task<DiscordRestartResult> RestartAsync(
@@ -648,9 +667,46 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
             break;
         }
 
+        if (launchSpecs.Count == 0)
+        {
+            foreach (var spec in KnownInstallations)
+            {
+                var root = Path.Combine(localAppData, spec.DirectoryName);
+                var updateExecutable = Path.Combine(root, spec.UpdateExecutableName);
+                if (!IsTrustedDiscordExecutable(
+                        updateExecutable,
+                        spec.UpdateExecutableName))
+                {
+                    continue;
+                }
+
+                launchSpecs.Add(CreateUpdaterLaunchSpec(
+                    updateExecutable,
+                    root,
+                    spec.ExecutableName,
+                    spec.ProcessName));
+                break;
+            }
+        }
+
         return launchSpecs
             .DistinctBy(launchSpec => launchSpec.CommandKey, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static LaunchSpec CreateUpdaterLaunchSpec(
+        string updateExecutable,
+        string installRoot,
+        string executableName,
+        string processName)
+    {
+        return new LaunchSpec(
+            updateExecutable,
+            $"--processStart {executableName}",
+            installRoot,
+            processName,
+            installRoot,
+            [updateExecutable]);
     }
 
     private static string? FindInstalledDiscordExecutable(
@@ -978,6 +1034,7 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
     private sealed record InstallationSpec(
         string DirectoryName,
         string ExecutableName,
+        string UpdateExecutableName,
         string ProcessName);
 
     private sealed record LaunchSpec(

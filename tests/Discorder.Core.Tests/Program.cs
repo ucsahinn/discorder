@@ -52,10 +52,12 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Otomatik güncelleme varsayılan olarak GitHub doğrulamalı paketi hazırlar", AppUpdateDefaultsToGitHubVerifiedPackageAsync),
     ("Otomatik güncelleme imza modu açılırsa tüm PE dosyalarını doğrulamaya alır", AppUpdateRequiresSignaturesForAllPortableBinariesAsync),
     ("Ayarlar WireSock onayını sürüm bazında saklar", SettingsPersistConsentAsync),
+    ("Eski tarayıcı modu açık ayarı güvenli varsayılana taşınır", BrowserAccessLegacyImplicitEnabledMigratesToOptInAsync),
     ("WireSock hazırlığı onaysız kurulumu reddeder", BootstrapRequiresConsentAsync),
     ("WireSock hazırlığı güvenilir kurulumu yeniden kullanır", BootstrapReusesTrustedInstallAsync),
     ("WireSock hazırlığı güvenilmeyen kurulumu yok sayar", BootstrapIgnoresUntrustedInstallAsync),
     ("WireSock hazırlığı resmi paketi doğrulayıp kurar", BootstrapLifecycleAsync),
+    ("WireSock hazırlığı doğrulanmış yerel kurucuyu indirmeden kullanır", BootstrapUsesVerifiedLocalInstallerAsync),
     ("WireSock hazırlığı yeniden başlatma gerektiren başarı kodunu kabul eder", BootstrapAcceptsRestartRequiredExitCodeAsync),
     ("Denetleyici idempotent bağlanır ve keser", ControllerLifecycleAsync),
     ("Denetleyici temiz kapanışta firewall scriptini tekrar çalıştırmaz", ControllerDisposeSkipsDisconnectedCleanupAsync),
@@ -67,6 +69,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici web kapsamını bağlıyken kilitler", ControllerLocksBrowserScopeWhileConnectedAsync),
     ("Denetleyici bağlantıyı Discord oturumu sanmadan doğrular", ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync),
     ("Windows Discord başlatma planı updater yerine uygulamayı hedefler", WindowsDiscordLaunchPlanUsesAppExecutableAsync),
+    ("Windows Discord başlatma planı updater fallback kullanabilir", WindowsDiscordLaunchPlanCanUseUpdaterFallbackAsync),
     ("Denetleyici Discord kapalıyken uygulamayı açmayı dener", ControllerOpensDiscordWhenItIsClosedAsync),
     ("Denetleyici Discord otomatik yenileme başarısızlığını ayrı durum yapar", ControllerKeepsTunnelActiveWhenDiscordRestartFailsAsync),
     ("Denetleyici Discord penceresi görünmezse hazır demeyi bırakır", ControllerRequiresManualActionWhenDiscordWindowIsHiddenAsync),
@@ -1366,6 +1369,45 @@ static async Task SettingsPersistConsentAsync()
     }
 }
 
+static async Task BrowserAccessLegacyImplicitEnabledMigratesToOptInAsync()
+{
+    var root = CreateTemporaryDirectory();
+
+    try
+    {
+        var paths = new AppPaths(root);
+        paths.EnsureDirectories();
+        await File.WriteAllTextAsync(paths.SettingsFile, """
+            {
+              "AcceptedWireSockVersion": "1.4.7.1",
+              "AcceptedCloudflareWarpTerms": true,
+              "BrowserAccessEnabled": true,
+              "RunInBackgroundOnClose": true,
+              "StartWithWindows": true
+            }
+            """);
+
+        var legacyStore = new AppSettingsStore(paths);
+        Assert(legacyStore.EnsureBrowserAccessPreferenceInitialized());
+        Assert(!legacyStore.IsBrowserAccessEnabled());
+        Assert(legacyStore.IsRunInBackgroundOnCloseEnabled());
+        Assert(legacyStore.IsStartWithWindowsEnabled());
+
+        var migratedStore = new AppSettingsStore(paths);
+        Assert(!migratedStore.EnsureBrowserAccessPreferenceInitialized());
+        Assert(!migratedStore.IsBrowserAccessEnabled());
+
+        migratedStore.SetBrowserAccessEnabled(true);
+        var explicitStore = new AppSettingsStore(paths);
+        Assert(!explicitStore.EnsureBrowserAccessPreferenceInitialized());
+        Assert(explicitStore.IsBrowserAccessEnabled());
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task BootstrapRequiresConsentAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -1518,6 +1560,72 @@ static async Task BootstrapLifecycleAsync()
         Assert(!File.Exists(Path.Combine(
             paths.InstallerDirectory,
             WireSockPackage.InstallerFileName)));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task BootstrapUsesVerifiedLocalInstallerAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var settings = new AppSettingsStore(paths);
+    var locator = new MutableWireSockLocator();
+    var downloader = new FakeVerifiedDownloader();
+    var verifier = new FakeWireSockPackageVerifier();
+    var installedPath = Path.Combine(root, "WireSock", "wiresock-client.exe");
+    var launcher = new FakeInstallerLauncher(() => locator.Path = installedPath);
+    var localInstallerPath = Path.Combine(
+        paths.InstallerDirectory,
+        WireSockPackage.InstallerFileName);
+    var hashVerifyCount = 0;
+    var bootstrapper = new WireSockBootstrapper(
+        paths,
+        settings,
+        locator,
+        downloader,
+        verifier,
+        launcher,
+        (path, expectedSha256, cancellationToken) =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            hashVerifyCount++;
+            Assert(expectedSha256 == WireSockPackage.WindowsX64Sha256);
+            return Task.FromResult(string.Equals(
+                Path.GetFullPath(path),
+                Path.GetFullPath(localInstallerPath),
+                StringComparison.OrdinalIgnoreCase));
+        });
+    var progressMessages = new List<string>();
+
+    try
+    {
+        paths.EnsureDirectories();
+        await File.WriteAllTextAsync(localInstallerPath, "yerel-kurucu");
+
+        bootstrapper.AcceptSetupConsent();
+        var result = await bootstrapper.EnsureInstalledAsync(
+            new ImmediateProgress<string>(progressMessages.Add),
+            CancellationToken.None);
+
+        Assert(result == installedPath);
+        Assert(downloader.DownloadCount == 0);
+        Assert(hashVerifyCount >= 1);
+        Assert(verifier.InstallerVerifyCount == 3);
+        Assert(verifier.ClientVerifyCount == 1);
+        Assert(launcher.LaunchCount == 1);
+        Assert(File.Exists(localInstallerPath));
+        var launchedInstallerPath = launcher.LastInstallerPath
+            ?? throw new InvalidOperationException("Kurucu yolu kaydedilmedi.");
+        Assert(Path.GetFullPath(launchedInstallerPath).StartsWith(
+            Path.GetFullPath(paths.WireSockInstallerStagingDirectory),
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!File.Exists(launchedInstallerPath));
+        Assert(progressMessages.Any(message => message.Contains(
+            "yerel paketten",
+            StringComparison.OrdinalIgnoreCase)));
     }
     finally
     {
@@ -2057,6 +2165,42 @@ static Task WindowsDiscordLaunchPlanUsesAppExecutableAsync()
             StringComparison.OrdinalIgnoreCase));
         Assert(!plan[0].Contains(
             "--processStart",
+            StringComparison.OrdinalIgnoreCase));
+        return Task.CompletedTask;
+    }
+    finally
+    {
+        var testRoot = Directory.GetParent(root)?.FullName;
+        if (!string.IsNullOrWhiteSpace(testRoot)
+            && Directory.Exists(testRoot))
+        {
+            Directory.Delete(testRoot, recursive: true);
+        }
+    }
+}
+
+static Task WindowsDiscordLaunchPlanCanUseUpdaterFallbackAsync()
+{
+    var root = Path.Combine(
+        CreateTemporaryDirectory(),
+        "Discord");
+
+    try
+    {
+        var plan = WindowsDiscordProcessInspector.CreateUpdaterLaunchPlanForTesting(
+            root,
+            "Discord.exe",
+            "Discord");
+
+        Assert(plan.Count == 1);
+        Assert(plan[0].Contains(
+            "Update.exe",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(plan[0].Contains(
+            "--processStart Discord.exe",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!plan[0].Contains(
+            Path.Combine("app-1.0.9999", "Discord.exe"),
             StringComparison.OrdinalIgnoreCase));
         return Task.CompletedTask;
     }

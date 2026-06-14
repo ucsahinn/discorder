@@ -4,6 +4,8 @@ namespace Discorder.Core.Configuration;
 
 public sealed class AppSettingsStore
 {
+    private const int CurrentBrowserAccessPreferenceVersion = 1;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true
@@ -37,6 +39,28 @@ public sealed class AppSettingsStore
         lock (_gate)
         {
             return Load().BrowserAccessEnabled ?? false;
+        }
+    }
+
+    public bool EnsureBrowserAccessPreferenceInitialized()
+    {
+        lock (_gate)
+        {
+            var settings = Load();
+            if (settings.BrowserAccessPreferenceVersion >= CurrentBrowserAccessPreferenceVersion)
+            {
+                return false;
+            }
+
+            _paths.EnsureDirectories();
+            var migratedFromEnabled = settings.BrowserAccessEnabled == true;
+            Save(settings with
+            {
+                BrowserAccessEnabled = false,
+                BrowserAccessPreferenceVersion = CurrentBrowserAccessPreferenceVersion
+            });
+
+            return migratedFromEnabled;
         }
     }
 
@@ -79,7 +103,8 @@ public sealed class AppSettingsStore
             _paths.EnsureDirectories();
             var settings = Load() with
             {
-                BrowserAccessEnabled = enabled
+                BrowserAccessEnabled = enabled,
+                BrowserAccessPreferenceVersion = CurrentBrowserAccessPreferenceVersion
             };
 
             Save(settings);
@@ -202,6 +227,7 @@ public sealed class AppSettingsStore
         string? AcceptedWireSockVersion,
         bool AcceptedCloudflareWarpTerms,
         bool? BrowserAccessEnabled,
+        int? BrowserAccessPreferenceVersion,
         bool? RunInBackgroundOnClose,
         bool? StartWithWindows,
         bool? DebugDiagnosticsEnabled,
@@ -211,6 +237,7 @@ public sealed class AppSettingsStore
             null,
             AcceptedCloudflareWarpTerms: false,
             BrowserAccessEnabled: false,
+            BrowserAccessPreferenceVersion: CurrentBrowserAccessPreferenceVersion,
             RunInBackgroundOnClose: false,
             StartWithWindows: false,
             DebugDiagnosticsEnabled: false,

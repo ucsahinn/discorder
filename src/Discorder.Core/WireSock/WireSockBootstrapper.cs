@@ -1,5 +1,6 @@
 using Discorder.Core.Configuration;
 using Discorder.Core.Provisioning;
+using Discorder.Core.Security;
 using Discorder.Core.Updates;
 
 namespace Discorder.Core.WireSock;
@@ -18,6 +19,7 @@ public sealed class WireSockBootstrapper : IWireSockBootstrapper
     private readonly IVerifiedDownloader _downloader;
     private readonly IWireSockPackageVerifier _packageVerifier;
     private readonly IElevatedInstallerLauncher _installerLauncher;
+    private readonly Func<string, string, CancellationToken, Task<bool>> _hashVerifier;
 
     public WireSockBootstrapper(
         AppPaths paths,
@@ -26,6 +28,25 @@ public sealed class WireSockBootstrapper : IWireSockBootstrapper
         IVerifiedDownloader downloader,
         IWireSockPackageVerifier packageVerifier,
         IElevatedInstallerLauncher installerLauncher)
+        : this(
+            paths,
+            settings,
+            locator,
+            downloader,
+            packageVerifier,
+            installerLauncher,
+            FileHashVerifier.MatchesSha256Async)
+    {
+    }
+
+    internal WireSockBootstrapper(
+        AppPaths paths,
+        AppSettingsStore settings,
+        IWireSockLocator locator,
+        IVerifiedDownloader downloader,
+        IWireSockPackageVerifier packageVerifier,
+        IElevatedInstallerLauncher installerLauncher,
+        Func<string, string, CancellationToken, Task<bool>> hashVerifier)
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -35,6 +56,8 @@ public sealed class WireSockBootstrapper : IWireSockBootstrapper
             ?? throw new ArgumentNullException(nameof(packageVerifier));
         _installerLauncher = installerLauncher
             ?? throw new ArgumentNullException(nameof(installerLauncher));
+        _hashVerifier = hashVerifier
+            ?? throw new ArgumentNullException(nameof(hashVerifier));
     }
 
     public string RequiredVersion => WireSockPackage.Version;
@@ -84,32 +107,39 @@ public sealed class WireSockBootstrapper : IWireSockBootstrapper
             installerDirectory,
             WireSockPackage.InstallerFileName);
 
-        progress?.Report("WireSock resmi kurucusu indiriliyor");
-        double? lastProgressPercent = null;
-        long lastProgressBytes = -ProgressByteInterval;
-        var downloadProgress = new DirectProgress<DownloadProgress>(
-            download =>
-            {
-                if (ShouldReportDownloadProgress(
-                    download,
-                    ref lastProgressPercent,
-                    ref lastProgressBytes))
-                {
-                    progress?.Report(FormatDownloadProgress(
-                        "WireSock kurucusu",
-                        download));
-                }
-            });
         int exitCode;
         try
         {
-            await _downloader.DownloadAsync(
-                WireSockPackage.WindowsX64Download,
-                installerPath,
-                WireSockPackage.WindowsX64Sha256,
-                cancellationToken,
-                maxBytes: WireSockPackage.WindowsX64MaxBytes,
-                progress: downloadProgress);
+            if (!await TryUseLocalInstallerAsync(
+                    installerPath,
+                    progress,
+                    cancellationToken))
+            {
+                progress?.Report("WireSock resmi kurucusu indiriliyor");
+                double? lastProgressPercent = null;
+                long lastProgressBytes = -ProgressByteInterval;
+                var downloadProgress = new DirectProgress<DownloadProgress>(
+                    download =>
+                    {
+                        if (ShouldReportDownloadProgress(
+                            download,
+                            ref lastProgressPercent,
+                            ref lastProgressBytes))
+                        {
+                            progress?.Report(FormatDownloadProgress(
+                                "WireSock kurucusu",
+                                download));
+                        }
+                    });
+
+                await _downloader.DownloadAsync(
+                    WireSockPackage.WindowsX64Download,
+                    installerPath,
+                    WireSockPackage.WindowsX64Sha256,
+                    cancellationToken,
+                    maxBytes: WireSockPackage.WindowsX64MaxBytes,
+                    progress: downloadProgress);
+            }
 
             progress?.Report("WireSock kurucusunun imzası doğrulanıyor");
             _packageVerifier.VerifyInstaller(installerPath);
@@ -153,6 +183,79 @@ public sealed class WireSockBootstrapper : IWireSockBootstrapper
             _paths.WireSockInstallMarker,
             $"{DateTimeOffset.Now:O}{Environment.NewLine}");
         return installedExecutable;
+    }
+
+    private async Task<bool> TryUseLocalInstallerAsync(
+        string installerPath,
+        IProgress<string>? progress,
+        CancellationToken cancellationToken)
+    {
+        var candidates = GetLocalInstallerCandidates(installerPath)
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => Path.GetFullPath(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var candidate in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!File.Exists(candidate))
+            {
+                continue;
+            }
+
+            try
+            {
+                if (!await _hashVerifier(
+                        candidate,
+                        WireSockPackage.WindowsX64Sha256,
+                        cancellationToken))
+                {
+                    continue;
+                }
+
+                _packageVerifier.VerifyInstaller(candidate);
+                progress?.Report("WireSock kurucusu yerel paketten doğrulandı");
+                if (!string.Equals(
+                        Path.GetFullPath(candidate),
+                        Path.GetFullPath(installerPath),
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Copy(candidate, installerPath, overwrite: true);
+                }
+
+                return true;
+            }
+            catch (Exception exception)
+                when (exception is ArgumentException
+                    or IOException
+                    or InvalidDataException
+                    or NotSupportedException
+                    or UnauthorizedAccessException)
+            {
+                progress?.Report(
+                    "Yerel WireSock kurucusu doğrulanamadı, resmi indirme deneniyor");
+            }
+        }
+
+        return false;
+    }
+
+    private IEnumerable<string> GetLocalInstallerCandidates(string installerPath)
+    {
+        var baseDirectory = AppContext.BaseDirectory;
+        yield return Path.Combine(baseDirectory, WireSockPackage.InstallerFileName);
+        yield return Path.Combine(
+            baseDirectory,
+            "installers",
+            WireSockPackage.InstallerFileName);
+        yield return Path.Combine(
+            baseDirectory,
+            "WireSock",
+            WireSockPackage.InstallerFileName);
+        yield return Path.Combine(
+            _paths.InstallerDirectory,
+            WireSockPackage.InstallerFileName);
+        yield return installerPath;
     }
 
     private static bool IsSuccessfulInstallerExitCode(int exitCode)

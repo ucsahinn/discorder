@@ -27,6 +27,9 @@ $stableArchive = Join-Path $root "artifacts\Discorder-$Runtime.zip"
 $stableShaPath = Join-Path $root "artifacts\Discorder-$Runtime.sha256.txt"
 $signingStatusPath = Join-Path $root 'artifacts\signing-status.txt'
 $updateManifestPath = Join-Path $output 'discorder.update-manifest.json'
+$wireSockInstallerName = 'wiresock-vpn-client-x64-1.4.7.1.msi'
+$wireSockInstallerHash = 'FA3F483DA7EA1AE6C234F95BECB0AA6A18E7EB18B944D3FFB4518D40F4292F40'
+$wireSockInstallerSource = Join-Path $root "vendor\wiresock\$wireSockInstallerName"
 $buildArtifactsPath = Join-Path ([IO.Path]::GetTempPath()) (
     'discorder-release-' + [guid]::NewGuid().ToString('N'))
 
@@ -54,6 +57,23 @@ try {
     }
 
     & "$PSScriptRoot\prepare-background-video.ps1" -PublishDirectory $output
+
+    if (Test-Path -LiteralPath $wireSockInstallerSource) {
+        $wireSockInstallerActualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $wireSockInstallerSource).Hash
+        if (-not [string]::Equals(
+                $wireSockInstallerActualHash,
+                $wireSockInstallerHash,
+                [StringComparison]::OrdinalIgnoreCase)) {
+            throw "WireSock kurucu SHA-256 dogrulamasi basarisiz oldu: $wireSockInstallerSource"
+        }
+
+        $wireSockInstallerOutput = Join-Path $output 'installers'
+        New-Item -ItemType Directory -Path $wireSockInstallerOutput -Force | Out-Null
+        Copy-Item `
+            -LiteralPath $wireSockInstallerSource `
+            -Destination (Join-Path $wireSockInstallerOutput $wireSockInstallerName) `
+            -Force
+    }
 
     $signed = $false
     if (-not [string]::IsNullOrWhiteSpace($CodeSigningCertificatePath) -or $RequireCodeSigning) {
