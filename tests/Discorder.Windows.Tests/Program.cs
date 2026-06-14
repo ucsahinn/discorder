@@ -151,6 +151,8 @@ static void RenderMainWindow()
         Assert(text.Contains("Arka planda çalıştır", StringComparison.Ordinal));
         Assert(text.Contains("Windows açılışında çalıştır", StringComparison.Ordinal));
         Assert(text.Contains("Tanılama", StringComparison.Ordinal));
+        Assert(text.Contains("Debug tanılama", StringComparison.Ordinal));
+        Assert(text.Contains("Kapalı. Normal rapor hafif kalır.", StringComparison.Ordinal));
         Assert(text.Contains("Hazır", StringComparison.Ordinal));
         Assert(text.Contains("Discorder Bağlı Değil", StringComparison.Ordinal));
         Assert(text.Contains(
@@ -175,9 +177,17 @@ static void RenderMainWindow()
             toggle.Name == "RunInBackgroundToggle");
         var startupSwitch = switches.Single(toggle =>
             toggle.Name == "StartupToggle");
+        var debugDiagnosticsSwitch = switches.Single(toggle =>
+            toggle.Name == "DebugDiagnosticsToggle");
         Assert(browserSwitch.IsChecked == false);
         Assert(runInBackgroundSwitch.IsChecked == false);
         Assert(startupSwitch.IsChecked == false);
+        Assert(debugDiagnosticsSwitch.IsChecked == false);
+        Assert(
+            string.Equals(
+                debugDiagnosticsSwitch.ToolTip?.ToString(),
+                "Ayrıntılı ağ ve performans verisi ekle",
+                StringComparison.Ordinal));
         Assert(FindVisualChildren<ProgressBar>(window).Any());
         Assert(text.Contains("DNS SUNUCUSU", StringComparison.Ordinal));
         Assert(text.Contains("BAĞLANTI DURUMU", StringComparison.Ordinal));

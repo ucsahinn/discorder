@@ -86,6 +86,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Uygulamayı kaldırma beklenmeyen veri kökünü reddeder", CleanupServiceRejectsUnexpectedDataRootAsync),
     ("Uygulamayı kaldırma salt okunur Discorder dosyalarını siler", CleanupServiceDeletesReadOnlyFilesAsync),
     ("Tanılama logları devops paketi üretir", DiagnosticsWritesDevOpsBundleAsync),
+    ("Debug tanılama yalnızca açıkken ayrıntılı paket üretir", DiagnosticsWritesDebugBundleOnlyWhenEnabledAsync),
     ("Tanılama kalıcı hata loglarını redakte eder", DiagnosticsRedactsPersistentErrorLogAsync),
     ("WireSock süreç logları yazılırken redakte edilir", ProcessLauncherRedactsTunnelLogAndConfirmsExitAsync),
     ("Tanılama özeti son bilgi durumunu gecikmeli yazar", DiagnosticsFlushesDebouncedSummaryAsync)
@@ -1314,11 +1315,13 @@ static async Task SettingsPersistConsentAsync()
         Assert(!firstStore.IsBrowserAccessEnabled());
         Assert(!firstStore.IsRunInBackgroundOnCloseEnabled());
         Assert(!firstStore.IsStartWithWindowsEnabled());
+        Assert(!firstStore.IsDebugDiagnosticsEnabled());
         Assert(!firstStore.IsWireSockInstalledByDiscorder());
 
         firstStore.SetBrowserAccessEnabled(true);
         firstStore.SetRunInBackgroundOnCloseEnabled(true);
         firstStore.SetStartWithWindowsEnabled(true);
+        firstStore.SetDebugDiagnosticsEnabled(true);
         firstStore.SetWireSockInstalledByDiscorder(true);
         firstStore.AcceptSetupConsent(WireSockPackage.Version);
 
@@ -1328,16 +1331,19 @@ static async Task SettingsPersistConsentAsync()
         Assert(reloadedStore.IsBrowserAccessEnabled());
         Assert(reloadedStore.IsRunInBackgroundOnCloseEnabled());
         Assert(reloadedStore.IsStartWithWindowsEnabled());
+        Assert(reloadedStore.IsDebugDiagnosticsEnabled());
         Assert(reloadedStore.IsWireSockInstalledByDiscorder());
 
         reloadedStore.SetBrowserAccessEnabled(false);
         reloadedStore.SetRunInBackgroundOnCloseEnabled(false);
         reloadedStore.SetStartWithWindowsEnabled(false);
+        reloadedStore.SetDebugDiagnosticsEnabled(false);
         reloadedStore.SetWireSockInstalledByDiscorder(false);
         var disabledStore = new AppSettingsStore(paths);
         Assert(!disabledStore.IsBrowserAccessEnabled());
         Assert(!disabledStore.IsRunInBackgroundOnCloseEnabled());
         Assert(!disabledStore.IsStartWithWindowsEnabled());
+        Assert(!disabledStore.IsDebugDiagnosticsEnabled());
         Assert(!disabledStore.IsWireSockInstalledByDiscorder());
 
         await File.WriteAllTextAsync(paths.SettingsFile, """
@@ -1351,6 +1357,7 @@ static async Task SettingsPersistConsentAsync()
         Assert(!legacyStore.IsBrowserAccessEnabled());
         Assert(!legacyStore.IsRunInBackgroundOnCloseEnabled());
         Assert(!legacyStore.IsStartWithWindowsEnabled());
+        Assert(!legacyStore.IsDebugDiagnosticsEnabled());
         Assert(!legacyStore.IsWireSockInstalledByDiscorder());
     }
     finally
@@ -3126,6 +3133,8 @@ static async Task DiagnosticsWritesDevOpsBundleAsync()
         Assert(archive.Entries.Any(entry =>
             entry.FullName.Equals("runtime.json", StringComparison.OrdinalIgnoreCase)));
         Assert(!archive.Entries.Any(entry =>
+            entry.FullName.Equals("debug.json", StringComparison.OrdinalIgnoreCase)));
+        Assert(!archive.Entries.Any(entry =>
             entry.FullName.Equals("unexpected.tmp", StringComparison.OrdinalIgnoreCase)));
         var bundledSummary = archive.GetEntry("diagnostics.md")
             ?? throw new InvalidOperationException("diagnostics.md pakette yok.");
@@ -3205,6 +3214,59 @@ static void AssertRedactedKnownFolder(
     Assert(content.Contains(marker, StringComparison.Ordinal));
 }
 
+static async Task DiagnosticsWritesDebugBundleOnlyWhenEnabledAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var debugEnabled = false;
+    var diagnostics = new DiscorderDiagnostics(
+        paths,
+        isDebugDiagnosticsEnabled: () => debugEnabled);
+
+    try
+    {
+        diagnostics.Info("test.debug", "normal tanılama");
+        var normalBundle = diagnostics.CreateBundle();
+        using (var normalArchive = ZipFile.OpenRead(normalBundle))
+        {
+            Assert(!normalArchive.Entries.Any(entry =>
+                entry.FullName.Equals("debug.json", StringComparison.OrdinalIgnoreCase)));
+        }
+
+        debugEnabled = true;
+        diagnostics.Info(
+            "test.debug",
+            "debug tanılama",
+            new Dictionary<string, string?>
+            {
+                ["private_key"] = "raw-secret-value"
+            });
+        var debugBundle = diagnostics.CreateBundle();
+        using var debugArchive = ZipFile.OpenRead(debugBundle);
+        var debugEntry = debugArchive.GetEntry("debug.json")
+            ?? throw new InvalidOperationException("debug.json pakette yok.");
+        await using var debugStream = debugEntry.Open();
+        using var debugDocument = await JsonDocument.ParseAsync(debugStream);
+
+        Assert(debugDocument.RootElement.GetProperty("debugMode").GetString() == "enabled");
+        Assert(debugDocument.RootElement.TryGetProperty("runtime", out _));
+        Assert(debugDocument.RootElement.TryGetProperty("cpuSample", out _));
+        Assert(debugDocument.RootElement.TryGetProperty("network", out _));
+        Assert(debugDocument.RootElement.TryGetProperty("processes", out _));
+
+        var eventLog = await File.ReadAllTextAsync(paths.EventLog);
+        Assert(!eventLog.Contains("raw-secret-value", StringComparison.Ordinal));
+        Assert(eventLog.Contains("[REDACTED]", StringComparison.Ordinal));
+    }
+    finally
+    {
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
 static async Task DiagnosticsRedactsPersistentErrorLogAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -3219,7 +3281,8 @@ static async Task DiagnosticsRedactsPersistentErrorLogAsync()
             new InvalidOperationException("Authorization: Bearer fake-token-value"),
             new Dictionary<string, string?>
             {
-                ["access_token"] = "access_token = fake-access-token"
+                ["access_token"] = "access_token = fake-access-token",
+                ["private_key"] = "raw-private-key"
             });
 
         var eventLog = await File.ReadAllTextAsync(paths.EventLog);
@@ -3230,6 +3293,7 @@ static async Task DiagnosticsRedactsPersistentErrorLogAsync()
             Assert(!text.Contains("fake-private-key", StringComparison.Ordinal));
             Assert(!text.Contains("fake-token-value", StringComparison.Ordinal));
             Assert(!text.Contains("fake-access-token", StringComparison.Ordinal));
+            Assert(!text.Contains("raw-private-key", StringComparison.Ordinal));
             Assert(text.Contains("[REDACTED]", StringComparison.Ordinal));
         }
     }

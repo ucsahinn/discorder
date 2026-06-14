@@ -97,6 +97,7 @@ public partial class MainWindow : Window, IDisposable
             _settingsStore.IsRunInBackgroundOnCloseEnabled());
         ApplyStartupSetting(SynchronizeStartupLaunchSetting(
             _settingsStore.IsStartWithWindowsEnabled()));
+        ApplyDebugDiagnosticsSetting(_settingsStore.IsDebugDiagnosticsEnabled());
         _controller.StatusChanged += OnStatusChanged;
         ApplySnapshot(_controller.Snapshot);
     }
@@ -666,6 +667,43 @@ public partial class MainWindow : Window, IDisposable
 
     }
 
+    private void DebugDiagnosticsToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isApplyingSettings)
+        {
+            return;
+        }
+
+        var enabled = DebugDiagnosticsToggle.IsChecked == true;
+        _settingsStore.SetDebugDiagnosticsEnabled(enabled);
+        _diagnostics.Info(
+            "ui.debugDiagnostics",
+            enabled
+                ? "Debug tanılama açıldı."
+                : "Debug tanılama kapatıldı.",
+            new Dictionary<string, string?>
+            {
+                ["debugDiagnostics"] = enabled.ToString()
+            });
+        ApplyDebugDiagnosticsSetting(enabled);
+    }
+
+    private void ApplyDebugDiagnosticsSetting(bool enabled)
+    {
+        _isApplyingSettings = true;
+        try
+        {
+            DebugDiagnosticsToggle.IsChecked = enabled;
+            DebugDiagnosticsStatus.Text = enabled
+                ? "Açık. Rapor ağ ve performans debug verisi ekler."
+                : "Kapalı. Normal rapor hafif kalır.";
+        }
+        finally
+        {
+            _isApplyingSettings = false;
+        }
+    }
+
     private void RunInBackgroundToggle_Changed(object sender, RoutedEventArgs e)
     {
         if (_isApplyingSettings)
@@ -1232,6 +1270,8 @@ public partial class MainWindow : Window, IDisposable
             var details = new Dictionary<string, string?>(
                 _controller.CreateDiagnosticDetails(),
                 StringComparer.Ordinal);
+            details["debugDiagnostics"] =
+                _settingsStore.IsDebugDiagnosticsEnabled().ToString();
             foreach (var detail in PortableInstallDiagnostics.Capture())
             {
                 details[detail.Key] = detail.Value;

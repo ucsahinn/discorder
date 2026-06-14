@@ -56,6 +56,8 @@ Paket genellikle şunları içerir:
 
 `runtime.json`; RAM, GC heap, handle, thread ve calisma suresi gibi sayisal performans metriklerini icerir. Token, sertifika, gizli anahtar veya ozel hesap bilgisi yazmaz. Yine de paketi paylasmadan once dosyalari gozden gecirin.
 
+**Debug tanilama** secenegi kapali gelir. Acildiginda bir sonraki tanilama paketine `debug.json` eklenir. Bu dosya CPU orneklemesi, ag adaptor ozeti, TCP baglanti durum sayilari ve ilgili sureclerin RAM/handle/thread bilgilerini toplar. Paket yakalama, komut satiri, cookie, token veya endpoint listesi toplamaz; private IP adresleri maskelenir.
+
 ## Kapsam Dışı
 
 Discorder şunları yapmaz:

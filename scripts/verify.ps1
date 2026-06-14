@@ -105,6 +105,17 @@ try {
         throw "Discorder WireSock VPN Client surecini yonetmek icin yonetici manifest'iyle derlenmelidir"
     }
 
+    $gitleaks = Get-Command gitleaks -ErrorAction SilentlyContinue
+    if ($null -ne $gitleaks) {
+        & $gitleaks.Source dir . --redact --no-banner --exit-code 1
+        if ($LASTEXITCODE -ne 0) {
+            throw "gitleaks secret scan hata kodu $LASTEXITCODE ile basarisiz oldu"
+        }
+    }
+    else {
+        Write-Warning 'gitleaks bulunamadi; secret scan bu makinede atlandi.'
+    }
+
     Write-Host 'Dogrulama basariyla tamamlandi.'
 }
 finally {

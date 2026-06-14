@@ -10,6 +10,7 @@ using System.Globalization;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace Discorder.Core.Connection;
@@ -37,7 +38,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private bool _accessLockConfirmed;
     private DiscordProcessSnapshot _lastDiscordProcessSnapshot = new(0, []);
     private string? _lastProfilePath;
-    private string? _lastProfileSha256;
+    private string? _lastRoutingProfileSha256;
     private string? _lastNextAction;
     private string? _lastDiscordRestartStatus;
     private IReadOnlyDictionary<string, string?> _lastRoutingSummary =
@@ -101,6 +102,20 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["state"] = _snapshot.State.ToString()
                 });
             return false;
+        }
+
+        if (_includeBrowserAccess != enabled)
+        {
+            _lastProfilePath = null;
+            _lastRoutingProfileSha256 = null;
+            _lastRoutingSummary = new Dictionary<string, string?>
+            {
+                ["profileState"] = "pending-next-connect",
+                ["browserMode"] = enabled ? "pending-included" : "pending-excluded",
+                ["browserProcessScope"] = enabled
+                    ? "will-resolve-on-next-connect"
+                    : "excluded"
+            };
         }
 
         _includeBrowserAccess = enabled;
@@ -176,8 +191,10 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             ["nextAction"] = _lastNextAction,
             ["discordRestartStatus"] = _lastDiscordRestartStatus,
             ["profilePath"] = _lastProfilePath,
-            ["profileSha256"] = _lastProfileSha256,
+            ["routingProfileSha256"] = _lastRoutingProfileSha256,
+            ["profileHashScope"] = "sanitized-routing-lines",
             ["tunnelLog"] = _paths.TunnelLog,
+            ["routingSummaryKind"] = "last-applied-or-pending-profile",
             ["routingScope"] = CreateRoutingScopeDescription(IncludeBrowserAccess),
             ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary)
         };
@@ -195,6 +212,21 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 return;
             }
 
+            var connectStopwatch = Stopwatch.StartNew();
+            void LogConnectPhase(string phase)
+            {
+                _diagnostics.Info(
+                    "controller.connect.phase",
+                    phase,
+                    new Dictionary<string, string?>
+                    {
+                        ["elapsedMs"] = connectStopwatch.ElapsedMilliseconds
+                            .ToString(CultureInfo.InvariantCulture),
+                        ["browserAccess"] = IncludeBrowserAccess.ToString(),
+                        ["state"] = _snapshot.State.ToString()
+                    });
+            }
+
             _intentionalStop = false;
             SetStatus(TunnelState.Preparing, "Discord bağlantısı hazırlanıyor");
             _diagnostics.Info(
@@ -209,6 +241,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             await _accessLock.ApplyTunnelScopeAsync(
                 IncludeBrowserAccess,
                 cancellationToken);
+            LogConnectPhase("access-lock-ready");
 
             SetStatus(TunnelState.Preparing, "Discord bağlantısı açılıyor");
 
@@ -221,6 +254,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             var wireSockExecutable = await _wireSockBootstrapper.EnsureInstalledAsync(
                 progress,
                 cancellationToken);
+            LogConnectPhase("wiresock-ready");
 
             var allowedApplications = _discordScope.GetAllowedApplications(
                 IncludeBrowserAccess);
@@ -232,17 +266,19 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 progress,
                 cancellationToken);
             _lastProfilePath = profilePath;
-            var profileHash = await ComputeFileSha256Async(
+            var routingProfileHash = await ComputeRoutingProfileSha256Async(
                 profilePath,
                 cancellationToken);
-            _lastProfileSha256 = profileHash;
+            _lastRoutingProfileSha256 = routingProfileHash;
+            LogConnectPhase("profile-ready");
             _diagnostics.Info(
                 "controller.profile",
                 "Discord profili hazırlandı.",
                 new Dictionary<string, string?>
                 {
                     ["profilePath"] = profilePath,
-                    ["profileSha256"] = profileHash,
+                    ["routingProfileSha256"] = routingProfileHash,
+                    ["profileHashScope"] = "sanitized-routing-lines",
                     ["routingScope"] = CreateRoutingScopeDescription(IncludeBrowserAccess)
                 }.Concat(_lastRoutingSummary)
                     .ToDictionary(pair => pair.Key, pair => pair.Value));
@@ -251,6 +287,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 wireSockExecutable,
                 profilePath,
                 cancellationToken);
+            LogConnectPhase("wiresock-process-started");
 
             DiscordProcessSnapshot discordProcesses = _discordProcessManager.Capture();
             _lastDiscordProcessSnapshot = discordProcesses;
@@ -268,6 +305,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 discordProcesses,
                 TimeSpan.FromSeconds(4),
                 cancellationToken);
+            LogConnectPhase("discord-restart-attempted");
             restartStatus = restart.Message;
             _lastDiscordRestartStatus = restartStatus;
             discordProcesses = _discordProcessManager.Capture();
@@ -280,6 +318,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     wireSockExecutable,
                     profilePath,
                     cancellationToken);
+                LogConnectPhase("discord-updater-recovery-attempted");
                 restartStatus = restart.Message;
                 _lastDiscordRestartStatus = restartStatus;
                 discordProcesses = _discordProcessManager.Capture();
@@ -322,6 +361,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             }
 
             _lastNextAction = nextAction;
+            connectStopwatch.Stop();
 
             SetStatus(
                 finalState,
@@ -341,6 +381,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["discordExecutablePathCount"] =
                         discordProcesses.KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture),
                     ["nextAction"] = nextAction,
+                    ["connectElapsedMs"] = connectStopwatch.ElapsedMilliseconds
+                        .ToString(CultureInfo.InvariantCulture),
                     ["wireSockRunning"] = "True"
                 });
             _diagnostics.WriteHealth(
@@ -359,7 +401,10 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                         discordProcesses.KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture),
                     ["nextAction"] = nextAction,
                     ["profilePath"] = profilePath,
-                    ["profileSha256"] = profileHash,
+                    ["routingProfileSha256"] = routingProfileHash,
+                    ["profileHashScope"] = "sanitized-routing-lines",
+                    ["connectElapsedMs"] = connectStopwatch.ElapsedMilliseconds
+                        .ToString(CultureInfo.InvariantCulture),
                     ["tunnelLog"] = _paths.TunnelLog,
                     ["wireSockRunning"] = "True"
                 });
@@ -543,17 +588,27 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         ]);
     }
 
-    private static async Task<string> ComputeFileSha256Async(
+    private static async Task<string> ComputeRoutingProfileSha256Async(
         string path,
         CancellationToken cancellationToken)
     {
-        await using var stream = new FileStream(
-            path,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.Read);
-        return Convert.ToHexString(
-            await SHA256.HashDataAsync(stream, cancellationToken));
+        var safeLines = new List<string>();
+        var lines = await File.ReadAllLinesAsync(path, cancellationToken);
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("AllowedApps", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("AllowedIPs", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("Endpoint", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("DNS", StringComparison.OrdinalIgnoreCase))
+            {
+                safeLines.Add(trimmed);
+            }
+        }
+
+        var projection = string.Join("\n", safeLines.Order(StringComparer.Ordinal));
+        var bytes = Encoding.UTF8.GetBytes(projection);
+        return Convert.ToHexString(SHA256.HashData(bytes));
     }
 
     private void WriteWireSockProcessMarker(string profilePath)

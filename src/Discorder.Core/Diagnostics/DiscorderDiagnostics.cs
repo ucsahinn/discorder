@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO.Compression;
+using System.Net;
+using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text;
@@ -23,11 +25,23 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
     private static readonly Regex SensitiveAssignmentPattern = new(
         @"(?ix)
         \b(
-            privatekey|presharedkey|token|access[_-]?token|refresh[_-]?token|
-            password|passwd|secret|client[_-]?secret|cookie|authorization
+            privatekey|private[_-]?key|presharedkey|preshared[_-]?key|token|
+            access[_-]?token|refresh[_-]?token|password|passwd|secret|
+            client[_-]?secret|cookie|authorization|api[_-]?key|x-api-key|
+            session|jwt|set-cookie|connection[_-]?string
         )\b
         \s*[:=]\s*
         [^\r\n]+",
+        RegexOptions.Compiled);
+
+    private static readonly Regex SensitiveKeyPattern = new(
+        @"(?ix)
+        \b(
+            privatekey|private[_-]?key|presharedkey|preshared[_-]?key|token|
+            access[_-]?token|refresh[_-]?token|password|passwd|secret|
+            client[_-]?secret|cookie|authorization|api[_-]?key|x-api-key|
+            session|jwt|set-cookie|connection[_-]?string
+        )\b",
         RegexOptions.Compiled);
 
     private static readonly Regex BearerPattern = new(
@@ -36,6 +50,7 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
 
     private readonly AppPaths _paths;
     private readonly TimeSpan _summaryWriteInterval;
+    private readonly Func<bool> _isDebugDiagnosticsEnabled;
     private readonly object _gate = new();
     private DateTimeOffset _lastSummaryWriteUtc = DateTimeOffset.MinValue;
     private string? _pendingSummaryStatus;
@@ -44,10 +59,12 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
 
     public DiscorderDiagnostics(
         AppPaths paths,
-        TimeSpan? summaryWriteInterval = null)
+        TimeSpan? summaryWriteInterval = null,
+        Func<bool>? isDebugDiagnosticsEnabled = null)
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _summaryWriteInterval = summaryWriteInterval ?? DefaultSummaryWriteInterval;
+        _isDebugDiagnosticsEnabled = isDebugDiagnosticsEnabled ?? (() => false);
     }
 
     public void Info(
@@ -177,6 +194,10 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
             {
                 var warnings = CopyLogFilesToStaging(stagingDirectory);
                 WriteRuntimeSnapshotToStaging(stagingDirectory);
+                if (IsDebugDiagnosticsEnabled())
+                {
+                    WriteDebugSnapshotToStaging(stagingDirectory);
+                }
 
                 if (warnings.Count > 0)
                 {
@@ -285,6 +306,14 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
         File.WriteAllText(
             Path.Combine(stagingDirectory, "runtime.json"),
             JsonSerializer.Serialize(CaptureRuntimeMetrics().ToReport(), JsonOptions),
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
+    private static void WriteDebugSnapshotToStaging(string stagingDirectory)
+    {
+        File.WriteAllText(
+            Path.Combine(stagingDirectory, "debug.json"),
+            JsonSerializer.Serialize(CaptureDebugSnapshot(), JsonOptions),
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
 
@@ -433,6 +462,8 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
             $"- Veri klasörü: {Redact(_paths.DataDirectory)}"));
         builder.AppendLine(FormattableString.Invariant(
             $"- Log klasörü: {Redact(_paths.LogDirectory)}"));
+        builder.AppendLine(FormattableString.Invariant(
+            $"- Debug tanılama: {IsDebugDiagnosticsEnabled()}"));
         builder.AppendLine();
         builder.AppendLine("## Performans");
         builder.AppendLine(FormattableString.Invariant(
@@ -483,8 +514,16 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
             .OrderBy(pair => pair.Key, StringComparer.Ordinal)
             .ToDictionary(
                 pair => Redact(pair.Key) ?? string.Empty,
-                pair => Redact(pair.Value),
+                pair => IsSensitiveKey(pair.Key)
+                    ? "[REDACTED]"
+                    : Redact(pair.Value),
                 StringComparer.Ordinal);
+    }
+
+    private static bool IsSensitiveKey(string? key)
+    {
+        return !string.IsNullOrWhiteSpace(key)
+            && SensitiveKeyPattern.IsMatch(key);
     }
 
     private static string? Redact(string? value)
@@ -588,6 +627,269 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
                 or System.ComponentModel.Win32Exception)
         {
             return RuntimeMetrics.Empty;
+        }
+    }
+
+    private static Dictionary<string, object?> CaptureDebugSnapshot()
+    {
+        return new Dictionary<string, object?>
+        {
+            ["generatedAt"] = DateTimeOffset.Now,
+            ["debugMode"] = "enabled",
+            ["privacy"] = "No packet capture, command line, cookie, token, or endpoint list is collected.",
+            ["runtime"] = CaptureRuntimeMetrics().ToReport(),
+            ["cpuSample"] = CaptureCpuSample(),
+            ["network"] = CaptureNetworkSnapshot(),
+            ["processes"] = CaptureProcessSnapshot()
+        };
+    }
+
+    private static Dictionary<string, object?> CaptureCpuSample()
+    {
+        try
+        {
+            using var process = Process.GetCurrentProcess();
+            process.Refresh();
+            var before = process.TotalProcessorTime;
+            var stopwatch = Stopwatch.StartNew();
+            Thread.Sleep(TimeSpan.FromMilliseconds(200));
+            process.Refresh();
+            stopwatch.Stop();
+
+            var cpuTime = process.TotalProcessorTime - before;
+            var processorCount = Math.Max(1, Environment.ProcessorCount);
+            var percent = stopwatch.Elapsed.TotalMilliseconds <= 0
+                ? 0
+                : cpuTime.TotalMilliseconds
+                    / (stopwatch.Elapsed.TotalMilliseconds * processorCount)
+                    * 100d;
+
+            return new Dictionary<string, object?>
+            {
+                ["sampleMilliseconds"] = Math.Round(stopwatch.Elapsed.TotalMilliseconds, 0),
+                ["processCpuMilliseconds"] = Math.Round(cpuTime.TotalMilliseconds, 0),
+                ["estimatedProcessCpuPercent"] = Math.Round(Math.Max(0, percent), 1),
+                ["processorCount"] = processorCount
+            };
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException
+                or NotSupportedException
+                or System.ComponentModel.Win32Exception)
+        {
+            return new Dictionary<string, object?>
+            {
+                ["error"] = Redact(exception.Message)
+            };
+        }
+    }
+
+    private static Dictionary<string, object?> CaptureNetworkSnapshot()
+    {
+        var snapshot = new Dictionary<string, object?>
+        {
+            ["networkAvailable"] = NetworkInterface.GetIsNetworkAvailable()
+        };
+
+        try
+        {
+            snapshot["tcpConnectionStates"] = IPGlobalProperties
+                .GetIPGlobalProperties()
+                .GetActiveTcpConnections()
+                .GroupBy(connection => connection.State.ToString())
+                .OrderBy(group => group.Key, StringComparer.Ordinal)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Count(),
+                    StringComparer.Ordinal);
+        }
+        catch (NetworkInformationException exception)
+        {
+            snapshot["tcpConnectionStateError"] = Redact(exception.Message);
+        }
+
+        snapshot["interfaces"] = NetworkInterface
+            .GetAllNetworkInterfaces()
+            .OrderBy(adapter => adapter.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(CaptureNetworkInterface)
+            .ToArray();
+
+        return snapshot;
+    }
+
+    private static Dictionary<string, object?> CaptureNetworkInterface(
+        NetworkInterface adapter)
+    {
+        var details = new Dictionary<string, object?>
+        {
+            ["name"] = Redact(adapter.Name),
+            ["description"] = Redact(adapter.Description),
+            ["type"] = adapter.NetworkInterfaceType.ToString(),
+            ["status"] = adapter.OperationalStatus.ToString(),
+            ["speedMbps"] = adapter.Speed > 0
+                ? Math.Round(adapter.Speed / 1000d / 1000d, 1)
+                : 0,
+            ["supportsIpv4"] = adapter.Supports(NetworkInterfaceComponent.IPv4),
+            ["supportsIpv6"] = adapter.Supports(NetworkInterfaceComponent.IPv6)
+        };
+
+        try
+        {
+            var properties = adapter.GetIPProperties();
+            details["dnsServerCount"] = properties.DnsAddresses.Count;
+            details["dnsServers"] = properties.DnsAddresses
+                .Select(FormatIpAddressForDiagnostics)
+                .ToArray();
+            details["gatewayCount"] = properties.GatewayAddresses.Count;
+            details["ipv4UnicastCount"] = properties.UnicastAddresses.Count(address =>
+                address.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+            details["ipv6UnicastCount"] = properties.UnicastAddresses.Count(address =>
+                address.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6);
+        }
+        catch (NetworkInformationException exception)
+        {
+            details["ipPropertiesError"] = Redact(exception.Message);
+        }
+
+        try
+        {
+            var statistics = adapter.GetIPv4Statistics();
+            details["bytesReceived"] = ClampMetric(statistics.BytesReceived);
+            details["bytesSent"] = ClampMetric(statistics.BytesSent);
+        }
+        catch (NetworkInformationException exception)
+        {
+            details["ipv4StatisticsError"] = Redact(exception.Message);
+        }
+
+        return details;
+    }
+
+    private static Dictionary<string, object?>[] CaptureProcessSnapshot()
+    {
+        var names = new[]
+        {
+            "Discorder",
+            "wiresock-client",
+            "Discord",
+            "DiscordPTB",
+            "DiscordCanary",
+            "DiscordDevelopment",
+            "chrome",
+            "msedge",
+            "firefox",
+            "brave",
+            "opera",
+            "vivaldi"
+        };
+
+        return names
+            .SelectMany(name =>
+            {
+                try
+                {
+                    return Process.GetProcessesByName(name);
+                }
+                catch (Exception exception)
+                    when (exception is InvalidOperationException
+                        or System.ComponentModel.Win32Exception)
+                {
+                    return [];
+                }
+            })
+            .OrderBy(process => process.ProcessName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(process => process.Id)
+            .Select(CaptureProcessDetails)
+            .ToArray();
+    }
+
+    private static Dictionary<string, object?> CaptureProcessDetails(Process process)
+    {
+        using (process)
+        {
+            var details = new Dictionary<string, object?>
+            {
+                ["name"] = Redact(process.ProcessName),
+                ["processId"] = process.Id
+            };
+
+            TryAddProcessMetric(details, "workingSetBytes", () => ClampMetric(process.WorkingSet64));
+            TryAddProcessMetric(details, "privateMemoryBytes", () => ClampMetric(process.PrivateMemorySize64));
+            TryAddProcessMetric(details, "handleCount", () => process.HandleCount);
+            TryAddProcessMetric(details, "threadCount", () => process.Threads.Count);
+            TryAddProcessMetric(
+                details,
+                "startTime",
+                () => process.StartTime.ToString("O", CultureInfo.InvariantCulture));
+            TryAddProcessMetric(
+                details,
+                "executablePath",
+                () => Redact(process.MainModule?.FileName));
+
+            return details;
+        }
+    }
+
+    private static void TryAddProcessMetric(
+        Dictionary<string, object?> details,
+        string key,
+        Func<object?> getValue)
+    {
+        try
+        {
+            details[key] = getValue();
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException
+                or NotSupportedException
+                or System.ComponentModel.Win32Exception)
+        {
+            details[key + "Error"] = Redact(exception.Message);
+        }
+    }
+
+    private static string FormatIpAddressForDiagnostics(IPAddress address)
+    {
+        if (IPAddress.IsLoopback(address))
+        {
+            return "%LOOPBACK%";
+        }
+
+        var bytes = address.GetAddressBytes();
+        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+        {
+            if (bytes[0] == 10
+                || bytes[0] == 127
+                || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
+                || (bytes[0] == 192 && bytes[1] == 168)
+                || (bytes[0] == 169 && bytes[1] == 254))
+            {
+                return "%PRIVATE_IPV4%";
+            }
+        }
+
+        if (address.IsIPv6LinkLocal
+            || address.IsIPv6SiteLocal
+            || address.IsIPv6UniqueLocal)
+        {
+            return "%PRIVATE_IPV6%";
+        }
+
+        return address.ToString();
+    }
+
+    private bool IsDebugDiagnosticsEnabled()
+    {
+        try
+        {
+            return _isDebugDiagnosticsEnabled();
+        }
+        catch (Exception exception)
+            when (exception is IOException
+                or UnauthorizedAccessException
+                or JsonException)
+        {
+            return false;
         }
     }
 

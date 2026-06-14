@@ -1,71 +1,84 @@
 # Discorder Release ve Tag Denetimi
 
-> 2026-06-14 guncellemesi: aktif patch hedefi `v2.0.30` olarak belirlendi. Bu surum, `v2.0.29` uzerine Discord-only routing varsayilanini daraltir, Tarayici modunu opt-in yapar, WireSock owned-process cleanup ve tanilama redaction/summary alanlarini guclendirir. Eski release/tag silme islemi yapilmadi; cleanup icin yine ayrica `APPROVED - CLEAN RELEASES` gerekir.
+Son denetim: 2026-06-14
 
-Bu tablo, v2.0.20 public yüzeyi hazırlanırken çıkarılan non-destructive release temizliği planıdır. GitHub Release veya tag silme işlemi yapılmadı. Silme/cleanup için ayrıca `APPROVED - CLEAN RELEASES` onayı gerekir.
+Bu doküman, GitHub Releases yüzeyindeki sürüm karmaşasını güvenli şekilde sınıflandırır. Canlı release ve tag silme işlemi yapılmadı. Release/tag/asset silme veya `--cleanup-tag` kullanımı yıkıcı işlem sayılır; bunun için ayrıca tam olarak `APPROVED - CLEAN RELEASES` onayı gerekir.
 
 ## İnceleme Kaynakları
 
-- Yerel git tag listesi.
-- Remote tag listesi.
-- Yerel `artifacts/` klasöründeki ZIP, hash ve release note dosyaları.
-- Repo release workflow ve build script'leri.
-
-Aşağıdaki kararlar, erişilebilen tag ve artifact kanıtına göre hazırlanmış güvenli önerilerdir. Herhangi bir release veya tag silme kararı, canlı GitHub Release listesi release sahibi tarafından ayrıca doğrulandıktan sonra uygulanmalıdır.
-
-## Cleanup Tablosu
-
-| Release/tag | Öneri | Gerekçe | Risk | Komut/API aksiyonu |
-| --- | --- | --- | --- | --- |
-| `v2.0.30` | Olustur / latest yap | Discord-only varsayilan kapsam daraltilir; Tarayici modu opt-in olur; WireSock owned-process cleanup, routing summary ve kalici log redaction eklenir. | Authenticode yoksa kullanici Windows SmartScreen uyarisi gorebilir. | GitHub Release workflow veya `gh release create v2.0.30 ... --latest`. |
-| `v2.0.29` | Koru | Discord normal agda toparlandiktan sonra tunel altinda ikinci kez kapatilip updater ekranina dusme dongusu engellenir. | Latest olarak kalirsa v2.0.30'daki Discord-only varsayilan ve tanilama iyilestirmeleri kullaniciya ulasmaz. | v2.0.30 yayinlaninca latest guncellenir. |
-| `v2.0.28` | Koru | Discord'un kendi updater ekraninda kalma durumu ayri taninir; Discorder WireSock'u gecici durdurup Discord update kontrolunu normal agda tamamlatir. | Latest olarak kalırsa ikinci restart hotfix'i kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
-| `v2.0.27` | Koru | Uygulama kaldırma, Discorder'ın kendi kilidini, ayarlarını, loglarını ve veri klasörlerini temizledikten sonra tanılama yazımını durdurur; LocalAppData/ProgramData Discorder klasörleri `app.exit` loguyla geri oluşmaz; salt okunur dosyalar temizlenir; Discord açılışı updater penceresinde takılmasın diye imzalı gerçek `Discord.exe` üzerinden yapılır. | Latest olarak kalırsa updater recovery kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
-| `v2.0.26` | Koru | Discord kapalıyken uygulamayı Squirrel `Update.exe --processStart` yolu ile açmayı dener; restart sonrası görünür Discord ana penceresi doğrulanmazsa kullanıcıya "bağlantı hazır" denmez; diagnostic artık görünmeyen pencereyi açıkça raporlar. | Latest olarak kalırsa sonraki hotfix'ler kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
-| `v2.0.25` | Koru | v2.0.24 son kullanici diagnostic bundle'inda gorulen negatif `managedMemoryBytes` degerini engeller; runtime metrikleri sifir altina dusmez; test runtime.json ve health.json metriklerini kilitler. | Latest olarak kalırsa sonraki hotfix'ler kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
-| `v2.0.24` | Koru | Discord acikken tunel sonrasi otomatik yenileme dener; PID ve executable yolu yeniden dogrulanmadan process kapatmaz; AllowedApps hem bilinen process adlarini hem tam executable yollarini kapsar; live smoke ProgramData profil yolunu dogrular. | Latest olarak kalırsa sonraki hotfix'ler kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
-| `v2.0.23` | Koru | Gercek Discord `app-*\\Discord.exe` yollari profile eklenir, baglanti sonrasi dogrulama durumu ve tanilama kanitlari iyilestirilir. | Latest olarak kalırsa sonraki hotfix'ler kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
-| `v2.0.22` | Koru | Arka plan videosu gorunur pencerede calisir, Tarayici modu yeni kurulumda acik gelir, update/progress/ikon polish tamamlanir. | Latest olarak kalırsa sonraki hotfix'ler kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
-| `v2.0.21` | Koru | Bellek/tanılama hardening, runtime metrikleri ve düşük bellek video lifecycle bu sürümde yayınlandı. | Latest olarak kalırsa sonraki hotfix'ler kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
-| `v2.0.20` | Koru | Update indirme progress logları seyreltilir, tanılama dosyası şişmesi azaltılır, logo mikro animasyonu ve footer buton polish tamamlanır. | Latest olarak kalırsa sonraki hotfix'ler kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
-| `v2.0.19` | Koru | Ana ekran premium görsel polish, daha güçlü header/logo, bağlantı dairesi, kart derinliği ve canlı durum mikro-kartları içerir. | Latest olarak kalırsa sonraki hotfix'ler kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
-| `v2.0.18` | Koru | WireSock sonrası Cloudflare WARP aracı ve profil hazırlığı artık canlı durum, retry, max size ve sade hata mesajları içerir. | Latest olarak kalırsa sonraki hotfix'ler kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
-| `v2.0.17` | Koru | WireSock ilk kurulum indirmesi bağlantı kurma, retry, boyut ilerlemesi, max size ve protected staging davranışı içerir. | Latest olarak kalırsa sonraki hotfix'ler kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
-| `v2.0.16` | Koru | Görünür güncelleme penceresi, helper staging düzeltmesi ve target reparse guard bu sürümde yayınlandı. | Latest olarak kalırsa sonraki hotfix'ler kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
-| `v2.0.15` | Koru | Tanılama loglarından çıkan Tarayıcı modu kapalı kapsamı, kötü internet/DNS retry davranışı ve kapanış hızı düzeltmeleri bu sürümde yayınlandı. | Latest olarak kalırsa sonraki runtime düzeltmeleri kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
-| `v2.0.14` | Koru | Sertifikasız ama GitHub digest, SHA-256 ve manifest doğrulamalı otomatik update modu bu sürümde yayınlandı. | Latest olarak kalırsa sonraki runtime düzeltmeleri kullanıcıya ulaşmaz. | Latest v2.0.29 olmalı. |
-| `v2.0.13` | Koru / release oluşturma | Tag pushlandı fakat workflow test çalıştırma yolu yüzünden paket üretiminde durdu; tag taşımak force/destructive olacağı için korunur. | Eski tag release'siz kalır; Latest v2.0.29 ile düzeltilir. | Silme veya retag yok. |
-| `v2.0.12` | Koru / release oluşturma | Tag daha önce pushlandı fakat release oluşmadı. Tag silmek destructive olduğundan korunur. | Eski tag release'siz kalır; Latest v2.0.29 ile düzeltilir. | Silme yok. |
-| `v2.0.11` | Koru | Remote ve local tag mevcut; önceki stabil yayın hattı. | Latest olarak kalırsa README v2.0.29 hazırlığıyla çelişebilir. | v2.0.29 yayınlanınca latest otomatik/manuel güncellenir. |
-| `v2.0.10` | Koru / release notunu eski olarak bırak | v2.0.11 öncesi anlamlı geçiş sürümü olabilir. | Canlı release body görülmeden silmek yanlış olabilir. | Silme yok. |
-| `v2.0.9` | Koru, local artifact tekrarlarını temizleme adayı | `artifacts/` altında `complete`, `fix`, `complete2`, `complete3` gibi local tekrarlar var. | Public release silinirse indirme geçmişi ve güven kaybı oluşabilir. | Release silme yok; local artifact cleanup ayrı onay gerektirir. |
-| `v2.0.8` | Koru / arşiv olarak bırak | 2.0.9 öncesi tag mevcut. | Canlı release durumu bilinmiyor. | Silme yok. |
-| `v2.0.7` | Koru / arşiv olarak bırak | Tag ve release-check kalıntısı var. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
-| `v2.0.6` | Koru / arşiv olarak bırak | Tag ve artifact mevcut. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
-| `v2.0.5` | Koru / arşiv olarak bırak | Tag ve artifact mevcut. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
-| `v2.0.4` | Tag yok, local artifact var | Local artifact karmaşası; public tag görünmüyor. | Silme local dosya temizliği sayılır ve ayrıca onay ister. | Şimdilik işlem yok. |
-| `v2.0.3` | Koru / arşiv olarak bırak | Tag ve artifact mevcut. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
-| `v2.0.2` | Koru / arşiv olarak bırak | Tag ve artifact mevcut. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
-| `v2.0.1` | Koru / arşiv olarak bırak | Tag, artifact ve release note mevcut. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
-| `v2.0.0` | Koru | 2.x hattının başlangıç noktası. | Silmek geçmişi gereksiz kırar. | Silme yok. |
+- `gh release list --repo ucsahinn/discorder --limit 100`
+- `gh release view <tag> --repo ucsahinn/discorder --json tagName,name,isDraft,isPrerelease,isImmutable,publishedAt,url,assets,targetCommitish`
+- `git tag --list`
+- `git ls-remote --tags origin`
+- Yerel release notları ve build script'leri
+- GitHub CLI ve GitHub Releases dokümantasyonu
+- Semantic Versioning 2.0.0 kuralları
 
 ## Sürüm Kararı
 
-Bu public yüzey için anlamlı SemVer sürümü `v2.0.30` olarak belirlendi.
+Yeni public hedef `v2.1.0` olarak belirlendi.
 
-Neden patch?
+Neden `v2.1.0`?
 
-- Ürün adı, portable model ve çalışma kapsamı değişmedi.
-- Kullanıcıya görünen UI dili, güncelleme akışı, bağlantı kapsamı, kötü internet davranışı ve güvenlik doğrulama ayrıntıları iyileştirildi.
-- Breaking change veya yeni major/minor ürün hattı yok.
+- `v2.0.30` zaten tag'lenmiş ve yayınlanmış durumda.
+- Yeni değişiklik yalnızca dar bir hotfix değil; opt-in debug tanılama, ağ/performance gözlem katmanı, daha güvenli routing profile hash'i, tanılama UI ayarı ve release doğrulama kapısı ekliyor.
+- Davranış geriye uyumlu: Discord-only ürün amacı korunuyor, tarayıcı modu yine kullanıcı tercihine bağlı.
+- SemVer'e göre geriye uyumlu işlev eklemeleri minor sürüme uygundur; patch zincirini `v2.0.31` diye uzatmak yerine `v2.1.0` daha anlaşılırdır.
+
+## Yayınlanmış Release Envanteri
+
+| Release | Canlı durum | Asset durumu | Karar | Gerekçe | Risk | Komut/API aksiyonu |
+| --- | --- | --- | --- | --- | --- | --- |
+| `v2.1.0` | Yeni latest hedefi | 4 asset beklenir | Oluştur / latest yap | Enterprise debug tanılama ve stabilizasyon minor sürümü. | İmzasız build SmartScreen/AV uyarısı gösterebilir. | `gh release create v2.1.0 ... --latest` veya release workflow. |
+| `v2.0.30` | Yayınlandı, eski latest | 4 asset | Koru / arşiv | Discord-only varsayılan kapsam, Tarayıcı modu opt-in, WireSock cleanup ve redaction hattı. | Latest olarak kalırsa `v2.1.0` kullanıcıya ulaşmaz. | `v2.1.0` latest yapılır; silme yok. |
+| `v2.0.29` | Yayınlandı | 4 asset | Koru / arşiv | Discord updater döngüsü hotfix'i. | Eski kullanıcılar bu hotfix'e link vermiş olabilir. | Silme yok. |
+| `v2.0.28` | Yayınlandı | 4 asset | Koru / arşiv | Discord güncelleme ekranı recovery düzeltmesi. | Link kırılması güven kaybı yaratır. | Silme yok. |
+| `v2.0.27` | Yayınlandı | 2 asset | Koru / arşiv | Kaldırma temizliği ve Discord açılış yolu düzeltmeleri. | Eski indirme linkleri kırılabilir. | Silme yok. |
+| `v2.0.26` | Yayınlandı | 2 asset | Koru / arşiv | Discord açılış doğrulaması. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.25` | Yayınlandı | 2 asset | Koru / arşiv | Tanılama metrikleri hotfix'i. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.24` | Yayınlandı | 2 asset | Koru / arşiv | Discord yenileme ve tünel uyumluluğu hotfix'i. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.23` | Yayınlandı | 2 asset | Koru / arşiv | Discord bağlantı doğrulama hotfix'i. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.22` | Yayınlandı | 2 asset | Koru / arşiv | Premium UI ve tarayıcı modu hotfix'i. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.21` | Yayınlandı | 2 asset | Koru / arşiv | Bellek, tanılama ve UI hotfix'i. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.20` | Yayınlandı | 2 asset | Koru / arşiv | Update log ve motion polish geçişi. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.19` | Yayınlandı | 2 asset | Koru / arşiv | Premium arayüz polish. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.18` | Yayınlandı | 2 asset | Koru / arşiv | Portable Windows Discord bağlantı yöneticisi hattı. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.17` | Yayınlandı | 2 asset | Koru / arşiv | WireSock ilk kurulum ve protected staging iyileştirmeleri. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.16` | Yayınlandı | 2 asset | Koru / arşiv | Görünür güncelleme penceresi ve helper staging düzeltmesi. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.15` | Yayınlandı | 2 asset | Koru / arşiv | Tarayıcı modu kapsamı, DNS retry ve kapanış hızı düzeltmeleri. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.14` | Yayınlandı | 2 asset | Koru / arşiv | Sertifikasız ama hash/manifest doğrulamalı update hattı. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.13` | Tag var, canlı release yok | Release asset yok | Tag-only / silme adayı | Workflow paket üretiminde durduğu için release oluşmamış. | Tag silmek geçmişi değiştirir. | Ayrı onay olursa `gh release delete v2.0.13 --cleanup-tag` değil; önce tag-only kararını ayrıca doğrula. |
+| `v2.0.12` | Tag var, canlı release yok | Release asset yok | Tag-only / silme adayı | Yayın oluşmamış ara tag. | Tag silmek geçmişi değiştirir. | Ayrı onay olursa remote tag cleanup ayrıca planlanır. |
+| `v2.0.11` | Yayınlandı | 2 asset | Koru / arşiv | Erken stabil yayın hattı. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.10` | Yayınlandı | 2 asset | Koru / arşiv | v2.0.11 öncesi geçiş yayını. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.9` | Yayınlandı | 2 asset | Koru / arşiv | İlk büyük paket büyümesi ve release hattı. | Yerelde çok sayıda tekrar artifact var; yanlış upload riski. | Public release silme yok; yerel artifact cleanup ayrı onay ister. |
+| `v2.0.8` | Yayınlandı | 2 asset | Koru / arşiv | Erken geçiş yayını. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.7` | Yayınlandı | 2 asset | Koru / arşiv | Erken release doğrulama hattı. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.6` | Yayınlandı | 2 asset | Koru / arşiv | Erken public release. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.5` | Yayınlandı | 2 asset | Koru / arşiv | Erken public release. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.4` | Canlı release yok, remote tag yok | Yerel artifact var | Yerel cleanup adayı | Public yüzeyde sürüm yok, yalnızca yerel kalıntı görünüyor. | Yerel artifact silmek de cleanup sayılır. | Ayrı cleanup onayı olmadan işlem yok. |
+| `v2.0.3` | Yayınlandı | 2 asset | Koru / arşiv | Erken public release. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.2` | Yayınlandı | 2 asset | Koru / arşiv | Erken public release. | Eski kullanıcı linkleri kırılabilir. | Silme yok. |
+| `v2.0.1` | Tag var, canlı release yok | Yerel not/artifact var | Tag-only / silme adayı değil | İlk patch tag'i; canlı release listesinde yok. | Tag silmek geçmişi değiştirir. | Silme yok. |
+| `v2.0.0` | Yayınlandı | 2 asset | Koru | 2.x hattının başlangıç noktası. | Silmek geçmişi gereksiz kırar. | Silme yok. |
+
+## Cleanup Kararı
+
+Önerilen güvenli politika:
+
+- Public release'leri silme: eski indirme linklerini kırar ve güven geçmişini zedeler.
+- Latest işaretini sadece `v2.1.0` üzerinde tut.
+- Tag-only kalan `v2.0.12` ve `v2.0.13` için silme yalnızca ayrıca onaylanırsa yapılmalı.
+- Yerel `artifacts/` altındaki eski ZIP/log/smoke dosyaları public release'e yüklenmemeli; silme/temizleme için ayrı cleanup onayı gerekir.
+- Eski release asset'leri `--clobber` ile değiştirilmemeli. Değişiklik yeni sürümle yayınlanmalı.
 
 ## Yayın Kapısı
 
-v2.0.30 GitHub Release yayınlanmadan önce şu koşullar gerekir:
+`v2.1.0` yayınlanmadan önce şu koşullar gerekir:
 
-- GitHub yayın yetkisi geçerli olmalı.
-- `v2.0.30` tag'i doğru commit'e işaret etmeli.
-- Release workflow veya local build `Discorder-2.0.30-win-x64.zip` ve manuel kullanım için `Discorder-win-x64.zip` üretmeli.
-- `.sha256.txt` dosyası ZIP ile eşleşmeli.
-- Secret scan temiz olmalı.
-- Release body `docs/releases/v2.0.30.md` ile uyumlu olmalı.
+- Proje ve updater sürümü `2.1.0` ile aynı olmalı.
+- `v2.1.0` tag'i commit sonrası oluşturulmalı ve remote'a pushlanmalı.
+- Release build `Discorder-2.1.0-win-x64.zip` ve `Discorder-win-x64.zip` üretmeli.
+- `.sha256.txt` dosyaları ZIP ile eşleşmeli.
+- `scripts\verify.ps1`, `git diff --check`, Gitleaks ve release packaging geçmeli.
+- Release body `docs/releases/v2.1.0.md` ile uyumlu olmalı.
