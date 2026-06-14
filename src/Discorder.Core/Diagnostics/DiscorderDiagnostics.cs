@@ -487,6 +487,12 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
         var result = value.ReplaceLineEndings(" ");
         var replacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
+            [Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)] =
+                "%PROGRAMDATA%",
+            [Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)] =
+                "%PROGRAMFILES%",
+            [Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)] =
+                "%PROGRAMFILES_X86%",
             [Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)] =
                 "%LOCALAPPDATA%",
             [Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)] =

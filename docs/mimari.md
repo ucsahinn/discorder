@@ -101,6 +101,7 @@ Canlı doğrulama için `scripts/verify-firewall-lock.ps1` yönetici PowerShell 
 Desteklenen tarayıcı süreçleri:
 
 - Chrome: `chrome.exe`
+- Chromium: `chromium.exe`
 - Edge: `msedge.exe`
 - Firefox: `firefox.exe`
 - Brave: `brave.exe`
@@ -111,7 +112,7 @@ Tarayıcı modu yeni kurulumda varsayılan açık gelir. Açıkken Discord uygul
 
 ## Yayın Modeli
 
-`scripts/build-release.ps1` doğrulama scriptini çalıştırır, Windows x64 bağımsız yayın çıktısı üretir ve proje sürümünden `artifacts/Discorder-<sürüm>-win-x64.zip` arşivini oluşturur.
+`scripts/build-release.ps1` doğrulama scriptini çalıştırır, Windows x64 bağımsız yayın çıktısı üretir ve proje sürümünden `artifacts/Discorder-<sürüm>-win-x64.zip` arşivini oluşturur. Manuel kullanım için aynı paketin sabit adlı `artifacts/Discorder-win-x64.zip` kopyası da üretilir; sürüm bilgisi dosya adı yerine manifest, uygulama versiyonu ve release notlarında tutulur.
 
 ## Portable Güncelleme Modeli
 

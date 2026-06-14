@@ -13,7 +13,7 @@ Discorder resmi Discord ürünü değildir ve Discord hesabınızı yönetmez.
 
 ## İlk Çalıştırma
 
-1. [GitHub Releases](https://github.com/ucsahinn/discorder/releases) sayfasından en güncel `Discorder-*-win-x64.zip` dosyasını indirin.
+1. [GitHub Releases](https://github.com/ucsahinn/discorder/releases) sayfasından en güncel `Discorder-win-x64.zip` dosyasını indirin.
 2. ZIP içeriğini örneğin `C:\Tools\Discorder` gibi kalıcı bir klasöre çıkarın.
 3. `Discorder.exe` dosyasını çalıştırın.
 4. İlk kurulum ekranında WireSock VPN Client ve Cloudflare WARP koşullarını okuyun.

@@ -23,6 +23,8 @@ if ([string]::IsNullOrWhiteSpace($CodeSigningCertificatePassword) -and
 
 $archive = Join-Path $root "artifacts\Discorder-$version-$Runtime.zip"
 $shaPath = Join-Path $root "artifacts\Discorder-$version-$Runtime.sha256.txt"
+$stableArchive = Join-Path $root "artifacts\Discorder-$Runtime.zip"
+$stableShaPath = Join-Path $root "artifacts\Discorder-$Runtime.sha256.txt"
 $signingStatusPath = Join-Path $root 'artifacts\signing-status.txt'
 $updateManifestPath = Join-Path $output 'discorder.update-manifest.json'
 $buildArtifactsPath = Join-Path ([IO.Path]::GetTempPath()) (
@@ -103,12 +105,20 @@ try {
     if (Test-Path -LiteralPath $archive) {
         Remove-Item -LiteralPath $archive -Force
     }
+    if (Test-Path -LiteralPath $stableArchive) {
+        Remove-Item -LiteralPath $stableArchive -Force
+    }
 
     Compress-Archive -Path (Join-Path $output '*') -DestinationPath $archive
     $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $archive
     Set-Content `
         -LiteralPath $shaPath `
         -Value "$($hash.Hash)  $(Split-Path -Leaf $archive)" `
+        -Encoding ASCII
+    Copy-Item -LiteralPath $archive -Destination $stableArchive -Force
+    Set-Content `
+        -LiteralPath $stableShaPath `
+        -Value "$($hash.Hash)  $(Split-Path -Leaf $stableArchive)" `
         -Encoding ASCII
     $hash
 }

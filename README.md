@@ -69,7 +69,7 @@ Daha teknik sınırlar için [güvenlik dokümanına](docs/guvenlik.md) ve [SECU
 
 ## ⚡ Hızlı Başlangıç
 
-1. [GitHub Releases](https://github.com/ucsahinn/discorder/releases) sayfasından en güncel `Discorder-*-win-x64.zip` arşivini indirin.
+1. [GitHub Releases](https://github.com/ucsahinn/discorder/releases) sayfasından en güncel `Discorder-win-x64.zip` arşivini indirin.
 2. ZIP içeriğini istediğiniz klasöre çıkarın.
 3. `Discorder.exe` dosyasını çalıştırın.
 4. İlk kullanım ekranında WireSock ve WARP koşullarını okuyup onaylayın.
@@ -98,7 +98,7 @@ Yükleme, denetlenen sürümle eşleşen paketi kullanır. Paket önce staging a
 | Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
 | Mimari | [docs/mimari.md](docs/mimari.md) |
 | Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
-| v2.0.27 release notu | [docs/releases/v2.0.27.md](docs/releases/v2.0.27.md) |
+| v2.0.28 release notu | [docs/releases/v2.0.28.md](docs/releases/v2.0.28.md) |
 
 ## 🧪 Geliştirme
 

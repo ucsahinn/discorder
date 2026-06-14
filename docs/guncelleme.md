@@ -4,6 +4,8 @@ Discorder portable ZIP olarak çalışır. Bu yüzden güncelleme akışı, klas
 
 GitHub Releases üzerinden indirilen ZIP paketi manuel kullanım içindir. Uygulama içi otomatik güncelleme, aynı paketi GitHub release yolu, asset digest, SHA-256 dosyası ve manifest eşleşmesiyle doğrular.
 
+Manuel indirme için sabit dosya adı `Discorder-win-x64.zip` kullanılır. Otomatik güncelleme ise denetlenen sürümü kilitlemek için `Discorder-<version>-win-x64.zip` asset'ini ve aynı sürüme ait SHA-256 dosyasını doğrular.
+
 ## Kullanıcının Gördüğü Akış
 
 1. Kullanıcı **Güncelle** düğmesine basar.
@@ -50,6 +52,8 @@ C:\Tools\Discorder\Discorder.exe
 ```
 
 Bu durumda güncelleme `C:\Tools\Discorder` klasörünü hedef alır.
+
+Yeni elle kurulumlarda klasör adını sabit `Discorder` tutmak önerilir. `Discorder-2.0.28-win-x64` veya `2.0.28` gibi eski sürüm adlı klasörlerden çalıştırma desteklenir, ancak Discorder bu durumu tanılama paketine yazar ve kullanıcı onayı olmadan klasör taşımaz.
 
 ## Güvenli Değiştirme ve Geri Dönüş
 

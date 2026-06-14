@@ -23,6 +23,11 @@ public sealed class DiscordAppScope
                 @"Google\Chrome\Application\chrome.exe"
             ]),
         new(
+            "chromium.exe",
+            [
+                @"Chromium\Application\chromium.exe"
+            ]),
+        new(
             "firefox.exe",
             [
                 @"Mozilla Firefox\firefox.exe"

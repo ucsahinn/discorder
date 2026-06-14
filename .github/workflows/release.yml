@@ -111,6 +111,17 @@ jobs:
             -LiteralPath $shaPath `
             -Value "$hash  $($archive.Name)" `
             -Encoding ASCII
+          $stableArchivePath = Join-Path 'artifacts' 'Discorder-win-x64.zip'
+          $stableShaPath = Join-Path 'artifacts' 'Discorder-win-x64.sha256.txt'
+          Copy-Item -LiteralPath $archive.FullName -Destination $stableArchivePath -Force
+          $stableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $stableArchivePath).Hash
+          if ($stableHash -ne $hash) {
+            throw "Sabit isimli ZIP kopyasi versioned ZIP ile eslesmiyor."
+          }
+          Set-Content `
+            -LiteralPath $stableShaPath `
+            -Value "$hash  Discorder-win-x64.zip" `
+            -Encoding ASCII
 
           $signingStatusPath = Join-Path 'artifacts' 'signing-status.txt'
           $signingStatus = 'unsigned'
@@ -147,6 +158,8 @@ jobs:
 
           - $($archive.Name)
           - $(Split-Path -Leaf $shaPath)
+          - $(Split-Path -Leaf $stableArchivePath)
+          - $(Split-Path -Leaf $stableShaPath)
           - SHA-256: $hash
           - $signingText
           "@
@@ -156,6 +169,8 @@ jobs:
 
           "archive=$($archive.FullName)" >> $env:GITHUB_OUTPUT
           "sha=$shaPath" >> $env:GITHUB_OUTPUT
+          "stable_archive=$stableArchivePath" >> $env:GITHUB_OUTPUT
+          "stable_sha=$stableShaPath" >> $env:GITHUB_OUTPUT
           "notes=$notesPath" >> $env:GITHUB_OUTPUT
           "signed=$signingStatus" >> $env:GITHUB_OUTPUT
 
@@ -167,6 +182,8 @@ jobs:
           RELEASE_REPOSITORY: ${{ github.repository }}
           RELEASE_ARCHIVE: ${{ steps.package.outputs.archive }}
           RELEASE_SHA: ${{ steps.package.outputs.sha }}
+          RELEASE_STABLE_ARCHIVE: ${{ steps.package.outputs.stable_archive }}
+          RELEASE_STABLE_SHA: ${{ steps.package.outputs.stable_sha }}
           RELEASE_NOTES: ${{ steps.package.outputs.notes }}
         run: |
           $tag = $env:RELEASE_TAG
@@ -194,25 +211,138 @@ jobs:
             return $matches[0]
           }
 
+          function Assert-ReleaseTargetIfPinned($release) {
+            $targetCommitish = [string] $release.targetCommitish
+            if ($targetCommitish -match '^[a-fA-F0-9]{40}$') {
+              $headCommit = (git rev-parse HEAD).Trim()
+              if ($targetCommitish.ToLowerInvariant() -ne $headCommit.ToLowerInvariant()) {
+                throw "Release $tag farkli commit'e bagli. release=$targetCommitish head=$headCommit"
+              }
+            }
+          }
+
+          function Invoke-Gh {
+            & gh @args
+            if ($LASTEXITCODE -ne 0) {
+              throw "gh komutu basarisiz oldu."
+            }
+          }
+
+          function Get-ReleaseMetadata {
+            $json = & gh release view $tag --repo $repo --json assets,isDraft,isPrerelease,targetCommitish
+            if ($LASTEXITCODE -ne 0) {
+              throw "Release $tag okunamadi."
+            }
+
+            return $json | ConvertFrom-Json
+          }
+
+          function Assert-UploadedAsset($asset, [string] $name) {
+            if ($null -eq $asset) {
+              throw "Release $tag eksik asset iceriyor: $name"
+            }
+
+            if ([string]::IsNullOrWhiteSpace($asset.state) -or
+                $asset.state -ne 'uploaded') {
+              throw "Release $tag asset uploaded durumda degil: $name state=$($asset.state)"
+            }
+
+            if ([string]::IsNullOrWhiteSpace($asset.digest)) {
+              throw "Release $tag asset digest bilgisi icermiyor: $name"
+            }
+          }
+
+          function Assert-ReleaseAssetPair(
+            $release,
+            [string] $archiveAssetName,
+            [string] $shaAssetName,
+            [string] $assetCheckDir)
+          {
+            $archiveAsset = Get-AssetByName $release.assets $archiveAssetName
+            $shaAsset = Get-AssetByName $release.assets $shaAssetName
+            Assert-UploadedAsset $archiveAsset $archiveAssetName
+            Assert-UploadedAsset $shaAsset $shaAssetName
+
+            Invoke-Gh release download $tag `
+              --repo $repo `
+              --pattern $shaAssetName `
+              --dir $assetCheckDir `
+              --clobber
+
+            $downloadedShaPath = Join-Path $assetCheckDir $shaAssetName
+            $shaAssetHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $downloadedShaPath).Hash.ToLowerInvariant()
+            if ($shaAsset.digest.ToLowerInvariant() -ne "sha256:$shaAssetHash") {
+              throw "Release $tag SHA asset digest'i indirilen dosyayla eslesmiyor: $shaAssetName"
+            }
+
+            $declaredArchiveHash = ((Get-Content -Raw -LiteralPath $downloadedShaPath) -split '\s+')[0].ToLowerInvariant()
+            if ($declaredArchiveHash -notmatch '^[a-f0-9]{64}$') {
+              throw "Release $tag SHA dosyasi gecerli SHA-256 icermiyor: $shaAssetName"
+            }
+
+            if ($archiveAsset.digest.ToLowerInvariant() -ne "sha256:$declaredArchiveHash") {
+              throw "Release $tag ZIP asset digest'i SHA dosyasiyla eslesmiyor: $archiveAssetName"
+            }
+
+            return $declaredArchiveHash
+          }
+
+          function Assert-ReleaseAssetsReady(
+            [string] $archiveName,
+            [string] $shaName,
+            [string] $stableArchiveName,
+            [string] $stableShaName,
+            [string] $localArchivePath,
+            [string] $localStableArchivePath)
+          {
+            $release = Get-ReleaseMetadata
+            Assert-ReleaseTargetIfPinned $release
+
+            if ($release.isDraft -or $release.isPrerelease) {
+              throw "Release $tag draft veya prerelease durumda; latest yapilmiyor."
+            }
+
+            $assetCheckDir = Join-Path $env:RUNNER_TEMP "discorder-release-asset-check-$tag"
+            if (Test-Path -LiteralPath $assetCheckDir) {
+              Remove-Item -LiteralPath $assetCheckDir -Recurse -Force
+            }
+            New-Item -ItemType Directory -Path $assetCheckDir | Out-Null
+
+            $versionedHash = Assert-ReleaseAssetPair $release $archiveName $shaName $assetCheckDir
+            $stableHash = Assert-ReleaseAssetPair $release $stableArchiveName $stableShaName $assetCheckDir
+            $localHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $localArchivePath).Hash.ToLowerInvariant()
+            $localStableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $localStableArchivePath).Hash.ToLowerInvariant()
+
+            if ($versionedHash -ne $stableHash) {
+              throw "Versioned ve sabit isimli release ZIP hash'leri eslesmiyor."
+            }
+
+            if ($versionedHash -ne $localHash -or $stableHash -ne $localStableHash) {
+              throw "Release ZIP hash'i bu workflow'da uretilen paketle eslesmiyor."
+            }
+          }
+
+          $archiveName = [IO.Path]::GetFileName($env:RELEASE_ARCHIVE)
+          $shaName = [IO.Path]::GetFileName($env:RELEASE_SHA)
+          $stableArchiveName = [IO.Path]::GetFileName($env:RELEASE_STABLE_ARCHIVE)
+          $stableShaName = [IO.Path]::GetFileName($env:RELEASE_STABLE_SHA)
+
           gh release view $tag --repo $repo *> $null
           if ($LASTEXITCODE -eq 0) {
             $release = gh release view $tag --repo $repo --json assets,isDraft,isPrerelease,targetCommitish |
               ConvertFrom-Json
-            $archiveName = [IO.Path]::GetFileName($env:RELEASE_ARCHIVE)
-            $shaName = [IO.Path]::GetFileName($env:RELEASE_SHA)
             $archiveAsset = Get-AssetByName $release.assets $archiveName
             $shaAsset = Get-AssetByName $release.assets $shaName
+            $stableArchiveAsset = Get-AssetByName $release.assets $stableArchiveName
+            $stableShaAsset = Get-AssetByName $release.assets $stableShaName
 
             if ($release.isDraft -or $release.isPrerelease) {
               throw "Release $tag draft veya prerelease durumda; otomatik latest yayına çevrilmiyor."
             }
 
-            $headCommit = (git rev-parse HEAD).Trim()
-            if ($release.targetCommitish -ne $headCommit) {
-              throw "Release $tag farklı commit'e bağlı. release=$($release.targetCommitish) head=$headCommit"
-            }
+            Assert-ReleaseTargetIfPinned $release
 
-            if ($archiveAsset -or $shaAsset) {
+            if ($archiveAsset -or $shaAsset -or $stableArchiveAsset -or $stableShaAsset) {
               if (-not ($archiveAsset -and $shaAsset)) {
                 throw "Release $tag eksik asset içeriyor. Güvenli yayın için manuel kontrol gerekiyor."
               }
@@ -248,7 +378,56 @@ jobs:
                 throw "Release $tag ZIP asset digest'i SHA dosyasıyla eşleşmiyor."
               }
 
-              gh release edit $tag `
+              if ($stableArchiveAsset -or $stableShaAsset) {
+                if (-not ($stableArchiveAsset -and $stableShaAsset)) {
+                  throw "Release $tag eksik sabit isimli asset ciftini iceriyor. Guvenli yayin icin manuel kontrol gerekiyor."
+                }
+
+                if ([string]::IsNullOrWhiteSpace($stableArchiveAsset.digest) -or
+                    [string]::IsNullOrWhiteSpace($stableShaAsset.digest)) {
+                  throw "Release $tag sabit isimli asset digest bilgisi icermiyor."
+                }
+
+                gh release download $tag `
+                  --repo $repo `
+                  --pattern $stableShaName `
+                  --dir $assetCheckDir `
+                  --clobber
+
+                $downloadedStableShaPath = Join-Path $assetCheckDir $stableShaName
+                $stableShaAssetHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $downloadedStableShaPath).Hash.ToLowerInvariant()
+                if ($stableShaAsset.digest.ToLowerInvariant() -ne "sha256:$stableShaAssetHash") {
+                  throw "Release $tag sabit SHA asset digest'i indirilen dosyayla eslesmiyor."
+                }
+
+                $declaredStableArchiveHash = ((Get-Content -Raw -LiteralPath $downloadedStableShaPath) -split '\s+')[0].ToLowerInvariant()
+                if ($declaredStableArchiveHash -notmatch '^[a-f0-9]{64}$') {
+                  throw "Release $tag sabit SHA dosyasi gecerli SHA-256 icermiyor."
+                }
+
+                if ($stableArchiveAsset.digest.ToLowerInvariant() -ne "sha256:$declaredStableArchiveHash") {
+                  throw "Release $tag sabit ZIP asset digest'i SHA dosyasiyla eslesmiyor."
+                }
+              }
+              else {
+                gh release upload $tag `
+                  $env:RELEASE_STABLE_ARCHIVE `
+                  $env:RELEASE_STABLE_SHA `
+                  --repo $repo
+                if ($LASTEXITCODE -ne 0) {
+                  throw "Release $tag sabit isimli asset yukleme islemi basarisiz oldu."
+                }
+              }
+
+              Assert-ReleaseAssetsReady `
+                $archiveName `
+                $shaName `
+                $stableArchiveName `
+                $stableShaName `
+                $env:RELEASE_ARCHIVE `
+                $env:RELEASE_STABLE_ARCHIVE
+
+              Invoke-Gh release edit $tag `
                 --repo $repo `
                 --title $releaseTitle `
                 --notes-file $env:RELEASE_NOTES `
@@ -260,8 +439,20 @@ jobs:
             gh release upload $tag `
               $env:RELEASE_ARCHIVE `
               $env:RELEASE_SHA `
+              $env:RELEASE_STABLE_ARCHIVE `
+              $env:RELEASE_STABLE_SHA `
               --repo $repo
-            gh release edit $tag `
+            if ($LASTEXITCODE -ne 0) {
+              throw "Release $tag asset yukleme islemi basarisiz oldu."
+            }
+            Assert-ReleaseAssetsReady `
+              $archiveName `
+              $shaName `
+              $stableArchiveName `
+              $stableShaName `
+              $env:RELEASE_ARCHIVE `
+              $env:RELEASE_STABLE_ARCHIVE
+            Invoke-Gh release edit $tag `
               --repo $repo `
               --title $releaseTitle `
               --notes-file $env:RELEASE_NOTES `
@@ -271,6 +462,22 @@ jobs:
             gh release create $tag `
               $env:RELEASE_ARCHIVE `
               $env:RELEASE_SHA `
+              $env:RELEASE_STABLE_ARCHIVE `
+              $env:RELEASE_STABLE_SHA `
+              --repo $repo `
+              --title $releaseTitle `
+              --notes-file $env:RELEASE_NOTES
+            if ($LASTEXITCODE -ne 0) {
+              throw "Release $tag olusturulamadi."
+            }
+            Assert-ReleaseAssetsReady `
+              $archiveName `
+              $shaName `
+              $stableArchiveName `
+              $stableShaName `
+              $env:RELEASE_ARCHIVE `
+              $env:RELEASE_STABLE_ARCHIVE
+            Invoke-Gh release edit $tag `
               --repo $repo `
               --title $releaseTitle `
               --notes-file $env:RELEASE_NOTES `

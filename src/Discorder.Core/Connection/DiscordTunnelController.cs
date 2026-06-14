@@ -229,37 +229,10 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                         allowedApplications.Count.ToString(CultureInfo.InvariantCulture)
                 });
 
-            SetStatus(TunnelState.Connecting, "Discord ağına bağlanılıyor");
-            var arguments = await PrepareWireSockArgumentsAsync(
+            await StartWireSockProcessAsync(
                 wireSockExecutable,
                 profilePath,
                 cancellationToken);
-            _diagnostics.Info(
-                "controller.process",
-                "WireSock süreci başlatılıyor.",
-                new Dictionary<string, string?>
-                {
-                    ["executable"] = wireSockExecutable,
-                    ["arguments"] = string.Join(" ", arguments)
-                });
-            _wireSockProcess = _processLauncher.Start(
-                wireSockExecutable,
-                arguments,
-                Path.GetDirectoryName(wireSockExecutable)!,
-                _paths.TunnelLog);
-            _wireSockProcess.Exited += OnWireSockExited;
-
-            SetStatus(TunnelState.Verifying, "Bağlantı doğrulanıyor");
-            await Task.Delay(_startupGracePeriod, cancellationToken);
-
-            if (_wireSockProcess.HasExited)
-            {
-                var exitCode = _wireSockProcess.ExitCode;
-                await DisposeProcessAsync();
-                throw new InvalidOperationException(
-                    $"WireSock bağlantı kurulmadan kapandı. Çıkış kodu: " +
-                    $"{exitCode?.ToString(CultureInfo.InvariantCulture) ?? "bilinmiyor"}.");
-            }
 
             DiscordProcessSnapshot discordProcesses = _discordProcessManager.Capture();
             _lastDiscordProcessSnapshot = discordProcesses;
@@ -281,6 +254,19 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             _lastDiscordRestartStatus = restartStatus;
             discordProcesses = _discordProcessManager.Capture();
             _lastDiscordProcessSnapshot = discordProcesses;
+
+            if (!restart.Restarted
+                && restart.FailureKind is DiscordRestartFailureKind.UpdaterWindow)
+            {
+                restart = await TryRecoverDiscordUpdaterAsync(
+                    wireSockExecutable,
+                    profilePath,
+                    cancellationToken);
+                restartStatus = restart.Message;
+                _lastDiscordRestartStatus = restartStatus;
+                discordProcesses = _discordProcessManager.Capture();
+                _lastDiscordProcessSnapshot = discordProcesses;
+            }
 
             if (restart.Restarted)
             {
@@ -388,6 +374,113 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         {
             _operationGate.Release();
         }
+    }
+
+    private async Task StartWireSockProcessAsync(
+        string wireSockExecutable,
+        string profilePath,
+        CancellationToken cancellationToken)
+    {
+        SetStatus(TunnelState.Connecting, "Discord ağına bağlanılıyor");
+        var arguments = await PrepareWireSockArgumentsAsync(
+            wireSockExecutable,
+            profilePath,
+            cancellationToken);
+        _diagnostics.Info(
+            "controller.process",
+            "WireSock süreci başlatılıyor.",
+            new Dictionary<string, string?>
+            {
+                ["executable"] = wireSockExecutable,
+                ["arguments"] = string.Join(" ", arguments)
+            });
+        _wireSockProcess = _processLauncher.Start(
+            wireSockExecutable,
+            arguments,
+            Path.GetDirectoryName(wireSockExecutable)!,
+            _paths.TunnelLog);
+        _wireSockProcess.Exited += OnWireSockExited;
+
+        SetStatus(TunnelState.Verifying, "Bağlantı doğrulanıyor");
+        await Task.Delay(_startupGracePeriod, cancellationToken);
+
+        if (_wireSockProcess.HasExited)
+        {
+            var exitCode = _wireSockProcess.ExitCode;
+            await DisposeProcessAsync();
+            throw new InvalidOperationException(
+                $"WireSock bağlantı kurulmadan kapandı. Çıkış kodu: " +
+                $"{exitCode?.ToString(CultureInfo.InvariantCulture) ?? "bilinmiyor"}.");
+        }
+    }
+
+    private async Task<DiscordRestartResult> TryRecoverDiscordUpdaterAsync(
+        string wireSockExecutable,
+        string profilePath,
+        CancellationToken cancellationToken)
+    {
+        _diagnostics.Warning(
+            "controller.discordUpdaterRecovery",
+            "Discord güncelleme ekranında kaldı; bağlantı geçici olarak yenileniyor.");
+        SetStatus(
+            TunnelState.Verifying,
+            "Discord güncellemesi tamamlanıyor",
+            "Discord güncelleme ekranında kaldı; bağlantı kısa süre yenileniyor.");
+
+        await DisposeProcessAsync();
+        await TryClearTunnelScopeAsync("DiscordUpdaterRecovery");
+
+        var directSnapshot = _discordProcessManager.Capture();
+        _lastDiscordProcessSnapshot = directSnapshot;
+        var directRestart = await _discordProcessManager.RestartAsync(
+            directSnapshot,
+            TimeSpan.FromSeconds(4),
+            cancellationToken);
+        _diagnostics.Info(
+            "controller.discordUpdaterRecovery",
+            "Discord güncelleme recovery denemesi tamamlandı.",
+            new Dictionary<string, string?>
+            {
+                ["message"] = directRestart.Message,
+                ["diagnostic"] = directRestart.Diagnostic,
+                ["restarted"] = directRestart.Restarted.ToString()
+            });
+
+        await _accessLock.ApplyTunnelScopeAsync(
+            IncludeBrowserAccess,
+            cancellationToken);
+        await StartWireSockProcessAsync(
+            wireSockExecutable,
+            profilePath,
+            cancellationToken);
+
+        if (!directRestart.Restarted)
+        {
+            return new DiscordRestartResult(
+                false,
+                "Discord güncelleme bağlantısı tamamlanamadı. Discord'u kapatıp tekrar deneyin.",
+                directRestart.Diagnostic,
+                directRestart.FailureKind);
+        }
+
+        SetStatus(TunnelState.Verifying, "Discord bağlantısı doğrulanıyor");
+        var tunnelSnapshot = _discordProcessManager.Capture();
+        _lastDiscordProcessSnapshot = tunnelSnapshot;
+        var tunnelRestart = await _discordProcessManager.RestartAsync(
+            tunnelSnapshot,
+            TimeSpan.FromSeconds(4),
+            cancellationToken);
+
+        if (tunnelRestart.Restarted)
+        {
+            return tunnelRestart;
+        }
+
+        return new DiscordRestartResult(
+            false,
+            "Discord güncellendi ama bağlantı altında yeniden açılamadı. Tekrar deneyin.",
+            tunnelRestart.Diagnostic,
+            tunnelRestart.FailureKind);
     }
 
     private static Task<IReadOnlyList<string>> PrepareWireSockArgumentsAsync(

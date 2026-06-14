@@ -1,9 +1,17 @@
 namespace Discorder.Core.Discord;
 
+public enum DiscordRestartFailureKind
+{
+    None,
+    UpdaterWindow,
+    Unknown
+}
+
 public sealed record DiscordRestartResult(
     bool Restarted,
     string Message,
-    string? Diagnostic = null)
+    string? Diagnostic = null,
+    DiscordRestartFailureKind FailureKind = DiscordRestartFailureKind.None)
 {
     public static DiscordRestartResult NotNeeded() =>
         new(true, "Discord zaten kapalıydı.");

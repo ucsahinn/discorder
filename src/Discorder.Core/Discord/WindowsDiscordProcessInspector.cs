@@ -301,15 +301,28 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
                 string.Join("; ", failures));
         }
 
-        if (await WaitForVisibleDiscordWindowAsync(launchSpecs, cancellationToken))
+        var windowResult = await WaitForVisibleDiscordWindowAsync(
+            launchSpecs,
+            cancellationToken);
+        if (windowResult is VisibleDiscordWindowResult.MainWindow)
         {
             return new DiscordRestartResult(true, successMessage);
+        }
+
+        if (windowResult is VisibleDiscordWindowResult.UpdaterWindow)
+        {
+            return new DiscordRestartResult(
+                false,
+                "Discord güncelleme ekranında kaldı. Bağlantı kısa süre yenileniyor.",
+                "Only a trusted Discord updater window was detected; no trusted main window appeared.",
+                DiscordRestartFailureKind.UpdaterWindow);
         }
 
         return new DiscordRestartResult(
             false,
             "Discord açıldı ama pencere görünmedi. Görev çubuğundan Discord'u açın.",
-            "Discord process was launched, but no visible trusted Discord main window was detected.");
+            "Discord process was launched, but no visible trusted Discord main window was detected.",
+            DiscordRestartFailureKind.Unknown);
     }
 
     private static void ShellExecuteUnelevated(LaunchSpec launchSpec)
@@ -431,11 +444,12 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
         }
     }
 
-    private static async Task<bool> WaitForVisibleDiscordWindowAsync(
+    private static async Task<VisibleDiscordWindowResult> WaitForVisibleDiscordWindowAsync(
         IReadOnlyList<LaunchSpec> launchSpecs,
         CancellationToken cancellationToken)
     {
         var deadline = DateTimeOffset.UtcNow + LaunchVerificationTimeout;
+        var updaterWindowSeen = false;
 
         while (DateTimeOffset.UtcNow < deadline)
         {
@@ -448,9 +462,17 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
                 {
                     using (process)
                     {
-                        if (HasVisibleDiscordMainWindow(process, launchSpecs))
+                        var windowResult = GetVisibleDiscordWindowResult(
+                            process,
+                            launchSpecs);
+                        if (windowResult is VisibleDiscordWindowResult.MainWindow)
                         {
-                            return true;
+                            return VisibleDiscordWindowResult.MainWindow;
+                        }
+
+                        if (windowResult is VisibleDiscordWindowResult.UpdaterWindow)
+                        {
+                            updaterWindowSeen = true;
                         }
                     }
                 }
@@ -459,10 +481,12 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
             await Task.Delay(LaunchVerificationInterval, cancellationToken);
         }
 
-        return false;
+        return updaterWindowSeen
+            ? VisibleDiscordWindowResult.UpdaterWindow
+            : VisibleDiscordWindowResult.None;
     }
 
-    private static bool HasVisibleDiscordMainWindow(
+    private static VisibleDiscordWindowResult GetVisibleDiscordWindowResult(
         Process process,
         IReadOnlyList<LaunchSpec> launchSpecs)
     {
@@ -470,7 +494,7 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
         {
             if (process.HasExited)
             {
-                return false;
+                return VisibleDiscordWindowResult.None;
             }
 
             var executablePath = TryGetExecutablePath(process);
@@ -478,31 +502,36 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
                 || !launchSpecs.Any(spec => spec.MatchesExecutablePath(executablePath))
                 || !IsTrustedDiscordExecutable(executablePath))
             {
-                return false;
+                return VisibleDiscordWindowResult.None;
             }
 
             process.Refresh();
             var handle = process.MainWindowHandle;
             if (handle == IntPtr.Zero || !IsWindowVisible(handle))
             {
-                return false;
+                return VisibleDiscordWindowResult.None;
             }
 
             if (IsIconic(handle))
             {
                 ShowWindow(handle, RestoreWindow);
-                return false;
+                return VisibleDiscordWindowResult.None;
             }
 
             var title = process.MainWindowTitle;
-            return !title.Contains("Updater", StringComparison.OrdinalIgnoreCase)
-                && !title.Contains("Update", StringComparison.OrdinalIgnoreCase);
+            if (title.Contains("Updater", StringComparison.OrdinalIgnoreCase)
+                || title.Contains("Update", StringComparison.OrdinalIgnoreCase))
+            {
+                return VisibleDiscordWindowResult.UpdaterWindow;
+            }
+
+            return VisibleDiscordWindowResult.MainWindow;
         }
         catch (Exception exception)
             when (exception is InvalidOperationException
                 or System.ComponentModel.Win32Exception)
         {
-            return false;
+            return VisibleDiscordWindowResult.None;
         }
     }
 
@@ -927,4 +956,11 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
         IReadOnlyList<string> Failures);
 
     private sealed record RestartTarget(Process Process, string ExecutablePath);
+
+    private enum VisibleDiscordWindowResult
+    {
+        None,
+        MainWindow,
+        UpdaterWindow
+    }
 }

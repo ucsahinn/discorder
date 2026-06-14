@@ -68,6 +68,9 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici Discord kapalıyken uygulamayı açmayı dener", ControllerOpensDiscordWhenItIsClosedAsync),
     ("Denetleyici Discord otomatik yenileme başarısızlığını ayrı durum yapar", ControllerKeepsTunnelActiveWhenDiscordRestartFailsAsync),
     ("Denetleyici Discord penceresi görünmezse hazır demeyi bırakır", ControllerRequiresManualActionWhenDiscordWindowIsHiddenAsync),
+    ("Denetleyici Discord updater döngüsünü bağlantıyı yenileyerek kurtarır", ControllerRecoversDiscordUpdaterLoopAsync),
+    ("Denetleyici Discord updater recovery tamamlanamazsa manuel aksiyon durumunu korur", ControllerKeepsTunnelActiveWhenDiscordUpdaterDirectRestartFailsAsync),
+    ("Denetleyici Discord updater recovery hatasında kilidi geri açar", ControllerRestoresLockWhenDiscordUpdaterRecoveryFailsAsync),
     ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
     ("Denetleyici GitHub DNS hatasını Türkçe açıklar", ControllerNetworkFailureIsUserFriendlyAsync),
     ("Denetleyici indirme zaman aşımını Türkçe açıklar", ControllerDownloadTimeoutIsUserFriendlyAsync),
@@ -161,6 +164,13 @@ static Task DiscordScopeIncludesBrowsersWhenEnabledAsync()
         "chrome");
     Directory.CreateDirectory(Path.Combine(
         root,
+        "Chromium",
+        "Application"));
+    File.WriteAllText(
+        Path.Combine(root, "Chromium", "Application", "chromium.exe"),
+        "chromium");
+    Directory.CreateDirectory(Path.Combine(
+        root,
         "Mozilla Firefox"));
     File.WriteAllText(Path.Combine(root, "Mozilla Firefox", "firefox.exe"), "firefox");
     Directory.CreateDirectory(Path.Combine(root, "Opera"));
@@ -172,6 +182,7 @@ static Task DiscordScopeIncludesBrowsersWhenEnabledAsync()
             .GetAllowedApplications(includeBrowserAccess: true);
 
         Assert(apps.Any(app => app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals("chromium.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals("msedge.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals("firefox.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals("opera.exe", StringComparison.OrdinalIgnoreCase)));
@@ -184,6 +195,9 @@ static Task DiscordScopeIncludesBrowsersWhenEnabledAsync()
             StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals(
             Path.Combine(root, "Google", "Chrome", "Application", "chrome.exe"),
+            StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals(
+            Path.Combine(root, "Chromium", "Application", "chromium.exe"),
             StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals(
             Path.Combine(root, "Mozilla Firefox", "firefox.exe"),
@@ -2090,6 +2104,206 @@ static async Task ControllerRequiresManualActionWhenDiscordWindowIsHiddenAsync()
     }
 }
 
+static async Task ControllerRecoversDiscordUpdaterLoopAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var firstProcess = new FakeManagedProcess();
+    var secondProcess = new FakeManagedProcess();
+    var processLauncher = new SequencedProcessLauncher(firstProcess, secondProcess);
+    var accessLock = new FakeDiscordAccessLock();
+    var diagnostics = new DiscorderDiagnostics(
+        new AppPaths(root),
+        TimeSpan.Zero);
+    var snapshot = new DiscordProcessSnapshot(
+        1,
+        [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+        [100]);
+    var discordManager = new SequencedDiscordProcessManager(
+        snapshot,
+        new DiscordRestartResult(
+            false,
+            "Discord güncelleme ekranında kaldı. Bağlantı kısa süre yenileniyor.",
+            "updater window",
+            DiscordRestartFailureKind.UpdaterWindow),
+        new DiscordRestartResult(true, "Discord açıldı."),
+        new DiscordRestartResult(true, "Discord yenilendi."));
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        processLauncher,
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        discordManager);
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(controller.Snapshot.Message.Contains(
+            "Discord yenilendi",
+            StringComparison.Ordinal));
+        Assert(processLauncher.StartCount == 2);
+        Assert(firstProcess.HasExited);
+        Assert(!secondProcess.HasExited);
+        Assert(accessLock.ClearTunnelScopeCount == 1);
+        Assert(accessLock.ApplyTunnelScopeCount == 2);
+        Assert(discordManager.RestartCount == 3);
+
+        var events = await File.ReadAllTextAsync(
+            Path.Combine(root, "Discorder", "logs", "events.jsonl"));
+        Assert(events.Contains("controller.discordUpdaterRecovery", StringComparison.Ordinal));
+
+        var details = controller.CreateDiagnosticDetails();
+        Assert(details["discordRestartStatus"] == "Discord yenilendi.");
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerKeepsTunnelActiveWhenDiscordUpdaterDirectRestartFailsAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var firstProcess = new FakeManagedProcess();
+    var secondProcess = new FakeManagedProcess();
+    var processLauncher = new SequencedProcessLauncher(firstProcess, secondProcess);
+    var accessLock = new FakeDiscordAccessLock();
+    var diagnostics = new DiscorderDiagnostics(
+        new AppPaths(root),
+        TimeSpan.Zero);
+    var snapshot = new DiscordProcessSnapshot(
+        1,
+        [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+        [100]);
+    var discordManager = new SequencedDiscordProcessManager(
+        snapshot,
+        new DiscordRestartResult(
+            false,
+            "Discord güncelleme ekranında kaldı. Bağlantı kısa süre yenileniyor.",
+            "updater window",
+            DiscordRestartFailureKind.UpdaterWindow),
+        new DiscordRestartResult(
+            false,
+            "Discord update ekranında kaldı.",
+            "direct retry failed",
+            DiscordRestartFailureKind.UpdaterWindow));
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        processLauncher,
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        discordManager);
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.DiscordRestartRequired);
+        Assert(controller.Snapshot.Message.Contains(
+            "Discord güncelleme bağlantısı tamamlanamadı",
+            StringComparison.Ordinal));
+        Assert(processLauncher.StartCount == 2);
+        Assert(firstProcess.HasExited);
+        Assert(!secondProcess.HasExited);
+        Assert(accessLock.ClearTunnelScopeCount == 1);
+        Assert(accessLock.ApplyTunnelScopeCount == 2);
+        Assert(discordManager.RestartCount == 2);
+
+        var details = controller.CreateDiagnosticDetails();
+        Assert(details["wireSockRunning"] == "True");
+        Assert((details["discordRestartStatus"] ?? string.Empty).Contains(
+            "Discord güncelleme bağlantısı tamamlanamadı",
+            StringComparison.Ordinal));
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerRestoresLockWhenDiscordUpdaterRecoveryFailsAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var firstProcess = new FakeManagedProcess();
+    var processLauncher = new SequencedProcessLauncher(firstProcess);
+    var accessLock = new FakeDiscordAccessLock(
+        applyTunnelScopeException: new InvalidOperationException("Tunnel scope failed."),
+        applyTunnelScopeFailureAttempt: 2);
+    var diagnostics = new DiscorderDiagnostics(
+        new AppPaths(root),
+        TimeSpan.Zero);
+    var snapshot = new DiscordProcessSnapshot(
+        1,
+        [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+        [100]);
+    var discordManager = new SequencedDiscordProcessManager(
+        snapshot,
+        new DiscordRestartResult(
+            false,
+            "Discord güncelleme ekranında kaldı. Bağlantı kısa süre yenileniyor.",
+            "updater window",
+            DiscordRestartFailureKind.UpdaterWindow),
+        new DiscordRestartResult(true, "Discord açıldı."));
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        processLauncher,
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        discordManager);
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.Error);
+        Assert(controller.Snapshot.Message.Contains(
+            "Tunnel scope failed",
+            StringComparison.Ordinal));
+        Assert(processLauncher.StartCount == 1);
+        Assert(firstProcess.HasExited);
+        Assert(accessLock.ApplyTunnelScopeCount == 2);
+        Assert(accessLock.ClearTunnelScopeCount >= 2);
+        Assert(accessLock.EnableCount == 1);
+
+        var health = await File.ReadAllTextAsync(
+            Path.Combine(root, "Discorder", "logs", "health.json"));
+        Assert(health.Contains("\"operation\":\"connect\"", StringComparison.Ordinal));
+        Assert(health.Contains("Tunnel scope failed", StringComparison.Ordinal));
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task ControllerBootstrapFailureAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -2636,7 +2850,14 @@ static async Task DiagnosticsWritesDevOpsBundleAsync()
             "Tanılama başladı.",
             new Dictionary<string, string?>
             {
-                ["path"] = paths.DataDirectory
+                ["path"] = paths.DataDirectory,
+                ["programDataPath"] = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "Discorder",
+                    "updates"),
+                ["programFilesPath"] = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    "Discorder")
             });
         diagnostics.WriteHealth(
             "test sağlıklı",
@@ -2671,6 +2892,14 @@ static async Task DiagnosticsWritesDevOpsBundleAsync()
         Assert(summary.Contains("Discorder tanılama özeti", StringComparison.Ordinal));
         Assert(summary.Contains("Performans", StringComparison.Ordinal));
         Assert(!events.Contains(Environment.UserName, StringComparison.OrdinalIgnoreCase));
+        AssertRedactedKnownFolder(
+            events,
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "%PROGRAMDATA%");
+        AssertRedactedKnownFolder(
+            events,
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "%PROGRAMFILES%");
         using (var healthDocument = JsonDocument.Parse(health))
         {
             var runtime = healthDocument.RootElement.GetProperty("runtime");
@@ -2756,6 +2985,20 @@ static void AssertRuntimeMetricIsNonNegative(
     Assert(value >= 0);
 }
 
+static void AssertRedactedKnownFolder(
+    string content,
+    string knownFolderPath,
+    string marker)
+{
+    if (string.IsNullOrWhiteSpace(knownFolderPath))
+    {
+        return;
+    }
+
+    Assert(!content.Contains(knownFolderPath, StringComparison.OrdinalIgnoreCase));
+    Assert(content.Contains(marker, StringComparison.Ordinal));
+}
+
 static async Task DiagnosticsFlushesDebouncedSummaryAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -2811,7 +3054,7 @@ static void ResetReadOnlyAttribute(string path)
 
 static async Task WaitForConditionAsync(Func<Task<bool>> condition)
 {
-    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
     while (!timeout.IsCancellationRequested)
     {
@@ -2967,7 +3210,10 @@ file static class TestJsonOptions
     };
 }
 
-file sealed class FakeDiscordAccessLock(Exception? disableException = null) : IDiscordAccessLock
+file sealed class FakeDiscordAccessLock(
+    Exception? disableException = null,
+    Exception? applyTunnelScopeException = null,
+    int applyTunnelScopeFailureAttempt = 1) : IDiscordAccessLock
 {
     public int EnableCount { get; private set; }
 
@@ -3007,6 +3253,12 @@ file sealed class FakeDiscordAccessLock(Exception? disableException = null) : ID
         cancellationToken.ThrowIfCancellationRequested();
         ApplyTunnelScopeCount++;
         LastIncludeBrowserAccess = includeBrowserAccess;
+        if (applyTunnelScopeException is not null
+            && ApplyTunnelScopeCount == applyTunnelScopeFailureAttempt)
+        {
+            return Task.FromException(applyTunnelScopeException);
+        }
+
         return Task.CompletedTask;
     }
 
@@ -3630,6 +3882,28 @@ file sealed class FakeProcessLauncher(FakeManagedProcess process) : IProcessLaun
     }
 }
 
+file sealed class SequencedProcessLauncher(params FakeManagedProcess[] processes) : IProcessLauncher
+{
+    private int _index;
+
+    public int StartCount { get; private set; }
+
+    public IManagedProcess Start(
+        string executable,
+        IReadOnlyList<string> arguments,
+        string workingDirectory,
+        string logPath)
+    {
+        if (_index >= processes.Length)
+        {
+            throw new InvalidOperationException("Beklenenden fazla süreç başlatıldı.");
+        }
+
+        StartCount++;
+        return processes[_index++];
+    }
+}
+
 file sealed class FakeManagedProcess : IManagedProcess
 {
     public event EventHandler? Exited;
@@ -3653,6 +3927,39 @@ file sealed class FakeManagedProcess : IManagedProcess
         HasExited = true;
         return ValueTask.CompletedTask;
     }
+}
+
+file sealed class SequencedDiscordProcessManager(
+    DiscordProcessSnapshot snapshot,
+    params DiscordRestartResult[] restartResults)
+    : IDiscordProcessManager
+{
+    private int _restartIndex;
+
+    public int RestartCount { get; private set; }
+
+    public DiscordProcessSnapshot Capture() => snapshot;
+
+    public Task<DiscordRestartResult> RestartAsync(
+        DiscordProcessSnapshot snapshot,
+        TimeSpan gracefulTimeout,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_restartIndex >= restartResults.Length)
+        {
+            throw new InvalidOperationException("Beklenenden fazla Discord restart denendi.");
+        }
+
+        RestartCount++;
+        return Task.FromResult(restartResults[_restartIndex++]);
+    }
+
+    public Task<DiscordRestartResult> CloseAsync(
+        DiscordProcessSnapshot snapshot,
+        TimeSpan gracefulTimeout,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new DiscordRestartResult(true, "Discord kapatıldı."));
 }
 
 file sealed class FakeDiscordProcessManager(

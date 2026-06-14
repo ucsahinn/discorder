@@ -1229,9 +1229,17 @@ public partial class MainWindow : Window, IDisposable
         {
             _paths.EnsureDirectories();
             _diagnostics.Info("ui.diagnostics", "Tanılama istendi.");
+            var details = new Dictionary<string, string?>(
+                _controller.CreateDiagnosticDetails(),
+                StringComparer.Ordinal);
+            foreach (var detail in PortableInstallDiagnostics.Capture())
+            {
+                details[detail.Key] = detail.Value;
+            }
+
             _diagnostics.WriteHealth(
                 "tanılama istendi",
-                _controller.CreateDiagnosticDetails());
+                details);
             var bundlePath = _diagnostics.CreateBundle();
             var bundleDirectory = !string.IsNullOrWhiteSpace(bundlePath)
                 ? Path.GetDirectoryName(bundlePath)
@@ -1433,13 +1441,7 @@ public partial class MainWindow : Window, IDisposable
             _diagnostics.Info(
                 "ui.update.prepared",
                 "Güncelleme paketi hazırlandı.",
-                new Dictionary<string, string?>
-                {
-                    ["latestVersion"] = AppUpdateService.FormatVersion(update.LatestVersion),
-                    ["packagePath"] = update.PackagePath,
-                    ["payloadDirectory"] = update.PayloadDirectory,
-                    ["expectedSha256"] = update.ExpectedSha256
-                });
+                CreateUpdateDiagnosticDetails(update));
 
             await StartUpdateApplicatorAsync(
                 update,
@@ -1521,6 +1523,11 @@ public partial class MainWindow : Window, IDisposable
         startInfo.ArgumentList.Add("--log");
         startInfo.ArgumentList.Add(Path.Combine(_paths.LogDirectory, "update.log"));
 
+        _diagnostics.Info(
+            "ui.update.apply",
+            "Güncelleme uygulayıcısı başlatılıyor.",
+            CreateUpdateDiagnosticDetails(update));
+
         var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException(
                 "Güncelleme uygulayıcısı başlatılamadı.");
@@ -1551,6 +1558,25 @@ public partial class MainWindow : Window, IDisposable
                     ["detail"] = progress.Detail
                 });
         }
+    }
+
+    private static Dictionary<string, string?> CreateUpdateDiagnosticDetails(
+        AppUpdatePreparation update)
+    {
+        var details = new Dictionary<string, string?>
+        {
+            ["latestVersion"] = AppUpdateService.FormatVersion(update.LatestVersion),
+            ["packagePath"] = update.PackagePath,
+            ["payloadDirectory"] = update.PayloadDirectory,
+            ["expectedSha256"] = update.ExpectedSha256
+        };
+
+        foreach (var detail in PortableInstallDiagnostics.Capture())
+        {
+            details[detail.Key] = detail.Value;
+        }
+
+        return details;
     }
 
     private void ResetUpdateProgressLogThrottle()
